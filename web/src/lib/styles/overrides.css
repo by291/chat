@@ -1,0 +1,23 @@
+/* Final theme and mobile-navigation overrides; cascade order is intentional. */
+
+[data-theme='dark'] {
+  --surface: #182622;
+  --background: #101c18;
+  --line: #2c3c34;
+  --muted: #91a89b;
+  --text: #dce9e1;
+  --soft: #243a30;
+  --accent: #67c4a6;
+  --accent-hover: #4ab08f;
+  --danger: #ed9da1;
+  color: var(--text);
+  background: var(--background);
+}
+.mobile-back {
+  display: none;
+}
+@media (max-width: 700px) {
+  .mobile-back {
+    display: grid;
+  }
+}

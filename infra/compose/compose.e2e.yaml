@@ -1,0 +1,13 @@
+services:
+  postgres:
+    ports: !override ["127.0.0.1:55433:5432"]
+  valkey:
+    ports: !override ["127.0.0.1:56380:6379"]
+  centrifugo:
+    ports: !override ["127.0.0.1:8001:8000"]
+    environment:
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: http://localhost:5174
+      CENTRIFUGO_CLIENT_PROXY_CONNECT_ENDPOINT: http://host.docker.internal:18081/internal/centrifugo/connect
+      CENTRIFUGO_CLIENT_PROXY_REFRESH_ENDPOINT: http://host.docker.internal:18081/internal/centrifugo/refresh
+  seaweedfs:
+    ports: !override ["127.0.0.1:8334:8333"]

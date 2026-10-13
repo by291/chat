@@ -1,0 +1,63 @@
+/* Authenticated application frame and navigation rail. */
+
+.app-frame {
+  display: flex;
+  height: 100dvh;
+  overflow: hidden;
+}
+.app-rail {
+  width: 76px;
+  border-right: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  background: var(--surface);
+  padding: 24px 0;
+  flex-shrink: 0;
+}
+.rail-bottom {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-direction: column;
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: #dcece2;
+  color: #447b60;
+  font-weight: 650;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+}
+.avatar.small {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+.app-content {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  overflow: auto;
+}
+.empty-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 30px;
+  text-align: center;
+}
+.empty-page h1 {
+  font-size: 28px;
+}
+.empty-page p {
+  font-size: 14px;
+}

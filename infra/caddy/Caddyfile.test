@@ -1,0 +1,34 @@
+{$CHAT_DOMAIN} {
+    tls internal
+    encode zstd gzip
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy same-origin
+        X-Frame-Options DENY
+        Content-Security-Policy "frame-ancestors 'none'"
+    }
+    @internal path /internal/* /metrics /api /api/*
+    @api path /api/v1/* /health/*
+    @socket path /connection/websocket
+    # Only the explicit application API is public. Centrifugo's HTTP API stays private.
+    route {
+        handle @api {
+            reverse_proxy api:8080 {
+                header_up X-Forwarded-For {http.request.remote.host}
+            }
+        }
+        handle @socket {
+            reverse_proxy centrifugo:8000
+        }
+        handle @internal {
+            respond "Not found" 404
+        }
+        handle {
+            root * /srv
+            @assets path /_app/immutable/*
+            header @assets Cache-Control "public, max-age=31536000, immutable"
+            try_files {path} /index.html
+            file_server
+        }
+    }
+}

@@ -1,0 +1,61 @@
+{
+  "name": "chat-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "imports": {
+    "#lib": "./src/lib/index.ts",
+    "#lib/api-client": "./src/lib/api-client/index.ts",
+    "#lib/*": "./src/lib/*"
+  },
+  "packageManager": "pnpm@12.11.2",
+  "engines": {
+    "node": ">=24.21.0"
+  },
+  "scripts": {
+    "dev": "vite --host localhost",
+    "build": "vite build",
+    "preview": "vite preview --host localhost",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "lint": "prettier --check src tests e2e *.ts *.json",
+    "format": "prettier --write src tests e2e *.ts *.json",
+    "e2e": "playwright test",
+    "test:realtime-auth": "vitest run --config vitest.integration.config.ts tests/integration/realtime-auth.test.ts",
+    "test:delivery": "vitest run --config vitest.integration.config.ts tests/integration/delivery.test.ts",
+    "test:ephemeral": "vitest run --config vitest.integration.config.ts tests/integration/ephemeral.test.ts",
+    "api:generate": "node ../scripts/generate-api.mjs",
+    "api:check": "node ../scripts/generate-api.mjs --check",
+    "test:e2e": "playwright test",
+    "test:deployment": "playwright test --config playwright.deployment.config.ts",
+    "test:backup": "vitest run --config vitest.integration.config.ts tests/integration/backup-restore.test.ts"
+  },
+  "dependencies": {
+    "@lucide/svelte": "1.55.0",
+    "@tanstack/svelte-query": "6.3.2",
+    "bits-ui": "2.19.5",
+    "centrifuge": "5.7.4",
+    "openapi-fetch": "0.17.0",
+    "svelte": "5.57.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@sveltejs/adapter-static": "4.0.0",
+    "@sveltejs/kit": "3.0.1",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.2",
+    "openapi-typescript": "7.13.0",
+    "pg": "^8.23.1",
+    "prettier": "3.9.10",
+    "prettier-plugin-svelte": "4.1.1",
+    "svelte-check": "4.7.6",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vite": "8.3.4",
+    "vitest": "5.0.4",
+    "ws": "^8.22.0"
+  }
+}

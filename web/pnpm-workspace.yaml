@@ -1,0 +1,8 @@
+allowBuilds:
+  protobufjs: true
+minimumReleaseAgeExclude:
+  - '@vitest/mocker@5.0.4'
+  - '@vitest/spy@5.0.4'
+  - vitest@5.0.4
+  - '@tanstack/query-core@5.104.2'
+  - '@tanstack/svelte-query@6.3.2'

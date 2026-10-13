@@ -1,0 +1,2 @@
+# Keep source and tooling files consistent with rustfmt and Prettier.
+* text=auto eol=lf

@@ -1,0 +1,12 @@
+{
+  "engine": { "type": "redis", "redis": { "address": "redis://valkey:6379" } },
+  "client": {
+    "allowed_origins": ["http://localhost:5173"],
+    "proxy": {
+      "connect": {"enabled": true, "endpoint": "http://host.docker.internal:8081/internal/centrifugo/connect", "timeout": "3s", "http_headers": ["Cookie", "Origin"]},
+      "refresh": {"enabled": true, "endpoint": "http://host.docker.internal:8081/internal/centrifugo/refresh", "timeout": "3s", "include_connection_meta": true}
+    }
+  },
+  "channel": { "namespaces": [{ "name": "personal", "allow_user_limited_channels": true, "presence": true, "history_size": 100, "history_ttl": "300s", "force_recovery": true }] },
+  "http_api": { "key": "" }
+}
