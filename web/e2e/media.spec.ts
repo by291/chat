@@ -112,7 +112,7 @@ test('real signed uploads report progress, retry and send image/files with avata
     ).toBeVisible();
     await peer.setViewportSize({ width: 390, height: 844 });
     await peer.screenshot({
-      path: '../.superpowers/sdd/2026-10-13-seaweedfs-media/media-mobile.png',
+      path: test.info().outputPath('media-mobile.png'),
     });
   } finally {
     await context.close();

@@ -74,9 +74,9 @@ changes. Do not use `--overwrite` without comparing the existing local adaptatio
 CLI versions are pinned in the package manifest and lockfile; component source is
 owned by this repository and is not automatically updated by a package upgrade.
 
-Run `./scripts/check.ps1` at the repository root. UI migrations should also run the
+Run `node scripts/check.mjs` at the repository root. UI migrations should also run the
 existing browser suite, including forms, keyboard composition, dialogs, settings,
 groups and media. For deployed changes, check an already deployed HTTPS staging
-application with `./scripts/production-test.ps1 -Prepare` and
+application with
 `pnpm -C web test:deployment`. Configure its origins and invitations using
 [the deployment guide](../operations/deployment.md); the checks do not build images.

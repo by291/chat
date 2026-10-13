@@ -56,7 +56,7 @@ pub async fn spawn_test_app_with_config(mut config: Config) -> TestApp {
     let admin_url = config.database_url.clone();
     assert!(
         admin_url.contains("@127.0.0.1:55433/"),
-        "Rust integration tests require the isolated test PostgreSQL; run scripts/check.ps1"
+        "Rust integration tests require the isolated test PostgreSQL; run node scripts/check.mjs"
     );
     let admin = PgPool::connect(&config.database_url).await.unwrap();
     let database = format!("test_{}", uuid::Uuid::new_v4().simple());

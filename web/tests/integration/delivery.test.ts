@@ -94,10 +94,7 @@ test('committed messages survive a stopped worker and duplicate publication does
 });
 test('a real worker crash after publish replays the leased head before later messages', async () => {
   // Stop the normal worker from the previous scenario, preserving the saved messages.
-  if (stack.workerPid) {
-    process.kill(stack.workerPid);
-    stack.workerPid = null;
-  }
+  await stack.stopWorker();
   const a = await account(stack);
   const b = await account(stack);
   const client = sdk(stack, b.cookie);
@@ -124,16 +121,13 @@ test('a real worker crash after publish replays the leased head before later mes
     await startWorker(stack, true);
     await eventually(async () => {
       try {
-        await readFile(
-          stack.envFile.replace('stack.env', 'published-marker.json'),
-        );
+        await readFile(stack.publishedMarker);
         return true;
       } catch {
         return false;
       }
     });
-    process.kill(stack.workerPid!);
-    stack.workerPid = null;
+    await stack.stopWorker();
     expect(seen.some((e) => e.kind === 'conversation.created')).toBe(true);
     expect(seen.some((e) => e.kind === 'message.created')).toBe(false);
     // Advance only this isolated test database lease to model the 30 second reclaim deadline.

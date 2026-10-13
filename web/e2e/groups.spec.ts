@@ -202,7 +202,7 @@ test('three browsers manage a private group and rejoining hides the old episode'
       .getByRole('textbox', { name: '输入消息' })
       .dispatchEvent('compositionend');
     await guest.screenshot({
-      path: '../.superpowers/sdd/2026-10-13-private-groups/group-mobile.png',
+      path: test.info().outputPath('group-mobile.png'),
     });
   } finally {
     await memberContext.close();

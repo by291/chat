@@ -53,8 +53,8 @@ See [implementation decisions](implementation-decisions.md) for phase boundaries
 The 2026-10-13 refactor keeps the same contracts and behavior. English conventions,
 logical paragraphs and explanatory invariants are recorded in root `AGENTS.md`;
 [the architecture guide](../architecture.md) describes code ownership. Boundary
-checks are now part of `check.ps1`. Source snapshots and current verification logs
-live in `.superpowers/sdd/2026-10-13-code-architecture-and-readability/`.
+checks were part of `check.ps1` at that time. Source snapshots and verification logs
+from that run live in `.superpowers/sdd/2026-10-13-code-architecture-and-readability/`.
 
 Final post-review verification on 2026-10-13 passed all 76 cases: 4 architecture
 guards, 36 Rust, 9 frontend units, 6 real SDK, 18 browser, 2 rebuilt Linux HTTPS,

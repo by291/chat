@@ -135,8 +135,8 @@ Backups coordinate all writers and media ingress at a common recovery point.
   thumbnails/avatars, associations and pending jobs in a fresh isolated stack.
 - [ ] Extend Linux CI storage prerequisites/portable test startup as needed by new tests;
   preserve the shared check entry and document actual automated vs local coverage.
-- [ ] Run `./scripts/check.ps1 -IncludeIntegration`, rebuilt
-  `./scripts/production-test.ps1 -Prepare`, and `pnpm -C web test:deployment`; expect
+- [ ] Run `node scripts/check.mjs --integration`, build and deploy to configured
+  staging, and run `pnpm -C web test:deployment`; expect
   all baseline/new cases green. Inspect desktop/mobile media UI and clean only owned resources.
 - [ ] Record exact test counts/results, version pins, limits, deployment and recovery
   commands in architecture/operations/acceptance docs. Obtain one fresh full review,

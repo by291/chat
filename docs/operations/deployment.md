@@ -135,9 +135,12 @@ $env:CHAT_DEPLOYMENT_ORIGIN='https://staging.example.com'
 $env:CHAT_DEPLOYMENT_MEDIA_ORIGIN='https://media-staging.example.com'
 $env:CHAT_DEPLOYMENT_INVITE_1='<first-fresh-staging-invitation>'
 $env:CHAT_DEPLOYMENT_INVITE_2='<second-fresh-staging-invitation>'
-./scripts/production-test.ps1 -Prepare
 pnpm -C web test:deployment
 ```
+
+On POSIX shells, use `export NAME='value'` for the same four environment variables.
+The test command is identical on Windows, Linux and macOS. Its first scenario checks
+`/health/ready` before exercising HTTPS routing and authentication.
 
 Generate the two invitations with the deployed staging `admin invite`; each run
 consumes them and creates two fixture accounts, a conversation and media objects.
@@ -154,8 +157,8 @@ or storage upgrades. Close public mutation/media PUT ingress, drain API and work
 then take the database dump and a stopped storage snapshot. Restart dependencies,
 API and worker before reopening ingress. Keep the matching protected configuration
 with each backup, and verify recovery into an isolated environment before relying
-on it. See [backup and restore](backup-restore.md) for the local development utility.
-A native/hosted deployment uses its provider or host tools for the same procedure.
+on it. See [backup and recovery](backup-restore.md) for the operator procedure and
+automated local recovery drill. Use provider or host tools for production snapshots.
 
 Migrations run on API startup. Keep existing migrations immutable and check schema
 compatibility before rolling back binaries. Persist service data across upgrades;

@@ -1,30 +1,32 @@
 # Continuous integration
 
-`.github/workflows/ci.yml` runs `scripts/check.ps1` on pushes, pull requests targeting
-`main`, and manual dispatch. The runner is Ubuntu 24.04; Rust, Node, pnpm and action
-references stay pinned by the repository.
+`.github/workflows/ci.yml` runs `node scripts/check.mjs --integration` on pushes,
+pull requests targeting `main`, and manual dispatch. The runner is Ubuntu 24.04;
+Rust, Node, pnpm and action references stay pinned by the repository. The workflow
+installs Chromium and its Linux dependencies before running browser scenarios.
 
-Local and CI checks use the root `compose.yaml` as the only middleware definition.
-`scripts/e2e.ps1 -PrepareInfrastructure` starts the independent `chat-test` project
-with test-only credentials, separate ports and volumes. Its configuration is derived
-from `.env.example`; development `.env` and production secrets are not read. The
-check entry point loads that environment for Rust tests, which create randomly
-named databases and buckets inside the test instance.
+Local and CI checks share the root `compose.yaml` and the same Node entry point.
+Test helpers start `chat-test` with separate credentials, ports and volumes derived
+from `.env.example`; development `.env` and production secrets are not read. Rust
+tests create unique databases and buckets. SDK/browser suites run native API and
+worker processes with fixture-owned data; recovery tests restore into a fresh
+`chat-restore-drill-*` project. Linux callback listeners are reachable from the
+Docker bridge and authenticated with test-only internal credentials.
 
-The shared command covers architecture guards, fmt/clippy, all Rust cases including
-real media/association tests, Svelte types, formatting, generated API consistency,
-frontend units and the static build. It shuts down only `chat-test` in `finally`.
-The workflow repeats that cleanup after interruption. Compose service health checks
-bound dependency startup; the job timeout is 30 minutes.
+The command covers architecture guards, fmt/clippy, real Rust media/association
+tests, Svelte types, formatting, generated API consistency, frontend units, the
+static build, SDK integration, recovery and browser scenarios. Each fixture owns
+its subprocesses; middleware stops in `finally`. The workflow repeats `chat-test`
+shutdown after interruption. Dependency health checks bound startup; the job timeout
+is 30 minutes. Logs and fixture configuration live in `.local/tests/`.
 
-The base CI does not run the Windows native SDK/browser/recovery launcher.
-`./scripts/check.ps1 -IncludeIntegration` adds those suites locally using the same
-infrastructure. HTTPS checks target an already deployed staging application as
-specified in [deployment](deployment.md), rather than a separate Compose stack.
+The base local command `node scripts/check.mjs` omits SDK/recovery/browser suites.
+HTTPS checks remain separate and target an operator-provided staging deployment;
+see [deployment](deployment.md). CI does not provision production infrastructure.
 
 The token has `contents: read`; checkout does not persist Git credentials. The
 workflow does not deploy or publish images. Writing a workflow is not an Actions
-run: inspect its first hosted run after an explicitly requested push. Local check
-results do not establish the hosted runner's installation or network behavior.
+run: inspect its first hosted run after an explicitly requested push. Local results
+do not establish the hosted runner's installation or network behavior.
 
 Validate workflow syntax with `actionlint .github/workflows/ci.yml` when available.

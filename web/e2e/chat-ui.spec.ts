@@ -64,7 +64,7 @@ test('two users find each other, send messages and preserve keyboard/IME behavio
       peer.getByRole('log').getByText('第一行\na', { exact: true }),
     ).toBeVisible();
     await page.screenshot({
-      path: '../.superpowers/sdd/2026-10-12-phase-1-private-chat/chat-desktop.png',
+      path: test.info().outputPath('chat-desktop.png'),
     });
   } finally {
     await context.close();
@@ -79,7 +79,7 @@ test('mobile navigation preserves the conversation and unsent draft', async ({
   try {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({
-      path: '../.superpowers/sdd/2026-10-12-phase-1-private-chat/chat-mobile.png',
+      path: test.info().outputPath('chat-mobile.png'),
     });
     const route = page.url();
     await page.getByRole('textbox', { name: '输入消息' }).fill('还没说完的话');

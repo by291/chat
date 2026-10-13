@@ -115,7 +115,7 @@ DTO intact and add a group summary variant, with query-cache-owned roster record
   IME/mobile behavior, and recoverable ordered fanout with the actual worker.
 - [ ] Run the new cases before claiming acceptance; fix behavioral failures with a
   regression RED→GREEN cycle, not timeout inflation.
-- [ ] Run `./scripts/check.ps1 -IncludeIntegration`; expect all old and new cases green.
+- [ ] Run `node scripts/check.mjs --integration`; expect all old and new cases green.
 - [ ] Update architecture and operations with actual endpoints, role/join policy and results.
   Carry the group membership interface into media; full rebuilt deployment is validated
   once more after media wiring, avoiding duplicate unchanged image builds.

@@ -9,7 +9,7 @@ import {
   rustLayerSourceViolations,
   rustSqlSourceViolations,
   rustSqlViolations,
-} from "../scripts/architecture-rules.mjs";
+} from "./architecture-rules.mjs";
 
 test("named workflow repositories own SQL but HTTP and services cannot", () => {
   const source = 'sqlx::query("SELECT 1");';

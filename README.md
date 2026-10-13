@@ -23,7 +23,7 @@ Comments and documentation are English; product localization remains Chinese.
 - [Production deployment](docs/operations/deployment.md)
 - [Continuous integration](docs/operations/continuous-integration.md)
 - [Private groups and media](docs/operations/groups-and-media.md)
-- [Backup and isolated restore](docs/operations/backup-restore.md)
+- [Backup and recovery](docs/operations/backup-restore.md)
 - [Phase-one acceptance](docs/operations/phase-1-acceptance.md)
 - [Groups and media acceptance](docs/operations/phase-2-acceptance.md)
 - [Implementation decisions](docs/operations/implementation-decisions.md)

@@ -6,12 +6,9 @@ import {
   sdk,
   type IntegrationStack,
 } from '../tests/integration/support';
-import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import type { Browser, Page } from '@playwright/test';
-const root = fileURLToPath(new URL('../../', import.meta.url));
 test.setTimeout(60000);
 async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   const context = await browser.newContext();
@@ -46,46 +43,6 @@ async function send(page: Page, body: string) {
   await page.getByRole('textbox', { name: '输入消息' }).fill(body);
   await page.getByRole('textbox', { name: '输入消息' }).press('Enter');
 }
-async function stopWorker(stack: IntegrationStack) {
-  const owned = stack.workerPid!;
-  process.kill(owned);
-  await eventually(async () => {
-    try {
-      process.kill(owned, 0);
-      return false;
-    } catch {
-      return true;
-    }
-  });
-  stack.workerPid = null;
-}
-async function infrastructure(
-  stack: IntegrationStack,
-  operation: 'stop' | 'start',
-  service: 'valkey' | 'centrifugo',
-) {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      'docker',
-      [
-        'compose',
-        '--project-name',
-        'chat-test',
-        '--env-file',
-        stack.envFile,
-        operation,
-        service,
-      ],
-      { cwd: root, stdio: 'ignore', windowsHide: true },
-    );
-    child.once('error', reject);
-    child.once('exit', (code) =>
-      code === 0
-        ? resolve()
-        : reject(new Error(`Test service ${operation} failed`)),
-    );
-  });
-}
 test('lost HTTP response retries the same message ID and saves exactly once', async ({
   page,
   browser,
@@ -93,7 +50,7 @@ test('lost HTTP response retries the same message ID and saves exactly once', as
 }) => {
   const { peer, context } = await pair(page, browser, stack);
   try {
-    await stopWorker(stack);
+    await stack.stopWorker();
     let clientId = '',
       lost = false;
     await page.route('**/api/v1/conversations/*/messages', async (route) => {
@@ -164,18 +121,13 @@ test('publish-before-ack worker crash gives duplicate notices but one displayed 
           )
         ).rows[0].n === 0,
     );
-    await stopWorker(stack);
+    await stack.stopWorker();
     await send(page, 'worker 崩溃后仍只有一条');
     await startWorker(stack, true);
     let marker: { job_id: string } | undefined;
     await eventually(async () => {
       try {
-        marker = JSON.parse(
-          await readFile(
-            `${root}/.superpowers/sdd/2026-10-12-phase-1-private-chat/integration/published-marker.json`,
-            'utf8',
-          ),
-        );
+        marker = JSON.parse(await readFile(stack.publishedMarker, 'utf8'));
         return true;
       } catch {
         return false;
@@ -186,7 +138,7 @@ test('publish-before-ack worker crash gives duplicate notices but one displayed 
         .getByRole('log')
         .getByText('worker 崩溃后仍只有一条', { exact: true }),
     ).toHaveCount(1);
-    await stopWorker(stack);
+    await stack.stopWorker();
     await stack.db.query(
       "UPDATE outbox SET lease_until=now()-interval '1 second' WHERE job_id=$1",
       [marker!.job_id],
@@ -351,7 +303,7 @@ test('Valkey outage rejects critical writes while committed history stays readab
       peer.getByRole('log').getByText('Valkey 停止前的历史', { exact: true }),
     ).toBeVisible();
     const session = await cookie(page);
-    await infrastructure(stack, 'stop', 'valkey');
+    await stack.service('stop', 'valkey');
     stopped = true;
     const response = await api(
       stack,
@@ -368,7 +320,7 @@ test('Valkey outage rejects critical writes while committed history stays readab
       (await history.json()).items.map((m: { body: string }) => m.body),
     ).toContain('Valkey 停止前的历史');
   } finally {
-    if (stopped) await infrastructure(stack, 'start', 'valkey');
+    if (stopped) await stack.service('start', 'valkey');
     await context.close();
   }
 });
@@ -380,7 +332,7 @@ test('Centrifugo outage still commits messages and worker delivers after restart
   const { peer, context, id } = await pair(page, browser, stack);
   let stopped = false;
   try {
-    await infrastructure(stack, 'stop', 'centrifugo');
+    await stack.service('stop', 'centrifugo');
     stopped = true;
     const response = await api(
       stack,
@@ -394,7 +346,7 @@ test('Centrifugo outage still commits messages and worker delivers after restart
       (await stack.db.query('SELECT count(*)::int AS n FROM messages')).rows[0]
         .n,
     ).toBe(1);
-    await infrastructure(stack, 'start', 'centrifugo');
+    await stack.service('start', 'centrifugo');
     stopped = false;
     await expect(
       peer.getByRole('log').getByText('实时服务恢复后的消息', { exact: true }),
@@ -409,7 +361,7 @@ test('Centrifugo outage still commits messages and worker delivers after restart
       30000,
     );
   } finally {
-    if (stopped) await infrastructure(stack, 'start', 'centrifugo');
+    if (stopped) await stack.service('start', 'centrifugo');
     await context.close();
   }
 });
@@ -459,7 +411,7 @@ test('foreground restoration catches missed messages without reconnect or a peri
     await expect(page.getByText('已连接', { exact: true })).toBeVisible();
     let reconnects = 0;
     page.on('websocket', () => reconnects++);
-    await stopWorker(stack);
+    await stack.stopWorker();
     const result = await api(
       stack,
       await cookie(peer),

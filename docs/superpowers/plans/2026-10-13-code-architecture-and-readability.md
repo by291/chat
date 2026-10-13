@@ -1,5 +1,8 @@
 # Code architecture and readability implementation plan
 
+This completed plan is retained as historical context. Current tooling commands
+are documented in [development](../../operations/development.md).
+
 > **For agentic workers:** Use `superpowers:executing-plans` to implement this plan
 > inline, with one fresh whole-project review at the end. Checkboxes track completion.
 

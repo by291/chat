@@ -1,55 +1,65 @@
-# Backup and isolated restore
+# Backup and recovery
 
-The local utility backs up the root Compose development infrastructure and restores
-it into a fresh project using that same `compose.yaml`:
+Use the deployment's database/storage snapshot tools and process manager. This
+repository provides an automated recovery test; it does not provide a production
+backup or restore CLI. Production does not require Compose.
 
-```powershell
-./scripts/backup.ps1 -OutputDirectory './backups/2026-10-13'
-./scripts/restore.ps1 -BackupDirectory './backups/2026-10-13' -ProjectName chat-restore-drill
+## Establish a consistent recovery point
+
+1. Close public mutation and media PUT ingress. Existing signed upload grants can
+   remain valid until expiry, so block transfers at the media proxy as well.
+2. Gracefully stop API and worker writers. Allow up to 90 seconds for in-flight
+   transactions and storage operations to drain. A failed drain invalidates the
+   recovery point; do not label that snapshot consistent.
+3. Create a PostgreSQL custom-format dump or equivalent provider snapshot while
+   application writers remain stopped.
+4. Stop SeaweedFS and snapshot its master, filer metadata and volume files together,
+   or use a storage-provider mechanism with equivalent consistency guarantees.
+   Copying live volume files independently does not establish attachment consistency.
+5. Store the matching application/S3 configuration, versions and a SHA256 manifest
+   with the database and storage snapshots. Record the shutdown/snapshot times and
+   whether both writers and PUT ingress were quiesced.
+6. Restart storage and dependencies, then API and worker. Verify readiness before
+   reopening mutation/media ingress.
+
+Protect backups as private account and message data. Configuration contains secrets;
+restrict access and encrypt off-site copies. Follow a retention policy appropriate
+to the deployment, and measure recovery time with regular isolated drills.
+
+## Restore into an isolated environment
+
+1. Verify the manifest and checksums before restoring. Use an empty target with its
+   own database, storage volumes, service addresses and credentials. Never restore
+   over a live instance to perform a drill.
+2. Restore PostgreSQL and the corresponding SeaweedFS snapshot. Use the matching
+   application/schema version; migrations run at API startup. Check compatibility
+   before letting a newer binary apply migrations.
+3. Configure the restored API and worker to use only restored services. Keep public
+   ingress closed and prevent restored sessions from reconnecting to live services.
+4. Start API, then worker. Validate original-password login, revoked-session
+   rejection, message history, attachment associations, original/thumbnail/file/avatar
+   bytes, and processing of uploads queued at the recovery point.
+5. Verify realtime recovery: PostgreSQL holds durable events; Valkey holds temporary
+   rates, presence and transport history. Clients recover persisted events through
+   REST even when Valkey history is empty.
+6. Record results and timings. Reopen ingress only when performing an intentional
+   cutover; dispose of an isolated drill's resources according to the host policy.
+
+## Automated development drill
+
+```sh
+pnpm -C web test:backup
 ```
 
-The default source is `chat-dev` using `.env`. Launcher-owned native writers are
-recognized through `.superpowers/dev/processes.json`. Use `-EnvFile`, `-ProjectName`,
-`-DatabaseName` and `-ProcessStateFile` for a test stack. A manually started API/worker
-must be stopped before backup; the utility cannot discover unrelated processes.
-Production deployments use their host/provider backup tools with the same consistency
-requirements, as described in [deployment](deployment.md).
+The test owns unique data in the independent `chat-test` infrastructure. It closes
+media ingress, drains native writers, dumps PostgreSQL and archives stopped SeaweedFS
+storage, then restores into a fresh `chat-restore-drill-*` Compose project. Checksums,
+authentication, messages, attachments, exact object bytes and queued processing are
+verified through the real API and worker. Only that drill project's volumes and the
+source fixture's database/bucket are deleted.
 
-The destination must be empty. A backup contains a PostgreSQL custom dump, a joint
-SeaweedFS `/data` archive, the matching S3/environment configuration and a SHA256
-manifest. Restrict access and encrypt off-site copies: they contain private data
-and credentials. The utility copies the selected stack's S3 configuration, including
-an overridden `SEAWEED_S3_CONFIG`, rather than development credentials by default.
-
-Backup closes mutation and media PUT ingress, drains application writers, takes
-the database dump and then stops SeaweedFS while archiving its metadata/volume files
-together. Writers and storage resume in `finally`. Native writers need the launcher's
-`CHAT_SHUTDOWN_FILE` marker for graceful draining; process paths and identities are
-checked before shutdown. The phase-two manifest records `coordinatedWriters: true`;
-older phase-one manifests do not establish attachment consistency.
-
-Restore verifies hashes and requires a new `chat-restore-*` project, rejecting
-existing containers, volumes or restore-state directories. Its independent PostgreSQL
-binds to loopback 55435 (`-Port` changes it), S3 to 8338 (`-StoragePort` changes it),
-Valkey to 56381 and Centrifugo to 8002. Run one drill at a time because the latter
-ports are fixed. New volumes never overwrite a running instance. The random database
-password and standard application variables are saved in
-`backups/restore-state/<project>/restore.env`, never printed. Restored local HTTP
-verification uses a non-Secure cookie; this configuration is for a drill only.
-
-Validate original-password login, message history, rejection of revoked sessions,
-original/thumbnail/file/avatar bytes, attachment associations and processing of
-uploads queued at the backup point. Use the generated environment for isolated
-native API/worker processes; do not reconnect restored sessions to the live services.
-
-After inspection, stop only the named restore project, preserving its volumes:
-
-```powershell
-docker compose --project-name chat-restore-drill --env-file backups/restore-state/chat-restore-drill/restore.env down
-```
-
-Run this command in a fresh terminal without test/development environment overrides:
-Compose process variables take precedence over `--env-file`. Valkey owns temporary
-rates/presence/realtime history; PostgreSQL owns durable records. Clients recover
-persisted events through REST after restore. Integration tests remove only their
-uniquely named drill volumes; manual restore volumes remain for inspection.
+The implementation lives in `web/tests/integration/recovery.ts` and the behavior
+assertions in `backup-restore.test.ts`. Test artifacts remain in `.local/tests/` for
+diagnosis. See [development](development.md) for interrupted-run cleanup and
+[deployment](deployment.md) for production service requirements. A passing local
+drill verifies the application procedure, not a provider's production backup policy.

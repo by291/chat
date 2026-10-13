@@ -1,73 +1,16 @@
-import { execFile, spawn } from 'node:child_process';
-import { promisify } from 'node:util';
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes } from 'node:crypto';
-import pg from 'pg';
+
 import WS from 'ws';
 import { Centrifuge } from 'centrifuge';
-const exec = promisify(execFile);
-const root = fileURLToPath(new URL('../../../', import.meta.url));
-export type IntegrationStack = {
-  apiUrl: string;
-  wsUrl: string;
-  origin: string;
-  apiPid: number;
-  workerPid: number | null;
-  envFile: string;
-  db: pg.Client;
-  cleanup: () => Promise<void>;
-};
+
+import { TestRuntime } from './runtime';
+
+export type IntegrationStack = TestRuntime;
+
 export async function startIntegrationStack(): Promise<IntegrationStack> {
-  // On Windows a background process can inherit captured pipe handles; wait for the launcher exit, then read its state file.
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      'pwsh',
-      ['-NoProfile', '-File', `${root}/scripts/e2e.ps1`, '-Prepare'],
-      { cwd: root, stdio: 'ignore', windowsHide: true },
-    );
-    const timer = setTimeout(() => {
-      child.kill();
-      reject(new Error('Test stack preparation timed out'));
-    }, 120000);
-    child.once('error', reject);
-    child.once('exit', (code) => {
-      clearTimeout(timer);
-      code === 0
-        ? resolve()
-        : reject(
-            new Error(
-              'Test stack preparation failed; inspect integration logs',
-            ),
-          );
-    });
-  });
-  const state = JSON.parse(
-    await readFile(
-      `${root}/.superpowers/sdd/2026-10-12-phase-1-private-chat/integration/stack.json`,
-      'utf8',
-    ),
-  );
-  const env = await readFile(state.envFile, 'utf8');
-  const url = env
-    .split(/\r?\n/)
-    .find((line) => line.startsWith('DATABASE_URL='))!
-    .slice(13);
-  const db = new pg.Client({ connectionString: url });
-  await db.connect();
-  return {
-    ...state,
-    db,
-    cleanup: async () => {
-      await db.end();
-      await exec(
-        'pwsh',
-        ['-NoProfile', '-File', `${root}/scripts/e2e.ps1`, '-Cleanup'],
-        { cwd: root },
-      );
-    },
-  };
+  return TestRuntime.start();
 }
+
 export async function account(stack: IntegrationStack) {
   const token = randomBytes(32).toString('hex');
   const username = `u${randomBytes(8).toString('hex')}`;
@@ -135,32 +78,9 @@ export async function startWorker(
   stack: IntegrationStack,
   pauseAfterPublish = false,
 ) {
-  await new Promise<void>((resolve, reject) => {
-    const args = [
-      '-NoProfile',
-      '-File',
-      `${root}/scripts/e2e.ps1`,
-      '-StartWorker',
-    ];
-    if (pauseAfterPublish) args.push('-PauseAfterPublish');
-    const child = spawn('pwsh', args, {
-      cwd: root,
-      stdio: 'ignore',
-      windowsHide: true,
-    });
-    child.once('error', reject);
-    child.once('exit', (code) =>
-      code === 0 ? resolve() : reject(new Error('Worker launcher failed')),
-    );
-  });
-  const state = JSON.parse(
-    await readFile(
-      `${root}/.superpowers/sdd/2026-10-12-phase-1-private-chat/integration/stack.json`,
-      'utf8',
-    ),
-  );
-  stack.workerPid = state.workerPid;
+  await stack.startWorker(pauseAfterPublish);
 }
+
 export async function api(
   stack: IntegrationStack,
   cookie: string,

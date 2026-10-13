@@ -134,6 +134,6 @@ conflicts; baseline replay above Number.MAX_SAFE_INTEGER; no premature read rece
 removed-device purge and old-episode invalidation; reconnect/fanout recovery; and
 three-user desktop/mobile workflows. Retain all direct-chat behavior regressions.
 
-Run `scripts/check.ps1 -IncludeIntegration`. Rebuild and validate the HTTPS deployment
+Run `node scripts/check.mjs --integration`. Rebuild and validate the HTTPS deployment
 because routing/events and deployed behavior change. Media uses this same membership
 boundary in its subsequent design; groups must be independently usable first.

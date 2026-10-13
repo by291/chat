@@ -159,14 +159,20 @@ transaction.commit().await?;
 
 ## Verification and review
 
-- Run `./scripts/check.ps1` for format, lint, boundary checks, Rust tests, frontend
+- Run `node scripts/check.mjs` for format, lint, boundary checks, Rust tests, frontend
   types, generated API checks, unit tests, and the static build.
-- Run `./scripts/check.ps1 -IncludeIntegration` after changes to auth, message
+- Run `node scripts/check.mjs --integration` after changes to auth, message
   transactions, replay, realtime transport, session lifetime, or production wiring.
-- Validate production wiring with `./scripts/production-test.ps1 -Prepare` and
-  `pnpm -C web test:deployment` against an explicitly configured staging deployment
-  when the deployed application changes. These commands do not provision a stack;
+- Validate production wiring with `pnpm -C web test:deployment`
+  against an explicitly configured staging deployment
+  when the deployed application changes. This command does not provision a stack;
   see `docs/operations/deployment.md` for HTTPS origins and staging invitations.
+- Keep public tooling in `scripts/` small and cross-platform. Use Node built-ins
+  for shared commands; keep fixture lifecycle helpers beside integration tests.
+  Prefer foreground service commands over custom background launchers and PID files.
+- Background verification commands must suppress new windows. Use `windowsHide`
+  without `detached` on Windows; reserve detached process groups for Unix signal
+  isolation. Windows detached mode can create a separate console despite hiding flags.
 - For refactoring, preserve existing behavior tests and add a regression only for
   a newly discovered bug or a meaningful architectural invariant. Do not write tests
   that merely repeat implementation details or assert an arbitrary file size.

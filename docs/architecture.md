@@ -160,7 +160,7 @@ and shared transport.
 Static bracket access, optional calls and expression wrappers are covered; comments,
 strings and unrelated object methods are ignored. Aliases and dynamic property access
 still require review; the guard is not a complete dependency analysis.
-`scripts/check.ps1` includes those guards and normal format/type/lint/unit/build checks.
+`node scripts/check.mjs` includes those guards and normal format/type/lint/unit/build checks.
 Integration checks retain
 real PostgreSQL, Valkey, Centrifugo, SeaweedFS and browsers; they cover the invariants
 above rather than mocking the end-to-end application.
@@ -172,6 +172,16 @@ Browser/SDK tests run native application processes against the same instance;
 restore drills reuse the same Compose file under a fresh `chat-restore-*` project.
 Production service requirements live in `docs/operations/deployment.md` and do not
 prescribe Compose. HTTPS browser checks target an operator-provided staging address.
+
+Public tooling has three entry points: `scripts/init-env.mjs` creates local secrets,
+`scripts/check.mjs` runs checks, and `scripts/generate-api.mjs` generates the contract.
+`tests/architecture-rules.mjs` owns source boundary inspection.
+`web/tests/integration/runtime.ts` owns test infrastructure, native child processes,
+unique fixture databases/buckets and cleanup. Browser fixtures share this owner.
+`recovery.ts` coordinates a fixture snapshot and restores it into a fresh project;
+it is a recovery test helper. Production backup procedures remain operator-owned.
+Test logs and protected configuration live in ignored `.local/tests/` directories;
+there are no persisted process IDs or dated scratch paths in the tooling.
 
 The original phase-one acceptance remains in `docs/operations/phase-1-acceptance.md`.
 Private group episodes, media limits and deployment configuration are documented in

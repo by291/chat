@@ -46,12 +46,16 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm -C web install --frozen-lockfile
 
-      # Local and CI tests resolve the same root Compose file with test fixtures.
+      - name: Install the browser used by integration tests
+        run: pnpm -C web exec playwright install --with-deps chromium
+
+      # Local and CI run the same native application and middleware fixtures.
       - name: Run repository checks
-        shell: pwsh
-        run: ./scripts/check.ps1
+        run: node scripts/check.mjs --integration
 
       - name: Stop owned test infrastructure after an interrupted check
         if: always()
-        shell: pwsh
-        run: ./scripts/e2e.ps1 -Cleanup -StopInfrastructure
+        run: |
+          if [ -f .local/tests/infrastructure/test.env ]; then
+            docker compose --project-name chat-test --env-file .local/tests/infrastructure/test.env down
+          fi

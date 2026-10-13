@@ -9,6 +9,7 @@
 .env.*
 !.env.example
 .superpowers/
+/.local/
 /backups/
 *.log
 /infra/seaweedfs/s3.json

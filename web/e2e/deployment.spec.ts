@@ -9,6 +9,7 @@ const bucket = process.env.CHAT_DEPLOYMENT_BUCKET ?? 'chat-media';
 test('HTTPS serves SPA deep links and keeps internal endpoints private', async ({
   request,
 }) => {
+  expect((await request.get('/health/ready')).status()).toBe(200);
   for (const path of [
     '/login',
     '/app/chats/01900000-0000-7000-8000-000000000001',
