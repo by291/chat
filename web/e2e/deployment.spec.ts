@@ -26,7 +26,7 @@ test('HTTPS serves SPA deep links and keeps internal endpoints private', async (
   const body = await response.json();
   expect(response.headers()['x-request-id']).toBe(body.request_id);
 });
-test('production cookie and real browser conversation work behind HTTPS', async ({
+test('six-character accounts and real browser conversation work behind HTTPS', async ({
   page,
   browser,
 }) => {
@@ -71,9 +71,7 @@ test('production cookie and real browser conversation work behind HTTPS', async 
     await target.goto(`/register?invite=${token}`);
     await target.getByLabel('用户名', { exact: true }).fill(username);
     await target.getByLabel('昵称', { exact: true }).fill('HTTPS 用户');
-    await target
-      .getByLabel('密码', { exact: true })
-      .fill('correct horse battery');
+    await target.getByLabel('密码', { exact: true }).fill('abc123');
     await target.getByRole('button', { name: '创建账号', exact: true }).click();
     await expect(target).toHaveURL(/\/app/);
     return username;

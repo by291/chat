@@ -43,9 +43,9 @@ export async function invitation(stack: IntegrationStack) {
 export async function signup(
   page: import('@playwright/test').Page,
   stack: IntegrationStack,
+  password = 'correct horse battery',
 ) {
-  const username = `e${randomBytes(6).toString('hex')}`,
-    password = 'correct horse battery';
+  const username = `e${randomBytes(6).toString('hex')}`;
   await page.goto(`/register?invite=${await invitation(stack)}`);
   await page.getByLabel('用户名', { exact: true }).fill(username);
   await page.getByLabel('昵称', { exact: true }).fill('测试用户 🌟');

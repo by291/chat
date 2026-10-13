@@ -10,6 +10,11 @@ use tokio::sync::Semaphore;
 
 use crate::error::AppError;
 
+/// Password limits count Unicode scalar values rather than UTF-8 bytes.
+pub const MIN_PASSWORD_CHARACTERS: usize = 6;
+/// Bound password input size consistently for hashing and verification.
+pub const MAX_PASSWORD_CHARACTERS: usize = 128;
+
 #[derive(Clone)]
 pub struct PasswordService {
     permits: Arc<Semaphore>,
@@ -26,8 +31,9 @@ impl Default for PasswordService {
 impl PasswordService {
     /// Validate password length and hash it on a bounded blocking worker.
     pub async fn hash(&self, password: &str) -> Result<String, AppError> {
-        if !(12..=128).contains(&password.chars().count()) {
-            return Err(AppError::invalid("密码需要 12–128 个字符"));
+        if !(MIN_PASSWORD_CHARACTERS..=MAX_PASSWORD_CHARACTERS).contains(&password.chars().count())
+        {
+            return Err(AppError::invalid("密码需要 6–128 个字符"));
         }
         // Keep the permit inside the blocking closure, including cancellation of its caller.
         let permit = self
@@ -51,7 +57,8 @@ impl PasswordService {
 
     /// Verify bounded input without blocking a Tokio executor thread.
     pub async fn verify(&self, password: &str, hash: &str) -> Result<bool, AppError> {
-        if !(12..=128).contains(&password.chars().count()) {
+        if !(MIN_PASSWORD_CHARACTERS..=MAX_PASSWORD_CHARACTERS).contains(&password.chars().count())
+        {
             return Ok(false);
         }
         let permit = self

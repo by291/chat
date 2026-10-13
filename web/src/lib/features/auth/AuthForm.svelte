@@ -160,7 +160,7 @@
           bind:value={password}
           autocomplete={registering ? 'new-password' : 'current-password'}
           required
-          placeholder={registering ? '至少 12 个字符' : '输入你的密码'}
+          placeholder={registering ? '至少 6 个字符' : '输入你的密码'}
         />
         {#if error}
           <p class="form-error" role="alert">{error}</p>

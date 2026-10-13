@@ -241,3 +241,54 @@ async fn foreign_session_cannot_be_revoked() {
         200
     );
 }
+
+#[tokio::test]
+async fn six_character_passwords_work_for_bootstrap_registration_login_and_reset() {
+    let app = support::spawn_test_app().await;
+    let client = app.client();
+    let invitation = invite(&app).await;
+
+    let user =
+        chat_server::auth::service::bootstrap(&app.state, "six_admin", "Six Admin", "abc123")
+            .await
+            .unwrap();
+    let response = client
+        .post(format!("{}/api/v1/auth/register", app.base_url))
+        .header("Origin", &app.origin)
+        .json(&json!({
+            "invitation": invitation,
+            "username": "six_member",
+            "display_name": "Six Member",
+            "password": "abc123"
+        }))
+        .send()
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), 201);
+
+    chat_server::auth::service::reset_password(&app.state, &user.username, "xyz789")
+        .await
+        .unwrap();
+
+    for (username, password, status) in [
+        ("six_member", "abc123", 200),
+        ("six_admin", "xyz789", 200),
+        ("six_admin", "abc123", 401),
+    ] {
+        let response = app
+            .client()
+            .post(format!("{}/api/v1/auth/login", app.base_url))
+            .header("Origin", &app.origin)
+            .json(&json!({
+                "username": username,
+                "password": password,
+                "device_label": "Password boundary test"
+            }))
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(response.status().as_u16(), status);
+    }
+}

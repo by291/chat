@@ -1,10 +1,10 @@
 import { test, expect, signup } from './fixtures';
 import { api } from '../tests/integration/support';
-test('invited user registers and restores identity after reload', async ({
+test('six-character password registers, logs in and restores identity', async ({
   page,
   stack,
 }) => {
-  await signup(page, stack);
+  const credentials = await signup(page, stack, 'abc123');
   await page.reload();
   await expect(
     page.getByRole('button', { name: '退出登录', exact: true }),
@@ -19,6 +19,17 @@ test('invited user registers and restores identity after reload', async ({
   await expect(page.getByRole('heading', { name: '登录设备' })).toBeVisible();
   await expect(page.getByText('当前设备', { exact: true })).toBeVisible();
   expect(await page.locator('body').innerText()).not.toContain('token_hash');
+
+  await page.getByRole('button', { name: '退出登录', exact: true }).click();
+  await expect(page).toHaveURL(/\/login/);
+  await page.getByLabel('用户名', { exact: true }).fill(credentials.username);
+  await page.getByLabel('密码', { exact: true }).fill(credentials.password);
+  await page.getByRole('button', { name: '登录', exact: true }).click();
+
+  await expect(page).toHaveURL(/\/app/);
+  await expect(
+    page.getByRole('button', { name: '退出登录', exact: true }),
+  ).toBeVisible();
 });
 test('revoked device returns to login', async ({ page, stack }) => {
   const credentials = await signup(page, stack);

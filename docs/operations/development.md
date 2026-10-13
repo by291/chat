@@ -32,7 +32,9 @@ Open `http://localhost:5173`. The public API and private proxy bind to loopback 
 55432, 56379, 8000, and 8333. Vite proxies API/WebSocket requests through the browser's
 same origin. Background process records and logs live in `.superpowers/dev/`.
 
-Create the first user. The terminal asks for the password twice without echo:
+Create the first user. The terminal asks for the password twice without echo.
+Passwords accept 6-128 Unicode scalar values. Operator prompts use ASCII English
+so hidden input is readable with legacy Windows console code pages as well.
 
 ```powershell
 cargo run --bin admin -- bootstrap --username alice --display-name 'Alice'
