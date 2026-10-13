@@ -69,9 +69,28 @@ changed to obtain a pass.
 One fresh architecture review found no Critical issue or concrete runtime regression.
 Its application-to-HTTP dependency was fixed with a regression observed RED then
 GREEN. Dense component/worker/test examples were expanded and formatter output
-checked. Two Minor improvements remain recorded in
-[implementation decisions](implementation-decisions.md): broader raw-fetch detection
-and relocating the queue row type to remove a small module import cycle.
+checked. Its two initially deferred Minor findings were resolved in a later
+2026-10-13 follow-up: direct/browser-global fetch detection with source fixtures,
+and repository-owned queue rows with a compatible outbox re-export. See
+[implementation decisions](implementation-decisions.md) for the current ownership.
+
+## Boundary and queue-row follow-up
+
+The 2026-10-13 follow-up passed `./scripts/check.ps1`: 24 architecture cases, 36 Rust
+tests and 9 frontend unit tests. Rust fmt/clippy, Svelte types (zero errors/warnings),
+formatting, generated API checks and the static build passed. The targeted real
+worker/SDK delivery suite, `pnpm -C web test:delivery`, passed both cases, for 71
+executed tests in this follow-up. Runtime transaction, transport and production wiring
+did not change; the full browser/HTTPS/restore suite was not rerun for this scope.
+
+The raw-fetch fixtures failed before the guard changes and passed afterward. An
+independent review found a custom-element options omission; its new fixture also
+failed before the fix and passed afterward. The narrow re-review found no remaining
+issue. Evidence is under `.superpowers/followups/2026-10-13-boundary-and-queue/`:
+`fetch-red.log`, `options-red.log`, `options-green.log`, `full-check.log` and
+`delivery.log`. An initial base check failed while the development database was
+stopped; starting the existing services restored verification without a code or
+test-timeout change.
 
 ## Product limits
 

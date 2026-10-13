@@ -118,6 +118,9 @@ transaction.commit().await?;
 - Feature API adapters are the only place to invoke typed HTTP methods. Components
   call their feature adapter/state owner; they must not construct API URLs or own
   socket, replay, or cache-consistency rules.
+- Raw `fetch` calls belong in a feature API adapter or shared `api-client` transport.
+  This also applies to browser-global calls and inline Svelte template handlers.
+  Source guards check direct/static calls; review aliases and dynamic access manually.
 - Give state one owner. The query cache holds authoritative server records; runes
   hold UI state such as selection, drafts, pending submissions, and connection status.
   Do not mirror the same mutable server records in a second store.

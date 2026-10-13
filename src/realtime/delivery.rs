@@ -1,6 +1,9 @@
 //! Durable job delivery. Duplicate publications are safe because clients replay by sequence.
 
-use super::{client::RealtimeEvent, outbox::LeasedJob, repository};
+use super::{
+    client::RealtimeEvent,
+    repository::{self, LeasedJob},
+};
 use crate::{
     AppState,
     error::AppError,

@@ -3,8 +3,19 @@
 use sqlx::PgPool;
 use time::OffsetDateTime;
 
-use super::outbox::LeasedJob;
 use crate::types::{ConversationId, SessionId, UserId};
+
+/// A claimed outbox row; its lease token fences completion and retry by stale workers.
+#[derive(Debug, sqlx::FromRow)]
+pub struct LeasedJob {
+    pub job_id: uuid::Uuid,
+    pub lease_token: uuid::Uuid,
+    pub aggregate_key: String,
+    pub ordinal: i64,
+    pub payload: serde_json::Value,
+    pub attempt: i32,
+    pub reclaimed: bool,
+}
 
 pub async fn attach_connection(
     pool: &PgPool,

@@ -7,6 +7,18 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const requireWeb = createRequire(path.join(root, "web/package.json"));
 const ts = requireWeb("typescript");
+const { parse: parseComponent } = requireWeb("svelte/compiler");
+
+const httpMethods = new Set([
+  "GET",
+  "POST",
+  "PATCH",
+  "PUT",
+  "DELETE",
+  "HEAD",
+  "OPTIONS",
+]);
+const browserGlobals = new Set(["window", "globalThis", "self"]);
 
 async function filesUnder(directory) {
   const entries = await readdir(path.join(root, directory), {
@@ -22,11 +34,72 @@ async function filesUnder(directory) {
   return groups.flat();
 }
 
+function componentScript(source, filename) {
+  const component = parseComponent(source, { filename, modern: true });
+  const scripts = [component.module, component.instance]
+    .filter(Boolean)
+    .map(({ content }) => source.slice(content.start, content.end));
+  const templateCalls = [];
+
+  function visit(node) {
+    if (!node || typeof node !== "object") return;
+    if (node.type === "CallExpression") {
+      templateCalls.push(`(${source.slice(node.start, node.end)});`);
+      return;
+    }
+    for (const child of Object.values(node)) {
+      if (Array.isArray(child)) child.forEach(visit);
+      else visit(child);
+    }
+  }
+
+  // Inline handlers, template expressions and custom-element options can perform
+  // HTTP too. Inspect their calls without treating markup text as code.
+  visit(component.fragment);
+  visit(component.options);
+  return [...scripts, ...templateCalls].join("\n;\n");
+}
+
+function unwrapExpression(expression) {
+  while (
+    ts.isParenthesizedExpression(expression) ||
+    ts.isAsExpression(expression) ||
+    ts.isTypeAssertionExpression(expression) ||
+    ts.isNonNullExpression(expression) ||
+    ts.isSatisfiesExpression(expression)
+  ) {
+    expression = expression.expression;
+  }
+  return expression;
+}
+
+function isHttpCall(expression) {
+  const callee = unwrapExpression(expression);
+  if (ts.isIdentifier(callee)) return callee.text === "fetch";
+
+  let method;
+  if (ts.isPropertyAccessExpression(callee)) {
+    method = callee.name.text;
+  } else if (
+    ts.isElementAccessExpression(callee) &&
+    (ts.isStringLiteral(callee.argumentExpression) ||
+      ts.isNoSubstitutionTemplateLiteral(callee.argumentExpression))
+  ) {
+    method = callee.argumentExpression.text;
+  } else {
+    return false;
+  }
+
+  if (httpMethods.has(method)) return true;
+  if (method !== "fetch") return false;
+
+  const receiver = unwrapExpression(callee.expression);
+  return ts.isIdentifier(receiver) && browserGlobals.has(receiver.text);
+}
+
 function importsIn(source, filename) {
   const script = filename.endsWith(".svelte")
-    ? [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
-        .map((match) => match[1])
-        .join("\n")
+    ? componentScript(source, filename)
     : source;
   const syntax = ts.createSourceFile(
     filename,
@@ -47,13 +120,7 @@ function importsIn(source, filename) {
       imports.push(node.moduleSpecifier.text);
     }
 
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      ["GET", "POST", "PATCH", "PUT", "DELETE", "HEAD", "OPTIONS"].includes(
-        node.expression.name.text,
-      )
-    ) {
+    if (ts.isCallExpression(node) && isHttpCall(node.expression)) {
       hasHttpCall = true;
     }
 
@@ -125,6 +192,39 @@ export async function rustLayerViolations() {
   return violations;
 }
 
+/** Inspect one source file so boundary regressions can use isolated source fixtures. */
+export function frontendSourceViolations(filename, source) {
+  const violations = [];
+  const { imports, hasHttpCall } = importsIn(source, filename);
+  const isFeature = filename.startsWith("web/src/lib/features/");
+  const isRoute = filename.startsWith("web/src/routes/");
+
+  if (
+    hasHttpCall &&
+    !filename.startsWith("web/src/lib/api-client/") &&
+    !/\/features\/[^/]+\/api\.ts$/.test(filename)
+  ) {
+    violations.push(`${filename}: HTTP calls belong in a feature API adapter`);
+  }
+
+  for (const specifier of imports) {
+    const target = projectImport(filename, specifier);
+    if (!target) continue;
+
+    if (!isFeature && !isRoute && target.startsWith("web/src/lib/features/")) {
+      violations.push(
+        `${filename}: shared code must not import feature ${specifier}`,
+      );
+    }
+
+    if (isFeature && target.startsWith("web/src/routes/")) {
+      violations.push(`${filename}: features must not import routes`);
+    }
+  }
+
+  return violations;
+}
+
 export async function frontendViolations() {
   const violations = [];
   const files = (await filesUnder("web/src")).filter(
@@ -134,38 +234,7 @@ export async function frontendViolations() {
 
   for (const filename of files) {
     const source = await readFile(path.join(root, filename), "utf8");
-    const { imports, hasHttpCall } = importsIn(source, filename);
-    const isFeature = filename.startsWith("web/src/lib/features/");
-    const isRoute = filename.startsWith("web/src/routes/");
-
-    if (
-      hasHttpCall &&
-      !filename.startsWith("web/src/lib/api-client/") &&
-      !/\/features\/[^/]+\/api\.ts$/.test(filename)
-    ) {
-      violations.push(
-        `${filename}: typed HTTP calls belong in a feature API adapter`,
-      );
-    }
-
-    for (const specifier of imports) {
-      const target = projectImport(filename, specifier);
-      if (!target) continue;
-
-      if (
-        !isFeature &&
-        !isRoute &&
-        target.startsWith("web/src/lib/features/")
-      ) {
-        violations.push(
-          `${filename}: shared code must not import feature ${specifier}`,
-        );
-      }
-
-      if (isFeature && target.startsWith("web/src/routes/")) {
-        violations.push(`${filename}: features must not import routes`);
-      }
-    }
+    violations.push(...frontendSourceViolations(filename, source));
   }
 
   return violations;

@@ -68,7 +68,10 @@ The fresh architecture review found no Critical or concrete runtime regression.
 The application-to-HTTP dependency was fixed by moving transport extraction into
 the realtime HTTP adapter; its new architecture regression failed before the fix
 and passed afterward. Remaining dense component/worker/test examples were expanded.
-Two Minor findings are deferred: direct/global `fetch` detection in the frontend
-guard (no current component violation), and moving `LeasedJob` out of worker
-orchestration to remove its small repository import cycle. The ownership guards
-supplement compilation and review; they are not a complete dependency analysis.
+Two Minor findings were initially deferred and resolved in the 2026-10-13 follow-up:
+the frontend guard now detects direct/browser-global `fetch` in TypeScript and Svelte
+scripts, templates and custom-element options, with allowed/disallowed source fixtures.
+The realtime repository
+owns `LeasedJob` and delivery imports it there; outbox preserves its old public path
+through a re-export. No SQL, lease fields or runtime workflow changed. The ownership
+guards supplement compilation and review; aliases and dynamic access still need review.

@@ -7,16 +7,8 @@ use sqlx::PgPool;
 use super::repository;
 use crate::error::AppError;
 
-#[derive(Debug, sqlx::FromRow)]
-pub struct LeasedJob {
-    pub job_id: uuid::Uuid,
-    pub lease_token: uuid::Uuid,
-    pub aggregate_key: String,
-    pub ordinal: i64,
-    pub payload: serde_json::Value,
-    pub attempt: i32,
-    pub reclaimed: bool,
-}
+/// Preserve the public outbox API while persistence owns its database row mapping.
+pub use super::repository::LeasedJob;
 
 /// Claim the earliest available job whose aggregate has no unfinished predecessor.
 pub async fn claim_next(pool: &PgPool, duration: Duration) -> Result<Option<LeasedJob>, AppError> {

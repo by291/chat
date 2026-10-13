@@ -46,7 +46,7 @@ src/
     http.rs               private Centrifugo and metrics HTTP adapters
     model.rs              proxy request/reply DTOs
     service.rs            connect/refresh authorization and session leases
-    repository.rs         connection and outbox persistence/lease CAS
+    repository.rs         connection/outbox persistence, leased row mapping and CAS
     delivery.rs           durable fanout and revoked-client disconnects
     outbox.rs             cancellation-aware worker orchestration
     client.rs             bounded Centrifugo HTTP transport and event DTOs
@@ -58,6 +58,10 @@ Services own transactions so related writes can commit together. Repositories do
 not commit caller-owned transactions or import HTTP adapters. Concrete functions
 are sufficient for this single PostgreSQL implementation; adding a trait is not
 required to make a boundary clear.
+
+The realtime repository owns `LeasedJob` because it maps the claimed database row.
+Delivery and orchestration consume that record; persistence does not import either
+workflow. `outbox` re-exports the type to keep its existing public API compatible.
 
 `types` explicitly re-exports DTOs to preserve the existing crate consumers and
 OpenAPI names. Internal modules import the specific names they need. The facade
@@ -114,8 +118,15 @@ There is no second mutable copy of authoritative messages.
 ## Verification
 
 `node --test tests/architecture.test.mjs` checks the SQL/HTTP and frontend dependency
-boundaries without imposing arbitrary file-size rules. `scripts/check.ps1` includes
-those guards and normal format/type/lint/unit/build checks. Integration checks retain
+boundaries without imposing arbitrary file-size rules. Frontend checks inspect
+TypeScript plus Svelte scripts, template expressions and custom-element options.
+Typed methods and direct `fetch`/browser-global calls are restricted to feature APIs
+and shared transport.
+Static bracket access, optional calls and expression wrappers are covered; comments,
+strings and unrelated object methods are ignored. Aliases and dynamic property access
+still require review; the guard is not a complete dependency analysis.
+`scripts/check.ps1` includes those guards and normal format/type/lint/unit/build checks.
+Integration checks retain
 real PostgreSQL, Valkey, Centrifugo, SeaweedFS and browsers; they cover the invariants
 above rather than mocking the end-to-end application.
 
