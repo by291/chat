@@ -165,6 +165,13 @@ Integration checks retain
 real PostgreSQL, Valkey, Centrifugo, SeaweedFS and browsers; they cover the invariants
 above rather than mocking the end-to-end application.
 
+The root `compose.yaml` owns local infrastructure. Development uses `chat-dev`;
+test launchers use `chat-test` with separate loopback ports, credentials and volumes.
+Rust tests create unique databases and storage buckets in that test instance.
+Browser/SDK tests run native application processes against the same instance;
+restore drills reuse the same Compose file under a fresh `chat-restore-*` project.
+Production service requirements live in `docs/operations/deployment.md` and do not
+prescribe Compose. HTTPS browser checks target an operator-provided staging address.
 
 The original phase-one acceptance remains in `docs/operations/phase-1-acceptance.md`.
 Private group episodes, media limits and deployment configuration are documented in

@@ -4,6 +4,7 @@
 /web/build/
 /web/playwright-report/
 /web/test-results/
+/web/test-results-deployment/
 .env
 .env.*
 !.env.example

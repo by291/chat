@@ -23,7 +23,7 @@ if ($InitEnv) {
     Write-Host 'Generated local credentials in .env and SeaweedFS config.'
 }
 if ($Up) {
-    docker compose --project-name chat-dev --env-file .env --file infra/compose/compose.dev.yaml up -d --wait
+    docker compose up -d --wait
     if ($LASTEXITCODE -ne 0) { throw 'Infrastructure startup failed.' }
 }
 if($Start){
@@ -32,6 +32,10 @@ if($Start){
     New-Item -ItemType Directory -Path $runtime -Force|Out-Null
     cargo build --bins
     if($LASTEXITCODE -ne 0){throw 'Rust build failed.'}
+    $env:CHAT_SHUTDOWN_FILE=Join-Path $runtime 'maintenance.stop'
+    if(Test-Path -LiteralPath $env:CHAT_SHUTDOWN_FILE){throw 'Maintenance marker remains; inspect interrupted maintenance before starting.'}
+    cargo run --quiet --bin admin -- media-init
+    if($LASTEXITCODE -ne 0){Write-Warning 'Media bootstrap failed; text chat can start. Retry cargo run --bin admin -- media-init after storage recovers.'}
     $owned=@()
     try{
         foreach($name in @('api','worker')){

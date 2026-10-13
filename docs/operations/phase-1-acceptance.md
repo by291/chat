@@ -1,5 +1,10 @@
 # Phase-one acceptance
 
+This is historical acceptance evidence. Infrastructure is now shared through the
+root `compose.yaml`; current commands are in the development and deployment guides.
+The former container-based HTTPS harness has been replaced by checks targeting a
+configured staging deployment.
+
 Scope: working private text chat, a root Rust package and `web/` frontend, with Chinese
 desktop/mobile UI. Validation uses actual PostgreSQL, Valkey, Centrifugo, SeaweedFS,
 and Chromium rather than static conversations or a mocked backend.

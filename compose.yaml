@@ -1,0 +1,76 @@
+# Development and tests share this infrastructure. Test launchers override the
+# project name and loopback ports; application processes run on the host.
+name: chat-dev
+
+services:
+  postgres:
+    image: postgres:18.6-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-chat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:-chat}
+    ports: ["127.0.0.1:${POSTGRES_PORT:-55432}:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql"]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  valkey:
+    image: valkey/valkey:9.1.2-alpine
+    ports: ["127.0.0.1:${VALKEY_PORT:-56379}:6379"]
+    command: [valkey-server, --appendonly, "yes"]
+    volumes: ["valkey-data:/data"]
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  centrifugo:
+    image: centrifugo/centrifugo:v6.9.7
+    command: [centrifugo, -c, /centrifugo/config.json]
+    environment:
+      CENTRIFUGO_HTTP_API_KEY: ${CENTRIFUGO_API_KEY:?}
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      CENTRIFUGO_CLIENT_PROXY_CONNECT_ENDPOINT: http://host.docker.internal:${INTERNAL_PROXY_PORT:-8081}/internal/centrifugo/connect
+      CENTRIFUGO_CLIENT_PROXY_REFRESH_ENDPOINT: http://host.docker.internal:${INTERNAL_PROXY_PORT:-8081}/internal/centrifugo/refresh
+      CENTRIFUGO_CLIENT_PROXY_CONNECT_HTTP_STATIC_HEADERS: '{"X-Proxy-Key":"${INTERNAL_PROXY_KEY:?}"}'
+      CENTRIFUGO_CLIENT_PROXY_REFRESH_HTTP_STATIC_HEADERS: '{"X-Proxy-Key":"${INTERNAL_PROXY_KEY:?}"}'
+    ports: ["127.0.0.1:${CENTRIFUGO_PORT:-8000}:8000"]
+    volumes: ["./infra/centrifugo/config.json:/centrifugo/config.json:ro"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      valkey: {condition: service_healthy}
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48
+    command: [server, -dir=/data, -ip=seaweedfs, -filer, -s3, -s3.config=/etc/seaweedfs/s3.json]
+    ports: ["127.0.0.1:${SEAWEED_S3_PORT:-8333}:8333"]
+    volumes:
+      - seaweed-data:/data
+      - ${SEAWEED_S3_CONFIG:-./infra/seaweedfs/s3.json}:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: [CMD-SHELL, "wget -S -O /dev/null http://seaweedfs:8333/ 2>&1 | grep -q '403'"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  media-gateway:
+    image: caddy:2.11.7-alpine
+    ports: ["127.0.0.1:${MEDIA_GATEWAY_PORT:-8336}:80"]
+    environment:
+      CHAT_ORIGIN: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      MEDIA_S3_BUCKET: ${MEDIA_S3_BUCKET:-chat-media}
+    volumes:
+      - ./infra/caddy/Caddyfile.media-dev:/etc/caddy/Caddyfile:ro
+      - ./infra/caddy/media.caddy:/etc/caddy/media.caddy:ro
+      - ./infra/caddy/logging.caddy:/etc/caddy/logging.caddy:ro
+    depends_on:
+      seaweedfs: {condition: service_started}
+
+volumes:
+  postgres-data:
+  valkey-data:
+  seaweed-data:

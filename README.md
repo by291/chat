@@ -3,10 +3,11 @@
 A self-hosted chat application for individuals and small teams. The Rust package
 lives at the repository root; the SvelteKit frontend lives in `web/`.
 
-Phase one provides invitation-based registration, device sessions, exact username
-lookup, private text conversations, durable messages, idempotent retries, reconnect
-replay, read receipts, typing/presence, responsive Chinese UI, and themes. Groups,
-attachments, editing/search, and PWA support belong to later phases.
+The application provides invitation-based registration, device sessions, exact
+username lookup, direct and private group conversations, durable messages,
+idempotent retries, reconnect replay, read receipts, typing/presence, images/files,
+profile avatars, a responsive Chinese UI, and themes. Editing/search and PWA support
+remain future work.
 
 The locked stack uses Rust 1.99, Axum, SQLx, PostgreSQL 18, Svelte 5, SvelteKit 3,
 TypeScript, Tailwind CSS 4, TanStack Query, Bits UI, Centrifugo 6, Valkey 9,
@@ -19,10 +20,14 @@ For learning, read [AGENTS.md](AGENTS.md) and the
 login or message operation through its HTTP, application, persistence, and UI layers.
 Comments and documentation are English; product localization remains Chinese.
 
-- [Single-host HTTPS deployment](docs/operations/deployment.md)
+- [Production deployment](docs/operations/deployment.md)
+- [Continuous integration](docs/operations/continuous-integration.md)
+- [Private groups and media](docs/operations/groups-and-media.md)
 - [Backup and isolated restore](docs/operations/backup-restore.md)
 - [Phase-one acceptance](docs/operations/phase-1-acceptance.md)
+- [Groups and media acceptance](docs/operations/phase-2-acceptance.md)
 - [Implementation decisions](docs/operations/implementation-decisions.md)
+- [Phase-two decisions and trade-offs](docs/operations/phase-2-decisions.md)
 - [Product design and roadmap](docs/superpowers/specs/2026-10-12-chat-design.md)
 - [Phase-one implementation plan](docs/superpowers/plans/2026-10-12-phase-1-private-chat.md)
 - [Architecture refactor plan](docs/superpowers/plans/2026-10-13-code-architecture-and-readability.md)

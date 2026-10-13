@@ -1,0 +1,17 @@
+{
+	admin off
+	import /etc/caddy/logging.caddy
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 600s
+			write 630s
+		}
+	}
+}
+
+import /etc/caddy/media.caddy
+
+:80 {
+	import media_objects
+}

@@ -1,0 +1,64 @@
+(media_objects) {
+	header {
+		defer
+		X-Content-Type-Options nosniff
+		Cache-Control "private, no-store"
+		Referrer-Policy no-referrer
+	}
+	@cors header Origin {$CHAT_ORIGIN}
+	header @cors {
+		defer
+		Access-Control-Allow-Origin {$CHAT_ORIGIN}
+		Access-Control-Allow-Methods "PUT, GET, HEAD, OPTIONS"
+		Access-Control-Allow-Headers "Content-Type, x-amz-checksum-crc32, x-amz-checksum-sha256, x-amz-sdk-checksum-algorithm"
+		Access-Control-Expose-Headers "ETag, Content-Length, Content-Disposition"
+		Vary Origin
+		-Access-Control-Allow-Credentials
+	}
+	@foreign {
+		header Origin *
+		not header Origin {$CHAT_ORIGIN}
+	}
+	@preflight {
+		method OPTIONS
+		header Origin {$CHAT_ORIGIN}
+		path /{$MEDIA_S3_BUCKET:chat-media}/staging/* /{$MEDIA_S3_BUCKET:chat-media}/objects/*
+	}
+	@put {
+		method PUT
+		path /{$MEDIA_S3_BUCKET:chat-media}/staging/*
+		query X-Amz-Algorithm=AWS4-HMAC-SHA256 X-Amz-Signature=*
+	}
+	@read {
+		method GET HEAD
+		path /{$MEDIA_S3_BUCKET:chat-media}/objects/*
+		query X-Amz-Algorithm=AWS4-HMAC-SHA256 X-Amz-Signature=*
+	}
+	route {
+		respond @foreign "Not found" 404
+		respond @preflight 204
+		handle @put {
+			request_body {
+				max_size 52428800
+			}
+			# Preserve Host and path: both are part of the signed request.
+			reverse_proxy {$CHAT_MEDIA_UPSTREAM:seaweedfs:8333} {
+				header_up -Cookie
+				transport http {
+					dial_timeout 5s
+					response_header_timeout 30s
+				}
+			}
+		}
+		handle @read {
+			reverse_proxy {$CHAT_MEDIA_UPSTREAM:seaweedfs:8333} {
+				header_up -Cookie
+				transport http {
+					dial_timeout 5s
+					response_header_timeout 30s
+				}
+			}
+		}
+		respond "Not found" 404
+	}
+}

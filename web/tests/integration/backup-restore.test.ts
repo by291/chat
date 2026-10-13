@@ -1,22 +1,35 @@
 import { test, expect } from 'vitest';
 import { spawn } from 'node:child_process';
-import { readFile, copyFile, mkdir } from 'node:fs/promises';
+import { readFile, copyFile, mkdir, writeFile } from 'node:fs/promises';
+import { openSync, closeSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { startIntegrationStack, account, api, eventually } from './support';
+import {
+  startIntegrationStack,
+  account,
+  api,
+  eventually,
+  startWorker,
+} from './support';
+import { readyUpload, sendAttachments } from './media-support';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 async function command(exe: string, args: string[]) {
+  const logPath = `${root}/.superpowers/sdd/2026-10-13-seaweedfs-media/recovery-${exe}-${randomUUID()}.log`;
+  const log = openSync(logPath, 'w');
   return new Promise<void>((resolve, reject) => {
     const child = spawn(exe, args, {
       cwd: root,
-      stdio: 'ignore',
+      stdio: ['ignore', log, log],
       windowsHide: true,
     });
+    closeSync(log);
     child.once('error', reject);
     child.once('exit', (code) =>
       code === 0
         ? resolve()
-        : reject(new Error(`${exe} operation failed: ${code}`)),
+        : reject(
+            new Error(`${exe} operation failed: ${code}; inspect ${logPath}`),
+          ),
     );
   });
 }
@@ -24,18 +37,19 @@ const parseEnv = (text: string) =>
   Object.fromEntries(
     text
       .split(/\r?\n/)
-      .filter((l) => /^[A-Z_]+=/.test(l))
+      .filter((l) => /^[A-Z][A-Z0-9_]*=/.test(l))
       .map((line) => {
         const at = line.indexOf('=');
         return [line.slice(0, at), line.slice(at + 1)];
       }),
   );
-test('backup restores accounts, messages and revoked sessions into a fresh isolated project', async () => {
+test('coordinated backup restores media bytes, avatars, queued uploads and revoked sessions into an isolated project', async () => {
   const stack = await startIntegrationStack();
   const suffix = randomUUID().replaceAll('-', '');
   const project = `chat-restore-drill-${suffix}`;
   const backup = `${root}/backups/drill-${suffix}`;
   let restored: ReturnType<typeof spawn> | undefined;
+  let restoredWorker: ReturnType<typeof spawn> | undefined;
   let restoreEnv = '';
   try {
     const a = await account(stack),
@@ -45,6 +59,90 @@ test('backup restores accounts, messages and revoked sessions into a fresh isola
         peer_id: b.user.id,
       })
     ).json();
+    await startWorker(stack);
+    const picture = Uint8Array.from(
+      await readFile(new URL('../fixtures/sample.png', import.meta.url)),
+    );
+    const image = await readyUpload(stack, a.cookie, picture, {
+      purpose: 'message',
+      conversation_id: conversation.id,
+      filename: 'sample.png',
+      content_type: 'image/png',
+    });
+    const fileBytes = new TextEncoder().encode('restored file bytes');
+    const file = await readyUpload(stack, a.cookie, fileBytes, {
+      purpose: 'message',
+      conversation_id: conversation.id,
+      filename: 'notes.txt',
+      content_type: 'application/octet-stream',
+    });
+    await sendAttachments(stack, a.cookie, conversation.id, [
+      image.id,
+      file.id,
+    ]);
+    const avatar = await readyUpload(stack, a.cookie, picture, {
+      purpose: 'avatar',
+      filename: 'avatar.png',
+      content_type: 'image/png',
+    });
+    expect(
+      (
+        await api(stack, a.cookie, '/users/me/avatar', 'PUT', {
+          attachment_id: avatar.id,
+        })
+      ).status,
+    ).toBe(204);
+    const sourceGrant = await (
+      await api(
+        stack,
+        a.cookie,
+        `/media/${image.id}/download?variant=thumbnail`,
+      )
+    ).json();
+    const thumbnail = new Uint8Array(
+      await (await fetch(sourceGrant.url)).arrayBuffer(),
+    );
+
+    // Stop only the owned idle test worker, then seal a genuine queued upload.
+    // Recovery must process it rather than relying on a fabricated ready row.
+    const stateFile = `${root}/.superpowers/sdd/2026-10-12-phase-1-private-chat/integration/stack.json`;
+    const nativeState = JSON.parse(await readFile(stateFile, 'utf8'));
+    process.kill(nativeState.workerPid);
+    nativeState.workerPid = null;
+    await writeFile(stateFile, JSON.stringify(nativeState));
+    const pendingResponse = await api(
+      stack,
+      a.cookie,
+      '/media/uploads',
+      'POST',
+      {
+        purpose: 'avatar',
+        filename: 'pending.png',
+        content_type: 'image/png',
+        size_bytes: picture.length,
+      },
+    );
+    const pendingGrant = await pendingResponse.json();
+    expect(
+      (
+        await fetch(pendingGrant.url, {
+          method: 'PUT',
+          headers: pendingGrant.headers,
+          body: new Blob([picture]),
+        })
+      ).ok,
+    ).toBe(true);
+    expect(
+      (
+        await api(
+          stack,
+          a.cookie,
+          `/media/${pendingGrant.attachment.id}/complete`,
+          'POST',
+          { attempt_id: pendingGrant.attempt_id },
+        )
+      ).ok,
+    ).toBe(true);
     await api(
       stack,
       a.cookie,
@@ -64,13 +162,15 @@ test('backup restores accounts, messages and revoked sessions into a fresh isola
       '-OutputDirectory',
       backup,
       '-ProjectName',
-      'chat-e2e',
+      'chat-test',
       '-EnvFile',
       stack.envFile,
       '-ComposeFile',
-      'infra/compose/compose.dev.yaml',
+      'compose.yaml',
       '-DatabaseName',
       database,
+      '-ProcessStateFile',
+      `${root}/.superpowers/sdd/2026-10-12-phase-1-private-chat/integration/stack.json`,
     ]);
     await command('pwsh', [
       '-NoProfile',
@@ -92,9 +192,14 @@ test('backup restores accounts, messages and revoked sessions into a fresh isola
       env: {
         ...process.env,
         ...source,
-        DATABASE_URL: `postgres://${settings.RESTORE_DB_USER}:${settings.RESTORE_PASSWORD}@127.0.0.1:${settings.RESTORE_PORT}/${settings.RESTORE_DB_NAME}`,
+        DATABASE_URL: settings.DATABASE_URL,
         BIND_ADDR: '127.0.0.1:19090',
         INTERNAL_BIND_ADDR: '127.0.0.1:19091',
+        VALKEY_URL: 'redis://127.0.0.1:56381',
+        MEDIA_S3_INTERNAL_ENDPOINT: 'http://127.0.0.1:8338',
+        MEDIA_S3_PUBLIC_ENDPOINT: 'http://127.0.0.1:8338',
+        CENTRIFUGO_API_URL: 'http://127.0.0.1:8002/api',
+        CHAT_SHUTDOWN_FILE: `${backup}/runtime/maintenance.stop`,
       },
     });
     await eventually(async () => {
@@ -127,14 +232,83 @@ test('backup restores accounts, messages and revoked sessions into a fresh isola
       { headers: { Cookie: cookie } },
     );
     expect(history.status).toBe(200);
+    const records = (await history.json()).items;
+    expect(records.map((message: { body: string }) => message.body)).toContain(
+      '恢复演练：完整消息 🌱',
+    );
     expect(
-      (await history.json()).items.map((m: { body: string }) => m.body),
-    ).toContain('恢复演练：完整消息 🌱');
+      records
+        .find(
+          (message: { attachments?: { id: string }[] }) =>
+            message.attachments?.length,
+        )
+        ?.attachments.map((attachment: { id: string }) => attachment.id),
+    ).toEqual([image.id, file.id]);
+    const restoredApi = async (path: string) =>
+      fetch(`http://127.0.0.1:19090/api/v1${path}`, {
+        headers: { Cookie: cookie },
+      });
+    async function restoredBytes(url: string) {
+      let bytes: Uint8Array<ArrayBuffer> | undefined;
+      // S3 authentication can be ready before the restored master's volume routing.
+      // Probe a known object with a deadline; persistent missing/corrupt data still fails.
+      await eventually(async () => {
+        const response = await fetch(url);
+        if (!response.ok) return false;
+        bytes = new Uint8Array(await response.arrayBuffer());
+        return true;
+      }, 20000);
+      return bytes!;
+    }
+    for (const [id, variant, expectedBytes] of [
+      [image.id, 'original', picture],
+      [image.id, 'thumbnail', thumbnail],
+      [file.id, 'original', fileBytes],
+    ] as const) {
+      const grant = await (
+        await restoredApi(`/media/${id}/download?variant=${variant}`)
+      ).json();
+      expect(await restoredBytes(grant.url)).toEqual(expectedBytes);
+    }
+    const avatarGrant = await (
+      await restoredApi(`/users/${a.user.id}/avatar`)
+    ).json();
+    expect(await restoredBytes(avatarGrant.url)).toEqual(thumbnail);
+    await copyFile(
+      `${root}/target/debug/worker.exe`,
+      `${backup}/runtime/worker.exe`,
+    );
+    restoredWorker = spawn(`${backup}/runtime/worker.exe`, [], {
+      cwd: root,
+      windowsHide: true,
+      stdio: 'ignore',
+      env: {
+        ...process.env,
+        ...source,
+        DATABASE_URL: settings.DATABASE_URL,
+        VALKEY_URL: 'redis://127.0.0.1:56381',
+        MEDIA_S3_INTERNAL_ENDPOINT: 'http://127.0.0.1:8338',
+        MEDIA_S3_PUBLIC_ENDPOINT: 'http://127.0.0.1:8338',
+        CENTRIFUGO_API_URL: 'http://127.0.0.1:8002/api',
+        WORKER_METRICS_ADDR: '127.0.0.1:19092',
+        CHAT_SHUTDOWN_FILE: `${backup}/runtime/maintenance.stop`,
+      },
+    });
+    await eventually(
+      async () =>
+        (
+          await (
+            await restoredApi(`/media/${pendingGrant.attachment.id}`)
+          ).json()
+        ).state === 'ready',
+      15000,
+    );
   } finally {
     if (restored) {
       restored.kill();
     }
-    if (restoreEnv)
+    restoredWorker?.kill();
+    if (restoreEnv) {
       await command('docker', [
         'compose',
         '--project-name',
@@ -142,10 +316,24 @@ test('backup restores accounts, messages and revoked sessions into a fresh isola
         '--env-file',
         restoreEnv,
         '--file',
-        'infra/compose/compose.restore.yaml',
+        'compose.yaml',
+        'logs',
+        '--tail',
+        '80',
+        'seaweedfs',
+      ]);
+      await command('docker', [
+        'compose',
+        '--project-name',
+        project,
+        '--env-file',
+        restoreEnv,
+        '--file',
+        'compose.yaml',
         'down',
         '--volumes',
       ]);
+    }
     await stack.cleanup();
   }
 }, 120000);

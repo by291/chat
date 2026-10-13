@@ -1,0 +1,11 @@
+log default {
+	format filter {
+		wrap json
+		fields {
+			request>uri delete
+			request>headers>Referer delete
+			request>headers>Cookie delete
+			request>headers>Authorization delete
+		}
+	}
+}

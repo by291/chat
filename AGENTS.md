@@ -15,6 +15,9 @@ copy is a separate concern; preserve its existing localization during refactors.
 - Never edit generated `web/openapi.json` or `web/src/lib/api-client/schema.d.ts`
   manually. Regenerate them from Rust with `pnpm -C web api:generate`.
 - Do not commit, push, publish, or modify unrelated data unless explicitly requested.
+- Keep one root `compose.yaml` for development and test infrastructure. Isolate tests
+  with project names, ports and owned data, rather than additional Compose files.
+  Document production service requirements without requiring a deployment platform.
 
 ## Readability and logical paragraphs
 
@@ -161,7 +164,9 @@ transaction.commit().await?;
 - Run `./scripts/check.ps1 -IncludeIntegration` after changes to auth, message
   transactions, replay, realtime transport, session lifetime, or production wiring.
 - Validate production wiring with `./scripts/production-test.ps1 -Prepare` and
-  `pnpm -C web test:deployment` when the deployed application changes.
+  `pnpm -C web test:deployment` against an explicitly configured staging deployment
+  when the deployed application changes. These commands do not provision a stack;
+  see `docs/operations/deployment.md` for HTTPS origins and staging invitations.
 - For refactoring, preserve existing behavior tests and add a regression only for
   a newly discovered bug or a meaningful architectural invariant. Do not write tests
   that merely repeat implementation details or assert an arbitrary file size.

@@ -1,34 +1,51 @@
+{
+	import /etc/caddy/logging.caddy
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 600s
+			write 630s
+		}
+	}
+}
+
+import /etc/caddy/media.caddy
+
+{$CHAT_MEDIA_ORIGIN} {
+	import media_objects
+}
+
 {$CHAT_DOMAIN} {
-    encode zstd gzip
-    header {
-        X-Content-Type-Options nosniff
-        Referrer-Policy same-origin
-        X-Frame-Options DENY
-        # The static HTML contains SvelteKit's generated CSP with bootstrap hashes.
-        Content-Security-Policy "frame-ancestors 'none'"
-    }
-    @internal path /internal/* /metrics /api /api/*
-    @api path /api/v1/* /health/*
-    @socket path /connection/websocket
-    # Only the explicit application API is public. Centrifugo's HTTP API stays private.
-    route {
-        handle @api {
-            reverse_proxy api:8080 {
-                header_up X-Forwarded-For {http.request.remote.host}
-            }
-        }
-        handle @socket {
-            reverse_proxy centrifugo:8000
-        }
-        handle @internal {
-            respond "Not found" 404
-        }
-        handle {
-            root * /srv
-            @assets path /_app/immutable/*
-            header @assets Cache-Control "public, max-age=31536000, immutable"
-            try_files {path} /index.html
-            file_server
-        }
-    }
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		X-Frame-Options DENY
+		# The static HTML contains SvelteKit's generated CSP with bootstrap hashes.
+		Content-Security-Policy "frame-ancestors 'none'"
+	}
+	@internal path /internal/* /metrics /api /api/*
+	@api path /api/v1/* /health/*
+	@socket path /connection/websocket
+	# Only the explicit application API is public. Centrifugo's HTTP API stays private.
+	route {
+		handle @api {
+			reverse_proxy {$CHAT_API_UPSTREAM:127.0.0.1:8080} {
+				header_up X-Forwarded-For {http.request.remote.host}
+			}
+		}
+		handle @socket {
+			reverse_proxy {$CHAT_CENTRIFUGO_UPSTREAM:127.0.0.1:8000}
+		}
+		handle @internal {
+			respond "Not found" 404
+		}
+		handle {
+			root * {$CHAT_WEB_ROOT:/srv}
+			@assets path /_app/immutable/*
+			header @assets Cache-Control "public, max-age=31536000, immutable"
+			try_files {path} /index.html
+			file_server
+		}
+	}
 }

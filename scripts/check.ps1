@@ -1,6 +1,7 @@
 param([switch]$IncludeIntegration)
 $ErrorActionPreference = 'Stop'
 $chatRoot = Split-Path -Parent $PSScriptRoot
+$originalEnvironment=[Environment]::GetEnvironmentVariables('Process')
 
 function Invoke-Check([string]$Name, [scriptblock]$Command) {
     Write-Host "Checking $Name"
@@ -13,10 +14,18 @@ function Invoke-Check([string]$Name, [scriptblock]$Command) {
 
 Push-Location -LiteralPath $chatRoot
 try {
+    Invoke-Check 'Isolated test infrastructure' { ./scripts/e2e.ps1 -PrepareInfrastructure }
+    $testEnv=Join-Path $chatRoot '.superpowers/sdd/2026-10-12-phase-1-private-chat/integration/infrastructure.env'
+    foreach($line in Get-Content -LiteralPath $testEnv) {
+        if($line -match '^([A-Z][A-Z0-9_]*)=(.*)$') {
+            [Environment]::SetEnvironmentVariable($Matches[1],$Matches[2].Trim(),'Process')
+        }
+    }
+
     Invoke-Check 'Architecture boundaries' { node --test tests/architecture.test.mjs }
     Invoke-Check 'Rust format' { cargo fmt --all -- --check }
     Invoke-Check 'Rust lint' { cargo clippy --all-targets --all-features -- -D warnings }
-    Invoke-Check 'Rust tests' { cargo test }
+    Invoke-Check 'Rust tests and real media storage' { cargo test -- --include-ignored }
 
     Push-Location -LiteralPath (Join-Path $chatRoot 'web')
     try {
@@ -38,5 +47,12 @@ try {
         Pop-Location
     }
 } finally {
-    Pop-Location
+    try {
+        ./scripts/e2e.ps1 -Cleanup -StopInfrastructure
+    } finally {
+        foreach($key in [Environment]::GetEnvironmentVariables('Process').Keys) {
+            [Environment]::SetEnvironmentVariable($key,$originalEnvironment[$key],'Process')
+        }
+        Pop-Location
+    }
 }

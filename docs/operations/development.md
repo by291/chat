@@ -32,6 +32,13 @@ Open `http://localhost:5173`. The public API and private proxy bind to loopback 
 55432, 56379, 8000, and 8333. Vite proxies API/WebSocket requests through the browser's
 same origin. Background process records and logs live in `.superpowers/dev/`.
 
+Signed file transfers use the separate `http://localhost:8336` media ingress.
+`-Start` initializes the private `chat-media` bucket; manual startup also requires
+`cargo run --bin admin -- media-init`. The private S3 port 8333 is for server access.
+See [groups and media](groups-and-media.md) for endpoint, quota and upload limits.
+Shared frontend controls use shadcn-svelte; see [UI components](../development/ui-components.md)
+for the pinned component tooling, theme tokens and local adaptations.
+
 Create the first user. The terminal asks for the password twice without echo.
 Passwords accept 6-128 Unicode scalar values. Operator prompts use ASCII English
 so hidden input is readable with legacy Windows console code pages as well.
@@ -68,10 +75,32 @@ formatting/unit tests, contract verification, and the static build. See
 `web/pnpm-workspace.yaml` contains pnpm 12 dependency-script policy. This application
 still consists of one Rust package and one frontend package.
 
-Integration checks use the isolated `chat-e2e` Compose project and databases, with
-ports 55433, 56380, 8001, 8334, 18080, 18081, and 5174. They do not modify `chat-dev`
-data. Run the suite serially. After an interrupted run, execute
-`./scripts/e2e.ps1 -Cleanup`. Original phase-one evidence lives in
+`compose.yaml` at the repository root is the only infrastructure definition.
+`docker compose up -d --wait` starts development dependencies as `chat-dev`.
+Rust integration tests and additional browser/SDK checks use the isolated `chat-test`
+project with the same Compose file, independent fixture credentials and volumes, and
+ports 55433, 56380, 8001, 8334, 8337, 18080, 18081, 18082, and 5174. They do not modify `chat-dev`
+data. `check.ps1` starts and stops test infrastructure in `finally`; its default
+Rust stage includes the actual storage cases. `-IncludeIntegration` adds SDK,
+recovery and browser scenarios. Run these suites serially. After an interrupted run,
+execute `./scripts/e2e.ps1 -Cleanup -StopInfrastructure`.
+
+For a targeted Rust run, prepare the dependencies and load their generated environment
+into the current terminal; running `cargo test` against the development port is rejected:
+
+```powershell
+./scripts/e2e.ps1 -PrepareInfrastructure
+Get-Content .superpowers/sdd/2026-10-12-phase-1-private-chat/integration/infrastructure.env | ForEach-Object {
+    if ($_ -match '^([A-Z][A-Z0-9_]*)=(.*)$') {
+        [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2], 'Process')
+    }
+}
+cargo test --test auth_test
+./scripts/e2e.ps1 -Cleanup -StopInfrastructure
+```
+
+Use a separate terminal for targeted tests so fixture variables cannot affect a later
+development startup. Original phase-one evidence lives in
 `.superpowers/sdd/2026-10-12-phase-1-private-chat/`; architecture-refactor evidence and
 the original-source snapshot live in
 `.superpowers/sdd/2026-10-13-code-architecture-and-readability/`. Scratch is excluded
@@ -80,5 +109,5 @@ from version control and must be retained when no Git history exists.
 Stop development infrastructure while preserving data volumes:
 
 ```powershell
-docker compose --project-name chat-dev --env-file .env --file infra/compose/compose.dev.yaml down
+docker compose down
 ```

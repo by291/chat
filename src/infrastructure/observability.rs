@@ -120,8 +120,34 @@ pub fn render_metrics(pending: i64, oldest_age_seconds: f64) -> Response {
     ([("content-type", "text/plain; version=0.0.4")], rendered).into_response()
 }
 
-/// Wait for the platform's graceful termination signal.
+/// Wait for a termination signal or an operator-owned maintenance marker.
+/// Native Windows backups use the marker to drain tasks without force-killing writers.
 pub async fn shutdown_signal() {
+    let marker = async {
+        if let Some(path) = std::env::var_os("CHAT_SHUTDOWN_FILE") {
+            wait_for_shutdown_marker(std::path::PathBuf::from(path)).await;
+        } else {
+            std::future::pending::<()>().await;
+        }
+    };
+    tokio::select! {
+        _ = platform_shutdown_signal() => {},
+        _ = marker => {},
+    }
+}
+
+async fn wait_for_shutdown_marker(path: std::path::PathBuf) {
+    loop {
+        match tokio::fs::try_exists(&path).await {
+            Ok(true) => return,
+            Ok(false) => {}
+            Err(error) => tracing::warn!(%error, "maintenance marker check failed"),
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+}
+
+async fn platform_shutdown_signal() {
     #[cfg(unix)]
     {
         // Installing the handler is a startup invariant; failure prevents graceful shutdown.
@@ -138,5 +164,24 @@ pub async fn shutdown_signal() {
         if let Err(error) = tokio::signal::ctrl_c().await {
             tracing::warn!(%error, "shutdown signal handler failed");
         }
+    }
+}
+
+#[cfg(test)]
+mod shutdown_tests {
+    #[tokio::test]
+    async fn marker_shutdown_waits_until_the_owned_file_exists() {
+        let marker = std::env::temp_dir().join(format!("chat-shutdown-{}", uuid::Uuid::new_v4()));
+        let waiter = tokio::spawn(super::wait_for_shutdown_marker(marker.clone()));
+        tokio::task::yield_now().await;
+        assert!(!waiter.is_finished());
+
+        tokio::fs::write(&marker, b"maintenance").await.unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), waiter)
+            .await
+            .unwrap()
+            .unwrap();
+
+        tokio::fs::remove_file(&marker).await.unwrap();
     }
 }
