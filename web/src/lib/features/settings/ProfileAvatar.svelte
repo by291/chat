@@ -1,4 +1,5 @@
 <script lang="ts">
+  import * as Avatar from '#lib/components/ui/avatar/index.js';
   import { settingsApi } from './api';
   import { downloadBlob } from '../media/api';
 
@@ -45,7 +46,12 @@
   });
 </script>
 
-<span class="avatar">
-  {#if url}<img src={url} alt={`${name}的头像`} />{:else}{Array.from(name)[0] ??
-      '…'}{/if}
-</span>
+<!-- Bits UI retains loaded status on Root; reset it when the image disappears. -->
+{#key !!url}
+  <Avatar.Root>
+    {#if url}
+      <Avatar.Image src={url} alt={`${name}的头像`} />
+    {/if}
+    <Avatar.Fallback>{Array.from(name)[0] ?? '…'}</Avatar.Fallback>
+  </Avatar.Root>
+{/key}

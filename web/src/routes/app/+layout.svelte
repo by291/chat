@@ -1,4 +1,7 @@
 <script lang="ts">
+  import * as Avatar from '#lib/components/ui/avatar/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+
   import { onMount, untrack, type Snippet } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -97,15 +100,27 @@
           <MessageCircle size={24} />
         </a>
         <div class="rail-bottom">
-          <a class="icon-button" href="/app/settings" aria-label="设置">
+          <Button
+            variant="ghost"
+            size="icon"
+            href="/app/settings"
+            aria-label="设置"
+          >
             <Settings2 size={22} />
-          </a>
-          <button class="icon-button" aria-label="退出登录" onclick={logout}>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="退出登录"
+            onclick={logout}
+          >
             <LogOut size={21} />
-          </button>
-          <span class="avatar small" title={auth.user.display_name}>
-            {auth.user.display_name.slice(0, 1)}
-          </span>
+          </Button>
+          <Avatar.Root size="sm" title={auth.user.display_name}>
+            <Avatar.Fallback>
+              {auth.user.display_name.slice(0, 1)}
+            </Avatar.Fallback>
+          </Avatar.Root>
         </div>
       </nav>
       <div class="app-content">

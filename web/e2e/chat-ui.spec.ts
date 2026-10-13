@@ -13,6 +13,16 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   await page.getByRole('button', { name: '发起聊天', exact: true }).click();
   await page.getByLabel('对方的用户名', { exact: true }).fill(b.username);
   await page.getByRole('button', { name: '查找用户', exact: true }).click();
+  await expect(
+    page.getByRole('button', { name: '开始聊天', exact: true }),
+  ).toBeVisible();
+  const avatarBounds = await page
+    .getByRole('dialog')
+    .locator('[data-slot="avatar"]')
+    .boundingBox();
+  expect(avatarBounds).not.toBeNull();
+  expect(avatarBounds!.width).toBeCloseTo(avatarBounds!.height, 0);
+
   await page.getByRole('button', { name: '开始聊天', exact: true }).click();
   await expect(page).toHaveURL(/\/app\/chats\//);
   const link = peer

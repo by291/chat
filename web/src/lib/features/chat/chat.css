@@ -1,35 +1,6 @@
 /* Conversation list, message timeline, composer and chat dialogs. */
 
 /* Chat surfaces share the same palette as identity and settings. */
-[data-theme='dark'] {
-  --surface: #182622;
-  --background: #101c18;
-  --line: #2c3c34;
-  --muted: #91a89b;
-  --text: #dce9e1;
-  --soft: #243a30;
-  --accent: #67c4a6;
-  --accent-hover: #4ab08f;
-  --danger: #ed9da1;
-  color: var(--text);
-  background: var(--background);
-}
-body {
-  background: var(--background);
-  color: var(--text);
-}
-select {
-  font: inherit;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px;
-  width: 100%;
-}
-button {
-  color: inherit;
-}
 .group-actions {
   display: flex;
   flex-wrap: wrap;
@@ -82,12 +53,7 @@ button {
 
 .group-members small {
   margin-top: 4px;
-  color: var(--muted);
-}
-
-.group-members .compact {
-  padding: 7px 10px;
-  font-size: 12px;
+  color: var(--subtle-text);
 }
 
 .group-join-page {
@@ -100,7 +66,7 @@ button {
   display: block;
   margin-bottom: 5px;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--subtle-text);
 }
 
 .chat-shell {
@@ -129,14 +95,14 @@ button {
   font-size: 8px;
   letter-spacing: 1.4px;
   margin-bottom: 7px;
-  color: var(--muted);
+  color: var(--subtle-text);
 }
 .heading-dot {
-  color: var(--accent);
+  color: var(--brand);
 }
 .new-chat {
   background: var(--soft);
-  color: var(--accent);
+  color: var(--brand);
   width: 36px;
   height: 36px;
 }
@@ -148,7 +114,7 @@ button {
   background: var(--background);
   border-radius: 10px;
   padding: 0 13px;
-  color: var(--muted);
+  color: var(--subtle-text);
 }
 .search-field input {
   border: 0;
@@ -162,7 +128,7 @@ button {
   align-items: center;
   gap: 7px;
   font-size: 10px;
-  color: var(--muted);
+  color: var(--subtle-text);
   padding: 15px 25px 17px;
 }
 .connection-dot {
@@ -212,13 +178,13 @@ button {
 }
 .conversation-name time {
   font-size: 9px;
-  color: var(--muted);
+  color: var(--subtle-text);
   flex-shrink: 0;
 }
 .conversation-username {
   display: block;
   font-size: 9px;
-  color: var(--muted);
+  color: var(--subtle-text);
   margin-top: 3px;
 }
 .conversation-preview {
@@ -229,26 +195,15 @@ button {
 }
 .conversation-preview p {
   font-size: 11px;
-  color: var(--muted);
+  color: var(--subtle-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
 }
-.unread-badge {
-  border-radius: 20px;
-  background: var(--accent);
-  color: var(--surface);
-  font-size: 9px;
-  min-width: 17px;
-  height: 17px;
-  display: grid;
-  place-items: center;
-  padding: 0 5px;
-}
 .sidebar-empty {
   text-align: center;
-  color: var(--muted);
+  color: var(--subtle-text);
   padding: 65px 12px;
 }
 .sidebar-empty svg {
@@ -266,7 +221,7 @@ button {
   padding: 20px;
   text-align: center;
   font-size: 9px;
-  color: var(--muted);
+  color: var(--subtle-text);
   border-top: 1px solid var(--line);
   letter-spacing: 1px;
 }
@@ -292,7 +247,7 @@ button {
 }
 .chat-person p {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--subtle-text);
   margin-top: 7px;
   display: flex;
   align-items: center;
@@ -304,11 +259,11 @@ button {
   margin-left: 7px;
 }
 .online-dot.is-offline {
-  background: var(--muted);
+  background: var(--subtle-text);
   opacity: 0.55;
 }
 .typing-status {
-  color: var(--accent);
+  color: var(--brand);
 }
 .mobile-back {
   display: none;
@@ -324,13 +279,13 @@ button {
   display: grid;
   place-items: center;
   border-radius: 30px;
-  color: var(--accent);
+  color: var(--brand);
   background: var(--soft);
   margin: 0 auto 37px;
 }
 .welcome-chat .eyebrow {
   font-size: 9px;
-  color: var(--muted);
+  color: var(--subtle-text);
   letter-spacing: 2px;
 }
 .welcome-chat h2 {
@@ -343,7 +298,7 @@ button {
 .welcome-chat p {
   font-size: 12px;
   line-height: 2;
-  color: var(--muted);
+  color: var(--subtle-text);
 }
 .welcome-foot {
   display: flex;
@@ -352,7 +307,7 @@ button {
   gap: 7px;
   margin-top: 50px;
   font-size: 9px;
-  color: var(--muted);
+  color: var(--subtle-text);
 }
 .message-area {
   flex: 1;
@@ -409,7 +364,7 @@ button {
   align-items: center;
   justify-content: flex-end;
   gap: 5px;
-  color: var(--muted);
+  color: var(--subtle-text);
   font-size: 9px;
   margin-top: 5px;
 }
@@ -417,16 +372,7 @@ button {
   display: flex;
 }
 .message-row.own .message-meta {
-  color: var(--accent);
-}
-.message-meta button {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  color: var(--danger);
-  border: 0;
-  background: transparent;
-  font-size: 10px;
+  color: var(--brand);
 }
 .message-bubble.pending {
   opacity: 0.7;
@@ -439,7 +385,7 @@ button {
   margin: auto;
   text-align: center;
   padding: 30px;
-  color: var(--muted);
+  color: var(--subtle-text);
 }
 .first-message span {
   font-size: 10px;
@@ -453,7 +399,7 @@ button {
 }
 .message-placeholder {
   margin: auto;
-  color: var(--muted);
+  color: var(--subtle-text);
   font-size: 12px;
 }
 .message-bottom {
@@ -461,29 +407,15 @@ button {
   flex-shrink: 0;
 }
 .history-button {
-  margin: 0 auto 14px;
-  padding: 8px 14px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 10px;
-  border-radius: 20px;
+  align-self: center;
+  margin-bottom: 12px;
 }
 .jump-latest {
-  display: flex;
-  gap: 7px;
-  align-items: center;
   position: absolute;
-  bottom: 16px;
+  bottom: 18px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--surface);
-  box-shadow: 0 3px 15px #15241d15;
-  border: 1px solid var(--line);
-  border-radius: 25px;
-  padding: 10px 16px;
-  font-size: 11px;
-  color: var(--accent);
+  box-shadow: 0 4px 20px #244b3820;
 }
 .composer-wrap {
   padding: 15px 30px 13px;
@@ -508,26 +440,11 @@ button {
   max-height: 160px;
   border-radius: 13px;
 }
-.send-button {
-  border: 0;
-  background: var(--accent);
-  color: var(--surface);
-  width: 46px;
-  height: 46px;
-  border-radius: 13px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-.send-button:disabled {
-  cursor: default;
-  opacity: 0.35;
-}
 .composer-hint {
   display: flex;
   justify-content: space-between;
   font-size: 9px;
-  color: var(--muted);
+  color: var(--subtle-text);
   max-width: 864px;
   margin: 10px auto 0;
 }
@@ -543,48 +460,6 @@ button {
   padding: 12px 30px;
   font-size: 11px;
 }
-.sync-error button {
-  border: 0;
-  background: transparent;
-  text-decoration: underline;
-}
-.dialog-overlay {
-  position: fixed;
-  inset: 0;
-  background: #10231c66;
-  backdrop-filter: blur(3px);
-  z-index: 40;
-}
-.dialog-content {
-  position: fixed;
-  z-index: 41;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: 0 20px 80px #13271b22;
-  border-radius: 22px;
-  padding: 36px;
-  width: min(480px, calc(100vw - 32px));
-  outline: none;
-}
-.dialog-close {
-  position: absolute;
-  right: 16px;
-  top: 16px;
-}
-.dialog-title {
-  font-size: 23px;
-  letter-spacing: -0.7px;
-  margin: 12px 0;
-}
-.dialog-content .muted {
-  font-size: 12px;
-}
-.dialog-content .eyebrow {
-  font-size: 8px;
-}
 .find-button {
   margin-top: 16px;
   width: 100%;
@@ -597,7 +472,7 @@ button {
   padding-top: 22px;
   margin-top: 24px;
 }
-.found-user > div {
+.found-user-copy {
   flex: 1;
   min-width: 0;
 }
@@ -606,13 +481,9 @@ button {
 }
 .found-user p {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--subtle-text);
   margin-top: 5px;
   overflow-wrap: anywhere;
-}
-.found-user .button {
-  padding: 10px 12px;
-  font-size: 11px;
 }
 [data-theme='dark'] .auth-story {
   background: #203b2c;
@@ -622,10 +493,6 @@ button {
 }
 [data-theme='dark'] .form-error {
   background: #3e2828;
-}
-[data-theme='dark'] .avatar {
-  background: #2d4b3a;
-  color: #99cbae;
 }
 @media (max-width: 900px) {
   .chat-shell {
@@ -677,7 +544,7 @@ button {
     gap: 10px;
     min-height: 76px;
   }
-  .chat-heading .avatar {
+  .chat-heading [data-slot='avatar'] {
     width: 38px;
     height: 38px;
     border-radius: 13px;
@@ -714,9 +581,6 @@ button {
   }
   .app-frame:has(.has-conversation) .app-rail {
     display: none;
-  }
-  .dialog-content {
-    padding: 30px 24px;
   }
   .sidebar-heading {
     padding-top: 30px;

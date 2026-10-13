@@ -1,4 +1,9 @@
 <script lang="ts">
+  import * as Card from '#lib/components/ui/card/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import { Label } from '#lib/components/ui/label/index.js';
+
   import { untrack } from 'svelte';
   import type { components } from '../../api-client';
   import { settingsApi } from './api';
@@ -36,22 +41,22 @@
   }
 </script>
 
-<section class="settings-card">
+<Card.Root class="settings-card gap-0 p-6" role="region" aria-label="个人资料">
   <div class="section-heading">
     <span class="eyebrow">PROFILE</span>
     <h2>个人资料</h2>
     <p class="muted">让朋友更容易认出你。</p>
   </div>
   <form onsubmit={submit}>
-    <label for="profile-username">用户名</label>
-    <input id="profile-username" value={`@${user.username}`} readonly />
+    <Label class="form-label" for="profile-username">用户名</Label>
+    <Input id="profile-username" value={`@${user.username}`} readonly />
     <p class="field-help">用户名是你的唯一标识。</p>
-    <label for="profile-name">昵称</label>
-    <input id="profile-name" bind:value={displayName} required />
+    <Label class="form-label" for="profile-name">昵称</Label>
+    <Input id="profile-name" bind:value={displayName} required />
     <div class="form-actions">
-      <button class="button primary" disabled={pending}>
+      <Button type="submit" disabled={pending}>
         {pending ? '保存中…' : '保存资料'}
-      </button>
+      </Button>
       {#if saved}
         <span class="success" role="status">资料已保存</span>
       {/if}
@@ -60,4 +65,4 @@
       <p class="form-error" role="alert">{error}</p>
     {/if}
   </form>
-</section>
+</Card.Root>

@@ -1,4 +1,8 @@
 <script lang="ts">
+  import * as Avatar from '#lib/components/ui/avatar/index.js';
+  import { Badge } from '#lib/components/ui/badge/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+
   import ProfileAvatar from '../settings/ProfileAvatar.svelte';
   import { Search, MessageCircle } from '@lucide/svelte';
   import StartConversationDialog from './StartConversationDialog.svelte';
@@ -45,7 +49,7 @@
   </header>
   <div class="search-field">
     <Search size={16} />
-    <input
+    <Input
       aria-label="筛选会话"
       bind:value={filter}
       placeholder="搜索你的聊天"
@@ -71,9 +75,11 @@
         aria-current={sync.selectedId === conversation.id ? 'page' : undefined}
       >
         {#if isGroup(conversation)}
-          <span class="avatar">
-            {Array.from(conversationName(conversation))[0]}
-          </span>
+          <Avatar.Root>
+            <Avatar.Fallback>
+              {Array.from(conversationName(conversation))[0]}
+            </Avatar.Fallback>
+          </Avatar.Root>
         {:else}
           <ProfileAvatar
             userId={conversation.peer.id}
@@ -103,11 +109,11 @@
                 : (conversation.last_message?.body ?? '开始你们的第一段对话')}
             </p>
             {#if conversation.unread_count > 0}
-              <span class="unread-badge">
+              <Badge>
                 {conversation.unread_count > 99
                   ? '99+'
                   : conversation.unread_count}
-              </span>
+              </Badge>
             {/if}
           </div>
         </div>

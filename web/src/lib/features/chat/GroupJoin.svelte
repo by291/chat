@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Button } from '#lib/components/ui/button/index.js';
+
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
 
@@ -39,13 +41,9 @@
   <p class="muted">
     确认加入邀请中的群聊。加入后，只能看到本次加入之后的消息。
   </p>
-  <button
-    class="button primary"
-    disabled={busy || !token || !chat.sync?.alive}
-    onclick={join}
-  >
+  <Button disabled={busy || !token || !chat.sync?.alive} onclick={join}>
     {busy ? '正在加入…' : '确认加入'}
-  </button>
-  <a class="button subtle" href="/app">返回聊天</a>
+  </Button>
+  <Button variant="secondary" href="/app">返回聊天</Button>
   {#if error}<p class="form-error" role="alert">{error}</p>{/if}
 </section>

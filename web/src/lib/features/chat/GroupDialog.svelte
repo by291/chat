@@ -1,6 +1,10 @@
 <script lang="ts">
-  import { Dialog } from 'bits-ui';
-  import { Users, X } from '@lucide/svelte';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import { Label } from '#lib/components/ui/label/index.js';
+
+  import * as Dialog from '#lib/components/ui/dialog/index.js';
+  import { Users } from '@lucide/svelte';
   import { goto } from '$app/navigation';
 
   import { createGroupApi } from './api';
@@ -39,62 +43,61 @@
 
 <Dialog.Root bind:open>
   <Dialog.Trigger
-    class="icon-button"
     aria-label="创建或加入群聊"
     onclick={() => {
       error = '';
       token = '';
     }}
   >
-    <Users size={20} />
+    {#snippet child({ props })}
+      <Button variant="ghost" size="icon" {...props}>
+        <Users size={20} />
+      </Button>
+    {/snippet}
   </Dialog.Trigger>
-  <Dialog.Portal>
-    <Dialog.Overlay class="dialog-overlay" />
-    <Dialog.Content class="dialog-content">
-      <Dialog.Close class="icon-button dialog-close" aria-label="关闭">
-        <X size={20} />
-      </Dialog.Close>
-      <Dialog.Title class="dialog-title">一起聊聊</Dialog.Title>
-      <Dialog.Description class="muted">
-        创建一个私人群聊，再邀请你的伙伴加入。
-      </Dialog.Description>
-      <form
-        onsubmit={(event) => {
-          event.preventDefault();
-          void submit(false);
-        }}
+  <Dialog.Content closeLabel="关闭">
+    <Dialog.Title>一起聊聊</Dialog.Title>
+    <Dialog.Description>
+      创建一个私人群聊，再邀请你的伙伴加入。
+    </Dialog.Description>
+    <form
+      onsubmit={(event) => {
+        event.preventDefault();
+        void submit(false);
+      }}
+    >
+      <Label class="form-label" for="group-title">群名称</Label>
+      <Input
+        id="group-title"
+        bind:value={title}
+        required
+        maxlength={200}
+        placeholder="例如：我们的项目"
+      />
+      <Button type="submit" disabled={busy || !title.trim()}>创建群聊</Button>
+    </form>
+    <form
+      class="group-join-form"
+      onsubmit={(event) => {
+        event.preventDefault();
+        void submit(true);
+      }}
+    >
+      <Label class="form-label" for="group-token">已有群邀请</Label>
+      <Input
+        id="group-token"
+        bind:value={token}
+        autocomplete="off"
+        placeholder="粘贴邀请口令"
+      />
+      <Button
+        type="submit"
+        variant="secondary"
+        disabled={busy || !token.trim()}
       >
-        <label for="group-title">群名称</label>
-        <input
-          id="group-title"
-          bind:value={title}
-          required
-          maxlength="200"
-          placeholder="例如：我们的项目"
-        />
-        <button class="button primary" disabled={busy || !title.trim()}>
-          创建群聊
-        </button>
-      </form>
-      <form
-        class="group-join-form"
-        onsubmit={(event) => {
-          event.preventDefault();
-          void submit(true);
-        }}
-      >
-        <label for="group-token">已有群邀请</label>
-        <input
-          id="group-token"
-          bind:value={token}
-          autocomplete="off"
-          placeholder="粘贴邀请口令"
-        />
-        <button class="button subtle" disabled={busy || !token.trim()}>
-          加入群聊
-        </button>
-      </form>
-      {#if error}<p class="form-error" role="alert">{error}</p>{/if}
-    </Dialog.Content>
-  </Dialog.Portal>
+        加入群聊
+      </Button>
+    </form>
+    {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+  </Dialog.Content>
 </Dialog.Root>

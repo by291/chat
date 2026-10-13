@@ -1,4 +1,7 @@
 <script lang="ts">
+  import * as Avatar from '#lib/components/ui/avatar/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { ArrowLeft, MessageCircle, ShieldCheck } from '@lucide/svelte';
@@ -52,22 +55,26 @@
       {#if id}
         {@const current = sync.current}
         <header class="chat-heading">
-          <button
-            class="icon-button mobile-back"
+          <Button
+            variant="ghost"
+            size="icon"
+            class="mobile-back"
             aria-label="返回会话列表"
             onclick={() => goto('/app')}
           >
             <ArrowLeft size={21} />
-          </button>
+          </Button>
           {#if current && !isGroup(current)}
             <ProfileAvatar
               userId={current.peer.id}
               name={current.peer.display_name}
             />
           {:else}
-            <span class="avatar">
-              {Array.from(conversationName(current))[0] ?? '…'}
-            </span>
+            <Avatar.Root>
+              <Avatar.Fallback>
+                {Array.from(conversationName(current))[0] ?? '…'}
+              </Avatar.Fallback>
+            </Avatar.Root>
           {/if}
           <div class="chat-person">
             <h2>{conversationName(current)}</h2>
@@ -97,7 +104,9 @@
         {#if sync.error}
           <div class="sync-error" role="alert">
             <span>{sync.error}</span>
-            <button onclick={() => sync.reload()}>重新加载</button>
+            <Button variant="link" size="sm" onclick={() => sync.reload()}>
+              重新加载
+            </Button>
           </div>
         {/if}
         {#key id}

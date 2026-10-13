@@ -1,6 +1,11 @@
 <script lang="ts">
-  import { Dialog } from 'bits-ui';
-  import { Plus, X, ArrowUpRight } from '@lucide/svelte';
+  import * as Avatar from '#lib/components/ui/avatar/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import { Label } from '#lib/components/ui/label/index.js';
+
+  import * as Dialog from '#lib/components/ui/dialog/index.js';
+  import { Plus, ArrowUpRight } from '@lucide/svelte';
   import { goto } from '$app/navigation';
   import { findUser, startDirectConversation } from './api';
   import type { components } from '#lib/api-client';
@@ -54,7 +59,6 @@
 
 <Dialog.Root bind:open>
   <Dialog.Trigger
-    class="icon-button new-chat"
     aria-label="发起聊天"
     onclick={() => {
       username = '';
@@ -62,61 +66,62 @@
       error = '';
     }}
   >
-    <Plus size={21} />
+    {#snippet child({ props })}
+      <Button variant="ghost" size="icon" class="new-chat" {...props}>
+        <Plus size={21} />
+      </Button>
+    {/snippet}
   </Dialog.Trigger>
 
-  <Dialog.Portal>
-    <Dialog.Overlay class="dialog-overlay" />
+  <Dialog.Content closeLabel="关闭">
+    <span class="eyebrow">A NEW CONVERSATION</span>
+    <Dialog.Title>从一句你好开始</Dialog.Title>
 
-    <Dialog.Content class="dialog-content">
-      <Dialog.Close class="icon-button dialog-close" aria-label="关闭">
-        <X size={20} />
-      </Dialog.Close>
-      <span class="eyebrow">A NEW CONVERSATION</span>
-      <Dialog.Title class="dialog-title">从一句你好开始</Dialog.Title>
-
-      <Dialog.Description class="muted">
-        通过用户名找到伙伴，开始一对一聊天。
-      </Dialog.Description>
-      <form
-        onsubmit={(e) => {
-          e.preventDefault();
-          void find();
-        }}
+    <Dialog.Description>
+      通过用户名找到伙伴，开始一对一聊天。
+    </Dialog.Description>
+    <form
+      onsubmit={(e) => {
+        e.preventDefault();
+        void find();
+      }}
+    >
+      <Label class="form-label" for="peer-username">对方的用户名</Label>
+      <Input
+        id="peer-username"
+        bind:value={username}
+        oninput={() => (peer = undefined)}
+        placeholder="输入用户名，无需 @"
+        autocomplete="off"
+        required
+      />
+      <Button
+        type="submit"
+        variant="secondary"
+        class="find-button"
+        disabled={busy || !username.trim()}
       >
-        <label for="peer-username">对方的用户名</label>
-        <input
-          id="peer-username"
-          bind:value={username}
-          oninput={() => (peer = undefined)}
-          placeholder="输入用户名，无需 @"
-          autocomplete="off"
-          required
-        />
-        <button
-          class="button subtle find-button"
-          disabled={busy || !username.trim()}
-        >
-          查找用户
-        </button>
-      </form>
-      {#if peer}
-        <div class="found-user">
-          <span class="avatar">{peer.display_name.slice(0, 1)}</span>
-          <div>
-            <strong>{peer.display_name}</strong>
-            <p>@{peer.username}</p>
-          </div>
-          <button class="button primary" disabled={busy} onclick={start}>
-            开始聊天<ArrowUpRight size={16} />
-          </button>
+        查找用户
+      </Button>
+    </form>
+    {#if peer}
+      <div class="found-user">
+        <Avatar.Root>
+          <Avatar.Fallback>{peer.display_name.slice(0, 1)}</Avatar.Fallback>
+        </Avatar.Root>
+        <div class="found-user-copy">
+          <strong>{peer.display_name}</strong>
+          <p>@{peer.username}</p>
         </div>
-      {/if}
-      {#if error}
-        <p class="form-error" role="alert">
-          {error}
-        </p>
-      {/if}
-    </Dialog.Content>
-  </Dialog.Portal>
+        <Button disabled={busy} onclick={start}>
+          开始聊天<ArrowUpRight size={16} />
+        </Button>
+      </div>
+    {/if}
+    {#if error}
+      <p class="form-error" role="alert">
+        {error}
+      </p>
+    {/if}
+  </Dialog.Content>
 </Dialog.Root>

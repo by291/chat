@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import { Textarea } from '#lib/components/ui/textarea/index.js';
+
   import { Send, Paperclip } from '@lucide/svelte';
   import type { ChatSync } from './sync.svelte';
   import { membershipId } from './models';
@@ -13,8 +17,10 @@
   } = $props();
 
   let composing = false;
-  let input: HTMLTextAreaElement;
-  let files: HTMLInputElement;
+  // Component refs are bindable props; their assignment participates in Svelte's
+  // lifecycle even though the elements themselves do not own the message draft.
+  let input = $state<HTMLTextAreaElement>(null!);
+  let files = $state<HTMLInputElement>(null!);
 
   let draft = $derived(sync.drafts[id] ?? '');
   // Count Unicode scalars like Rust's chars(), rather than UTF-16 code units.
@@ -66,11 +72,11 @@
   {#if sync.uploads.error}<p class="form-error" role="alert">
       {sync.uploads.error}
     </p>{/if}
-  <input
+  <Input
     type="file"
     multiple
-    class="visually-hidden"
-    bind:this={files}
+    class="sr-only"
+    bind:ref={files}
     aria-label="选择附件"
     onchange={() => {
       const selected = Array.from(files.files ?? []);
@@ -89,26 +95,31 @@
       sendDraft();
     }}
   >
-    <button
+    <Button
       type="button"
-      class="icon-button"
+      variant="ghost"
+      size="icon"
       aria-label="添加附件"
       onclick={() => files.click()}
     >
       <Paperclip size={19} />
-    </button>
-    <textarea
-      bind:this={input}
+    </Button>
+    <Textarea
+      bind:ref={input}
+      class="min-h-0 field-sizing-fixed"
       value={draft}
       aria-label="输入消息"
       placeholder="写点什么…"
-      rows="1"
+      rows={1}
       oninput={resizeAndPublishTyping}
       onkeydown={handleKeydown}
       oncompositionstart={() => (composing = true)}
-      oncompositionend={() => (composing = false)}></textarea>
-    <button
-      class="send-button"
+      oncompositionend={() => (composing = false)}
+    />
+    <Button
+      type="submit"
+      size="icon"
+      class="size-11 rounded-xl"
       aria-label="发送消息"
       disabled={(!draft.trim() && !attachmentIds.length) ||
         !attachmentsReady ||
@@ -116,7 +127,7 @@
         sync.loading}
     >
       <Send size={19} />
-    </button>
+    </Button>
   </form>
   <div class="composer-hint">
     <span>Enter 发送 · Shift + Enter 换行</span>

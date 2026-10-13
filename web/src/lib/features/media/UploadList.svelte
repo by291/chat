@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Progress } from '#lib/components/ui/progress/index.js';
+
   import type { MediaUploads, UploadDraft } from './uploads.svelte';
 
   let { uploads, entries }: { uploads: MediaUploads; entries: UploadDraft[] } =
@@ -17,30 +20,32 @@
         {:else if uploads.metadata(entry)?.state === 'processing'}
           <span role="status">正在处理…</span>
         {:else}
-          <progress
-            max="100"
+          <Progress
+            max={100}
             value={entry.progress}
             aria-label={`${entry.file.name} 上传进度`}
-          ></progress>
+          />
           <span>{entry.progress}%</span>
         {/if}
       </div>
       {#if entry.error}
-        <button
+        <Button
           type="button"
-          class="button subtle compact"
+          variant="secondary"
+          size="sm"
           onclick={() => uploads.retry(entry.localId)}
         >
           重试
-        </button>
+        </Button>
       {/if}
-      <button
+      <Button
         type="button"
-        class="button subtle compact"
+        variant="secondary"
+        size="sm"
         onclick={() => uploads.cancel(entry.localId)}
       >
         取消
-      </button>
+      </Button>
     </li>
   {/each}
 </ul>

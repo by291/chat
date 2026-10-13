@@ -1,16 +1,16 @@
-/* Shared tokens, document defaults and reusable controls. */
+/* Shared tokens, document defaults and form layout. */
 
 :root {
   font-family: Inter, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   color: #263b3b;
   background: #f6f8f7;
   font-synthesis: none;
-  --accent: #18816f;
-  --accent-hover: #126a5c;
+  --brand: #18816f;
+  --brand-hover: #126a5c;
   --surface: #fff;
   --background: #f6f8f7;
   --line: #e5eeea;
-  --muted: #7b8d86;
+  --subtle-text: #7b8d86;
   --text: #263b3b;
   --soft: #edf5f1;
   --danger: #bd484b;
@@ -20,11 +20,6 @@
 }
 body {
   margin: 0;
-}
-button,
-input,
-textarea {
-  font: inherit;
 }
 button,
 a,
@@ -39,18 +34,10 @@ a {
 button {
   cursor: pointer;
 }
-button:disabled {
-  cursor: wait;
-  opacity: 0.55;
-}
 a {
   text-decoration: none;
-  color: inherit;
 }
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-textarea:focus-visible {
+a:not([data-slot]):focus-visible {
   outline: 3px solid #6ab4a0;
   outline-offset: 3px;
 }
@@ -70,7 +57,7 @@ h2 {
   letter-spacing: -0.5px;
 }
 .muted {
-  color: var(--muted);
+  color: var(--subtle-text);
   line-height: 1.8;
 }
 .eyebrow {
@@ -78,7 +65,7 @@ h2 {
   font-size: 11px;
   letter-spacing: 2px;
   font-weight: 650;
-  color: var(--accent);
+  color: var(--brand);
   margin-bottom: 14px;
 }
 .brand {
@@ -99,70 +86,12 @@ h2 {
   width: 45px;
   height: 45px;
   border-radius: 15px;
-  background: var(--accent);
+  background: var(--brand);
   color: white;
   flex-shrink: 0;
 }
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  padding: 11px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  transition: background 0.15s;
-}
-.button.primary {
-  background: var(--accent);
-  color: #fff;
-}
-.button.primary:hover {
-  background: var(--accent-hover);
-}
-.button.subtle {
-  background: var(--soft);
-  color: var(--accent);
-}
-.icon-button {
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-}
-.icon-button:hover {
-  background: var(--soft);
-  color: var(--accent);
-}
-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
+.form-label {
   margin: 22px 0 8px;
-}
-input,
-textarea {
-  width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 13px 14px;
-  font-size: 14px;
-  color: var(--text);
-}
-input::placeholder,
-textarea::placeholder {
-  color: #a1afa8;
-}
-input:focus,
-textarea:focus {
-  border-color: #78af9f;
 }
 .input-prefix {
   position: relative;
@@ -170,7 +99,8 @@ textarea:focus {
 .input-prefix > span {
   position: absolute;
   left: 15px;
-  top: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   color: #92a39a;
 }
 .input-prefix > input {
@@ -193,12 +123,12 @@ textarea:focus {
 }
 .field-help {
   font-size: 11px;
-  color: var(--muted);
+  color: var(--subtle-text);
   margin-top: 8px;
 }
 .success {
   font-size: 12px;
-  color: var(--accent);
+  color: var(--brand);
 }
 .online-dot {
   width: 7px;
@@ -215,5 +145,5 @@ textarea:focus {
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  color: var(--muted);
+  color: var(--subtle-text);
 }

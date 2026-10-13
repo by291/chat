@@ -1,4 +1,7 @@
 <script lang="ts">
+  import * as Card from '#lib/components/ui/card/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+
   import { onMount } from 'svelte';
   import { Monitor, ShieldCheck } from '@lucide/svelte';
   import { settingsApi } from './api';
@@ -38,7 +41,7 @@
   });
 </script>
 
-<section class="settings-card">
+<Card.Root class="settings-card gap-0 p-6" role="region" aria-label="登录设备">
   <div class="section-heading">
     <span class="eyebrow">SECURITY</span>
     <h2>登录设备</h2>
@@ -59,8 +62,8 @@
             </span>
           {/if}
         </div>
-        <button
-          class="button subtle"
+        <Button
+          variant="secondary"
           disabled={pending !== null}
           onclick={() => revoke(session.id)}
         >
@@ -69,11 +72,11 @@
             : session.is_current
               ? '撤销此设备'
               : '撤销'}
-        </button>
+        </Button>
       </div>
     {/each}
   </div>
   {#if error}
     <p class="form-error" role="alert">{error}</p>
   {/if}
-</section>
+</Card.Root>

@@ -116,6 +116,13 @@ transaction.commit().await?;
 - Keep `routes/` focused on routing and composition. Put business workflows under
   `lib/features/`, reusable transport under `lib/api-client/`, and shared styling under
   `lib/styles/`. Shared modules must not import features or routes.
+- Reuse shadcn-svelte primitives from `lib/components/ui/` for common controls.
+  Keep feature state, API calls and timers out of this presentational layer. Add
+  components with the pinned CLI and `web/components.json`; review local adaptations
+  before overwriting component source. Use the existing `#lib` import aliases.
+- Prefer component variants and theme tokens over new global button/input/dialog
+  selectors. Form buttons must declare `type="submit"` explicitly; UI components
+  expose their native element through `bind:ref`, not `bind:this`.
 - Feature API adapters are the only place to invoke typed HTTP methods. Components
   call their feature adapter/state owner; they must not construct API URLs or own
   socket, replay, or cache-consistency rules.

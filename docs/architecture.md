@@ -84,6 +84,8 @@ web/src/
   routes/                       routing and application composition
   lib/
     api-client/                 typed HTTP client, shared errors, generated schema
+    components/ui/              shadcn-svelte presentational controls and primitives
+    utils.ts                    class merging and shared UI prop types
     styles/                     shared foundation/layout/responsive/theme cascade
     features/
       auth/                     auth API, session lifetime, identity form and styles
@@ -105,6 +107,19 @@ web/src/
 Routes and components consume feature state/API adapters. Transport is reusable
 and feature-independent. A component should not need to understand a replay cursor,
 SQL transaction, websocket subscription or typed HTTP URL to display a conversation.
+
+Common controls use the shadcn-svelte component source in `components/ui/`.
+This shared layer depends on Bits UI, styling utilities and Svelte, and never imports
+feature state or transport. Forms, avatar authorization and blob URL lifetimes stay
+with their features. The UI migration does not change the query cache, coordinator,
+replay, uploads or session ownership.
+
+`styles/ui-theme.css` maps the product palette to shadcn semantic tokens. Product
+colors use `--brand` and `--subtle-text` so the library's `--accent` and `--muted`
+surface tokens remain distinct. The existing `data-theme` attribute also drives
+Tailwind's dark variant, including dialogs portaled beneath the document root.
+See [UI components](development/ui-components.md) for component commands and local
+adaptations.
 
 The query cache owns authoritative server records. The coordinator owns selection,
 drafts and optimistic sends. The conversation store owns per-conversation request
@@ -131,7 +146,8 @@ capabilities; they never become message fields or persistent cache records.
 - Media retains immutable retired-key tombstones. The worker revisits at most 50
   oldest-due keys per pass on an hourly schedule, protecting current references and
   releasing quota only during the original confirmed retirement.
-- Feature styles and shared styles retain the original cascade order in `app.css`.
+- UI animation and semantic theme layers load before workflow styles in `app.css`.
+  Feature styles and shared styles retain their relative cascade order.
   Shared overrides remain last because their specificity/order is observable.
 
 ## Verification
@@ -148,6 +164,7 @@ still require review; the guard is not a complete dependency analysis.
 Integration checks retain
 real PostgreSQL, Valkey, Centrifugo, SeaweedFS and browsers; they cover the invariants
 above rather than mocking the end-to-end application.
+
 
 The original phase-one acceptance remains in `docs/operations/phase-1-acceptance.md`.
 Private group episodes, media limits and deployment configuration are documented in

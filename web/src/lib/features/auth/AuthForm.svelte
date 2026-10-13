@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import { Label } from '#lib/components/ui/label/index.js';
+
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
@@ -115,8 +119,8 @@
       </p>
       <form onsubmit={submit}>
         {#if registering}
-          <label for="invitation">邀请码</label>
-          <input
+          <Label class="form-label" for="invitation">邀请码</Label>
+          <Input
             id="invitation"
             name="invitation"
             bind:value={invitation}
@@ -125,10 +129,10 @@
             placeholder="粘贴你的邀请码"
           />
         {/if}
-        <label for="username">用户名</label>
+        <Label class="form-label" for="username">用户名</Label>
         <div class="input-prefix">
-          <span>@</span>
-          <input
+          <span aria-hidden="true">@</span>
+          <Input
             id="username"
             name="username"
             bind:value={username}
@@ -138,8 +142,8 @@
           />
         </div>
         {#if registering}
-          <label for="display-name">昵称</label>
-          <input
+          <Label class="form-label" for="display-name">昵称</Label>
+          <Input
             id="display-name"
             name="display_name"
             bind:value={displayName}
@@ -148,8 +152,8 @@
             placeholder="朋友怎么称呼你"
           />
         {/if}
-        <label for="password">密码</label>
-        <input
+        <Label class="form-label" for="password">密码</Label>
+        <Input
           id="password"
           name="password"
           type="password"
@@ -161,17 +165,13 @@
         {#if error}
           <p class="form-error" role="alert">{error}</p>
         {/if}
-        <button
-          class="button primary auth-submit"
-          type="submit"
-          disabled={auth.pending}
-        >
+        <Button class="auth-submit" type="submit" disabled={auth.pending}>
           {auth.pending
             ? '请稍候…'
             : registering
               ? '创建账号'
               : '登录'}<ArrowRight size={18} />
-        </button>
+        </Button>
       </form>
       <p class="auth-switch">
         {registering ? '已有账号？' : '第一次来到这里？'}

@@ -40,7 +40,7 @@
   margin: 18px 0 30px;
 }
 .story-copy h1 > span {
-  color: var(--accent);
+  color: var(--brand);
 }
 .story-copy p {
   font-size: 14px;
@@ -80,12 +80,12 @@
 }
 .auth-switch {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--subtle-text);
   text-align: center;
   margin: 25px 0;
 }
 .auth-switch a {
-  color: var(--accent);
+  color: var(--brand);
   font-weight: 600;
 }
 .auth-note {

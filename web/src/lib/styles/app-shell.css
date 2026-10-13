@@ -22,23 +22,6 @@
   gap: 16px;
   flex-direction: column;
 }
-.avatar {
-  display: grid;
-  place-items: center;
-  border-radius: 15px;
-  background: #dcece2;
-  color: #447b60;
-  font-weight: 650;
-  width: 46px;
-  height: 46px;
-  flex-shrink: 0;
-}
-.avatar.small {
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  font-size: 12px;
-}
 .app-content {
   flex: 1;
   min-width: 0;

@@ -1,4 +1,8 @@
 <script lang="ts">
+  import * as Card from '#lib/components/ui/card/index.js';
+  import * as NativeSelect from '#lib/components/ui/native-select/index.js';
+  import { Label } from '#lib/components/ui/label/index.js';
+
   import ProfileForm from '#lib/features/settings/ProfileForm.svelte';
   import AvatarEditor from '#lib/features/settings/AvatarEditor.svelte';
   import SessionsPanel from '#lib/features/settings/SessionsPanel.svelte';
@@ -24,21 +28,26 @@
       }}
     />
   {/if}
-  <section class="settings-card">
+  <Card.Root
+    class="settings-card gap-0 p-6"
+    role="region"
+    aria-label="聊天偏好"
+  >
     <div class="section-heading">
       <h2>聊天偏好</h2>
       <p class="muted">选择看起来舒服的界面。</p>
     </div>
-    <label for="theme">外观</label>
-    <select
+    <Label class="form-label" for="theme">外观</Label>
+    <NativeSelect.Root
+      class="w-full"
       id="theme"
       value={theme.value}
       onchange={(e) => theme.set(e.currentTarget.value as Theme)}
     >
-      <option value="system">跟随系统</option>
-      <option value="light">浅色</option>
-      <option value="dark">深色</option>
-    </select>
-  </section>
+      <NativeSelect.Option value="system">跟随系统</NativeSelect.Option>
+      <NativeSelect.Option value="light">浅色</NativeSelect.Option>
+      <NativeSelect.Option value="dark">深色</NativeSelect.Option>
+    </NativeSelect.Root>
+  </Card.Root>
   <SessionsPanel />
 </main>

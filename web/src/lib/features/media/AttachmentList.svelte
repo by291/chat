@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Button } from '#lib/components/ui/button/index.js';
+
   import { tick, onDestroy } from 'svelte';
 
   import { createMediaApi, downloadBlob } from './api';
@@ -144,15 +146,16 @@
       {/if}
     </div>
   {/if}
-  <button
+  <Button
     type="button"
-    class="attachment-download"
+    variant="ghost"
+    class="attachment-download h-auto whitespace-normal"
     disabled={busy}
     onclick={download}
   >
     {busy ? '正在下载…' : attachment.filename}
     <small>{(attachment.size_bytes / 1024).toFixed(1)} KiB</small>
-  </button>
+  </Button>
   {#if error}
     <p class="form-error" role="alert">{error}</p>
   {/if}

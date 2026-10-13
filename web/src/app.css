@@ -1,6 +1,8 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+@import './lib/styles/ui-theme.css';
 
-/* Preserve the established cascade: feature blocks, shared controls, then overrides. */
+/* UI utilities use layers; workflow layouts and final overrides retain their order. */
 @import './lib/features/chat/chat.css';
 @import './lib/features/media/media.css';
 @import './lib/styles/foundation.css';

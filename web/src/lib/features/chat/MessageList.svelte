@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { Button } from '#lib/components/ui/button/index.js';
+
   import { onMount, tick, untrack } from 'svelte';
   import { Check, CheckCheck, ArrowDown, RotateCcw } from '@lucide/svelte';
   import type { ChatSync } from './sync.svelte';
@@ -134,13 +136,15 @@
       aria-live="polite"
     >
       {#if sync.hasOlder}
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           class="history-button"
           disabled={sync.loadingOlder}
           onclick={loadOlderPreservingScroll}
         >
           {sync.loadingOlder ? '正在加载…' : '加载更早的消息'}
-        </button>
+        </Button>
       {/if}
       {#if sync.loading}
         <p class="message-placeholder">正在加载聊天记录…</p>
@@ -201,9 +205,14 @@
               </small>{/if}
             <div class="message-meta">
               {#if message.status === 'failed'}
-                <button onclick={() => sync.retry(message.client_message_id)}>
+                <Button
+                  variant="link"
+                  size="xs"
+                  class="h-auto p-0 text-destructive"
+                  onclick={() => sync.retry(message.client_message_id)}
+                >
                   <RotateCcw size={12} />发送失败，重试
-                </button>
+                </Button>
               {:else}
                 <span>正在发送…</span>
               {/if}
@@ -215,8 +224,8 @@
     </div>
   </div>
   {#if !following}
-    <button class="jump-latest" onclick={scrollToLatest}>
+    <Button variant="secondary" class="jump-latest" onclick={scrollToLatest}>
       <ArrowDown size={15} />查看最新消息
-    </button>
+    </Button>
   {/if}
 </div>

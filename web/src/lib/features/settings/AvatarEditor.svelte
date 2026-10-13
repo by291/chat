@@ -1,4 +1,9 @@
 <script lang="ts">
+  import * as Card from '#lib/components/ui/card/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import { Label } from '#lib/components/ui/label/index.js';
+
   import { useChat } from '../chat/context.svelte';
   import UploadList from '../media/UploadList.svelte';
   import ProfileAvatar from './ProfileAvatar.svelte';
@@ -42,14 +47,14 @@
   }
 </script>
 
-<section class="settings-card">
+<Card.Root class="settings-card gap-0 p-6" role="region" aria-label="头像">
   <div class="section-heading">
     <h2>头像</h2>
     <p class="muted">选择 JPEG、PNG 或 WebP 图片。</p>
   </div>
   <ProfileAvatar {userId} {name} {revision} />
-  <label for="avatar-file">选择头像</label>
-  <input
+  <Label class="form-label" for="avatar-file">选择头像</Label>
+  <Input
     id="avatar-file"
     type="file"
     accept="image/jpeg,image/png,image/webp"
@@ -62,16 +67,12 @@
   />
   {#if uploads && entries.length}<UploadList {uploads} {entries} />{/if}
   <div class="form-actions">
-    <button
-      class="button primary"
-      disabled={busy || !ready}
-      onclick={() => save(false)}
-    >
+    <Button disabled={busy || !ready} onclick={() => save(false)}>
       保存头像
-    </button>
-    <button class="button subtle" disabled={busy} onclick={() => save(true)}>
+    </Button>
+    <Button variant="secondary" disabled={busy} onclick={() => save(true)}>
       移除头像
-    </button>
+    </Button>
   </div>
   {#if error}<p class="form-error" role="alert">{error}</p>{/if}
-</section>
+</Card.Root>
