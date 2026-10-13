@@ -148,27 +148,49 @@ export async function rustSqlViolations() {
   );
 
   for (const filename of files) {
-    if (
-      filename.endsWith("/repository.rs") ||
-      filename === "src/infrastructure/db.rs"
-    )
-      continue;
     const source = await readFile(path.join(root, filename), "utf8");
-    if (/\bsqlx\s*::\s*(?:query(?:_as|_scalar)?|raw_sql)\s*[<(]/.test(source)) {
-      violations.push(
-        `${filename}: move PostgreSQL queries into the owning repository`,
-      );
-    }
+    violations.push(...rustSqlSourceViolations(filename, source));
   }
 
   return violations;
+}
+
+/** Inspect persistence ownership independently of the current source tree. */
+export function rustSqlSourceViolations(filename, source) {
+  const repository = /(?:\/|_)repository\.rs$/.test(filename);
+  if (repository || filename === "src/infrastructure/db.rs") return [];
+  if (!/\bsqlx\s*::\s*(?:query(?:_as|_scalar)?|raw_sql)\s*[<(]/.test(source))
+    return [];
+
+  return [`${filename}: move PostgreSQL queries into the owning repository`];
+}
+
+/** Named workflow adapters have the same boundary as a feature's http.rs. */
+export function rustLayerSourceViolations(filename, source) {
+  if (
+    !/^src\/(?:auth|conversations|media|realtime|users)\//.test(filename) ||
+    /(?:\/|_)http\.rs$/.test(filename) ||
+    filename.endsWith("/mod.rs")
+  )
+    return [];
+  const imports = [...source.matchAll(/\buse\s+([^;]+);/g)];
+  const importsHttpAdapter = imports.some(
+    ([, declaration]) =>
+      /^(?:crate|super|self)\s*::/.test(declaration) &&
+      /\b(?:\w+_)?http\s*(?:::|[,{}])/.test(declaration),
+  );
+  if (!importsHttpAdapter) return [];
+
+  return [
+    `${filename}: application and persistence modules must not import HTTP adapters`,
+  ];
 }
 
 export async function rustLayerViolations() {
   const violations = [];
   const files = (await filesUnder("src")).filter(
     (filename) =>
-      /^src\/(?:auth|conversations|realtime|users)\//.test(filename) &&
+      /^src\/(?:auth|conversations|media|realtime|users)\//.test(filename) &&
       filename.endsWith(".rs") &&
       !filename.endsWith("/http.rs") &&
       !filename.endsWith("/mod.rs"),
@@ -176,17 +198,7 @@ export async function rustLayerViolations() {
 
   for (const filename of files) {
     const source = await readFile(path.join(root, filename), "utf8");
-    const imports = [...source.matchAll(/\buse\s+([^;]+);/g)];
-    const importsHttpAdapter = imports.some(
-      ([, declaration]) =>
-        /^(?:crate|super|self)\s*::/.test(declaration) &&
-        /\bhttp\s*(?:::|[,{}])/.test(declaration),
-    );
-    if (importsHttpAdapter) {
-      violations.push(
-        `${filename}: application and persistence modules must not import HTTP adapters`,
-      );
-    }
+    violations.push(...rustLayerSourceViolations(filename, source));
   }
 
   return violations;

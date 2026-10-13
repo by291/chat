@@ -48,3 +48,6 @@ id_type!(SessionId);
 id_type!(ConversationId);
 id_type!(MessageId);
 id_type!(EventId);
+id_type!(MembershipId);
+id_type!(AttachmentId);
+id_type!(UploadAttemptId);

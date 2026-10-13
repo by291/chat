@@ -1,6 +1,9 @@
 <script lang="ts">
+  import ProfileAvatar from '../settings/ProfileAvatar.svelte';
   import { Search, MessageCircle } from '@lucide/svelte';
   import StartConversationDialog from './StartConversationDialog.svelte';
+  import GroupDialog from './GroupDialog.svelte';
+  import { isGroup, conversationName } from './models';
   import type { ChatSync } from './sync.svelte';
 
   let {
@@ -13,7 +16,7 @@
 
   let conversations = $derived(
     sync.conversations.filter((c) =>
-      `${c.peer.username} ${c.peer.display_name}`
+      `${conversationName(c)} ${isGroup(c) ? '' : c.peer.username}`
         .toLowerCase()
         .includes(filter.toLowerCase()),
     ),
@@ -35,7 +38,10 @@
         <span class="heading-dot">.</span>
       </h1>
     </div>
-    <StartConversationDialog {sync} />
+    <div class="group-actions">
+      <StartConversationDialog {sync} />
+      <GroupDialog {sync} />
+    </div>
   </header>
   <div class="search-field">
     <Search size={16} />
@@ -64,10 +70,19 @@
         href={`/app/chats/${conversation.id}`}
         aria-current={sync.selectedId === conversation.id ? 'page' : undefined}
       >
-        <span class="avatar">{conversation.peer.display_name.slice(0, 1)}</span>
+        {#if isGroup(conversation)}
+          <span class="avatar">
+            {Array.from(conversationName(conversation))[0]}
+          </span>
+        {:else}
+          <ProfileAvatar
+            userId={conversation.peer.id}
+            name={conversation.peer.display_name}
+          />
+        {/if}
         <div class="conversation-copy">
           <div class="conversation-name">
-            <strong>{conversation.peer.display_name}</strong>
+            <strong>{conversationName(conversation)}</strong>
             {#if conversation.last_message}
               <time>
                 {time(conversation.last_message.created_at)}
@@ -75,7 +90,11 @@
             {/if}
           </div>
           <span class="conversation-username">
-            @{conversation.peer.username}
+            {#if isGroup(conversation)}
+              群聊 · {conversation.member_count} 位成员
+            {:else}
+              @{conversation.peer.username}
+            {/if}
           </span>
           <div class="conversation-preview">
             <p>

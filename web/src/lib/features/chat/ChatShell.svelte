@@ -6,6 +6,9 @@
   import ConversationList from './ConversationList.svelte';
   import MessageList from './MessageList.svelte';
   import Composer from './Composer.svelte';
+  import GroupDetails from './GroupDetails.svelte';
+  import ProfileAvatar from '../settings/ProfileAvatar.svelte';
+  import { isGroup, conversationName } from './models';
 
   let {
     id = null,
@@ -39,7 +42,7 @@
 </script>
 
 <svelte:head>
-  <title>{chat.sync?.current?.peer.display_name ?? '聊天'} · Chat</title>
+  <title>{conversationName(chat.sync?.current)} · Chat</title>
 </svelte:head>
 {#if chat.sync}
   {@const sync = chat.sync}
@@ -47,6 +50,7 @@
     <ConversationList {sync} />
     <section class="chat-panel">
       {#if id}
+        {@const current = sync.current}
         <header class="chat-heading">
           <button
             class="icon-button mobile-back"
@@ -55,30 +59,40 @@
           >
             <ArrowLeft size={21} />
           </button>
-          <span class="avatar">
-            {sync.current?.peer.display_name.slice(0, 1) ?? '…'}
-          </span>
+          {#if current && !isGroup(current)}
+            <ProfileAvatar
+              userId={current.peer.id}
+              name={current.peer.display_name}
+            />
+          {:else}
+            <span class="avatar">
+              {Array.from(conversationName(current))[0] ?? '…'}
+            </span>
+          {/if}
           <div class="chat-person">
-            <h2>{sync.current?.peer.display_name ?? '正在加载…'}</h2>
+            <h2>{conversationName(current)}</h2>
             <p>
               {#if sync.typingByConversation[id]}
                 <span class="typing-status">正在输入…</span>
-              {:else if sync.current}
+              {:else if isGroup(current)}
+                群聊 · {current.member_count} 位成员
+              {:else if current}
                 <span
                   class="online-dot"
-                  class:is-offline={!sync.onlineByUser[sync.current.peer.id]}
+                  class:is-offline={!sync.onlineByUser[current.peer.id]}
                 ></span>
-                {sync.onlineByUser[sync.current.peer.id] === true
+                {sync.onlineByUser[current.peer.id] === true
                   ? '在线'
-                  : sync.onlineByUser[sync.current.peer.id] === false
+                  : sync.onlineByUser[current.peer.id] === false
                     ? '离线'
                     : '状态暂不可用'}
                 <span class="person-username">
-                  @{sync.current.peer.username}
+                  @{current.peer.username}
                 </span>
               {/if}
             </p>
           </div>
+          {#if isGroup(current)}<GroupDetails {sync} />{/if}
         </header>
         {#if sync.error}
           <div class="sync-error" role="alert">
@@ -87,9 +101,12 @@
           </div>
         {/if}
         {#key id}
-          <MessageList {sync} {id} userId={sync.userId} />
-
-          <Composer {sync} {id} />
+          {#if current}
+            <MessageList {sync} {id} userId={sync.userId} />
+            <Composer {sync} {id} />
+          {:else}
+            <p class="message-placeholder">会话暂不可用，请返回会话列表。</p>
+          {/if}
         {/key}
       {:else}
         <div class="welcome-chat">

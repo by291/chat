@@ -23,17 +23,17 @@ export function createChatApi(api: ApiClient): ChatApi {
           signal,
         }),
       ),
-    snapshot: (id, before, signal) =>
+    snapshot: (id, before, signal, membership_id) =>
       unwrap(
         api.GET('/api/v1/conversations/{id}/messages', {
-          params: { path: { id }, query: { before, limit: 50 } },
+          params: { path: { id }, query: { before, limit: 50, membership_id } },
           signal,
         }),
       ),
-    events: (id, after, signal) =>
+    events: (id, after, signal, membership_id) =>
       unwrap(
         api.GET('/api/v1/conversations/{id}/events', {
-          params: { path: { id }, query: { after, limit: 200 } },
+          params: { path: { id }, query: { after, limit: 200, membership_id } },
           signal,
         }),
       ),
@@ -44,18 +44,25 @@ export function createChatApi(api: ApiClient): ChatApi {
           body,
         }),
       ),
-    read: (id, seq) =>
+    members: (id, signal) =>
+      unwrap(
+        api.GET('/api/v1/conversations/{id}/members', {
+          params: { path: { id } },
+          signal,
+        }),
+      ),
+    read: (id, seq, membership_id) =>
       unwrap(
         api.POST('/api/v1/conversations/{id}/read', {
           params: { path: { id } },
-          body: { message_seq: seq },
+          body: { message_seq: seq, membership_id },
         }),
       ),
-    typing: async (id, is_typing) => {
+    typing: async (id, is_typing, membership_id) => {
       await unwrap(
         api.POST('/api/v1/conversations/{id}/typing', {
           params: { path: { id } },
-          body: { is_typing },
+          body: { is_typing, membership_id },
         }),
       );
     },
@@ -63,6 +70,70 @@ export function createChatApi(api: ApiClient): ChatApi {
       unwrap(
         api.GET('/api/v1/users/{id}/status', { params: { path: { id } } }),
       ),
+  };
+}
+
+/** Group mutations carry the caller's current episode; stale dialogs cannot use a rejoin. */
+export function createGroupApi(api: ApiClient = sharedApi) {
+  return {
+    create: (title: string) =>
+      unwrap(api.POST('/api/v1/conversations/groups', { body: { title } })),
+    rename: (id: string, membership_id: string, title: string) =>
+      unwrap(
+        api.PATCH('/api/v1/conversations/{id}/group', {
+          params: { path: { id } },
+          body: { membership_id, title },
+        }),
+      ),
+    role: (
+      id: string,
+      membership_id: string,
+      user_id: string,
+      role: 'admin' | 'member',
+    ) =>
+      unwrap(
+        api.PATCH('/api/v1/conversations/{id}/members/{user_id}', {
+          params: { path: { id, user_id } },
+          body: { membership_id, role },
+        }),
+      ),
+    remove: (id: string, membership_id: string, user_id: string) =>
+      unwrap(
+        api.DELETE('/api/v1/conversations/{id}/members/{user_id}', {
+          params: { path: { id, user_id } },
+          body: { membership_id },
+        }),
+      ),
+    leave: (id: string, membership_id: string) =>
+      unwrap(
+        api.POST('/api/v1/conversations/{id}/leave', {
+          params: { path: { id } },
+          body: { membership_id },
+        }),
+      ),
+    transfer: (id: string, membership_id: string, user_id: string) =>
+      unwrap(
+        api.POST('/api/v1/conversations/{id}/owner', {
+          params: { path: { id } },
+          body: { membership_id, user_id },
+        }),
+      ),
+    invite: (id: string, membership_id: string) =>
+      unwrap(
+        api.POST('/api/v1/conversations/{id}/invitations', {
+          params: { path: { id } },
+          body: { membership_id },
+        }),
+      ),
+    revoke: (id: string, membership_id: string, invitation_id: string) =>
+      unwrap(
+        api.DELETE('/api/v1/conversations/{id}/invitations/{invitation_id}', {
+          params: { path: { id, invitation_id } },
+          body: { membership_id },
+        }),
+      ),
+    accept: (token: string) =>
+      unwrap(api.POST('/api/v1/group-invitations/accept', { body: { token } })),
   };
 }
 

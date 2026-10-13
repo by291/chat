@@ -3,7 +3,10 @@
 mod ids;
 mod sequence;
 
-pub use ids::{ConversationId, EventId, MessageId, SessionId, UserId};
+pub use ids::{
+    AttachmentId, ConversationId, EventId, MembershipId, MessageId, SessionId, UploadAttemptId,
+    UserId,
+};
 
 pub use sequence::Seq;
 
@@ -16,6 +19,10 @@ pub use crate::conversations::model::{
 };
 
 pub use crate::users::model::{UpdateProfile, UserStatus, UserView};
+
+pub use crate::media::model::{
+    AttachmentView, CompleteInput, DownloadGrant, UploadGrant, UploadInput,
+};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Actor {

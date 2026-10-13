@@ -19,11 +19,27 @@
 
   const registering = $derived(mode === 'register');
 
+  function destination() {
+    const next = page.url.searchParams.get('next');
+    if (!next) return '/app';
+    try {
+      const target = new URL(next, page.url.origin);
+      // Only the new same-origin join workflow may retain a token through login.
+      return target.origin === page.url.origin &&
+        target.pathname === '/app/groups/join'
+        ? target.pathname + target.search
+        : '/app';
+    } catch {
+      // Untrusted malformed redirect values fall back to the ordinary application entry.
+      return '/app';
+    }
+  }
+
   onMount(() => {
     invitation = page.url.searchParams.get('invite') ?? '';
     void auth.restore().then(() => {
       if (auth.user) {
-        void goto('/app');
+        void goto(destination());
       }
     });
   });
@@ -51,7 +67,7 @@
         });
       }
       password = '';
-      await goto('/app');
+      await goto(destination());
     } catch (reason) {
       error = reason instanceof Error ? reason.message : '请稍后重试';
     }

@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/svelte-query';
 
 export const keys = {
+  members: (id: string) => ['members', id] as const,
   conversations: ['conversations'] as const,
   messages: (id: string) => ['messages', id] as const,
 };

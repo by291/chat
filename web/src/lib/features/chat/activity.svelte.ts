@@ -5,10 +5,13 @@ export class PeerActivity {
   typingByConversation = $state<
     Record<
       string,
-      {
-        user_id: string;
-        expires_at: string;
-      }
+      Record<
+        string,
+        {
+          user_id: string;
+          expires_at: string;
+        }
+      >
     >
   >({});
   onlineByUser = $state<Record<string, boolean | undefined>>({});
@@ -21,6 +24,7 @@ export class PeerActivity {
       userId: string;
       active: () => boolean;
       epoch: () => number;
+      membership: (id: string) => string | undefined;
     },
   ) {}
 
@@ -36,28 +40,32 @@ export class PeerActivity {
       void this.refreshStatus(event.user_id);
       return;
     }
+    if (event.kind === 'membership.invalidated') return;
     if (event.user_id === this.options.userId) {
       return;
     }
     const id = event.conversation_id;
-    const prior = this.typingTimers.get(id);
+    const key = `${id}/${event.user_id}`;
+    const prior = this.typingTimers.get(key);
     if (prior) {
       clearTimeout(prior);
     }
     if (!event.is_typing || Date.parse(event.expires_at) <= Date.now()) {
-      delete this.typingByConversation[id];
+      this.clearTyping(id, event.user_id);
+      this.typingTimers.delete(key);
       return;
     }
-    this.typingByConversation[id] = {
+    this.typingByConversation[id] ??= {};
+    this.typingByConversation[id][event.user_id] = {
       user_id: event.user_id,
       expires_at: event.expires_at,
     };
     this.typingTimers.set(
-      id,
+      key,
       setTimeout(
         () => {
-          delete this.typingByConversation[id];
-          this.typingTimers.delete(id);
+          this.clearTyping(id, event.user_id);
+          this.typingTimers.delete(key);
         },
         Math.min(5000, Math.max(0, Date.parse(event.expires_at) - Date.now())),
       ),
@@ -72,10 +80,28 @@ export class PeerActivity {
     this.typingLastSent.set(id, now);
 
     try {
-      await this.options.api.typing(id, isTyping);
+      await this.options.api.typing(id, isTyping, this.options.membership(id));
     } catch {
       /* Ephemeral state is allowed to expire. */
     }
+  }
+
+  private clearTyping(id: string, user: string) {
+    if (!this.typingByConversation[id]) return;
+    delete this.typingByConversation[id][user];
+    if (!Object.keys(this.typingByConversation[id]).length)
+      delete this.typingByConversation[id];
+  }
+
+  forget(id: string) {
+    for (const [key, timer] of this.typingTimers) {
+      if (key.startsWith(`${id}/`)) {
+        clearTimeout(timer);
+        this.typingTimers.delete(key);
+      }
+    }
+    delete this.typingByConversation[id];
+    this.typingLastSent.delete(id);
   }
 
   async refreshStatus(user: string) {

@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use crate::{
     error::AppError,
     infrastructure::config::Config,
-    types::{ConversationId, EventEnvelope, UserId},
+    types::{ConversationId, EventEnvelope, MembershipId, UserId},
 };
 
 #[derive(Clone)]
@@ -25,6 +25,11 @@ pub enum RealtimeEvent {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind")]
 pub enum EphemeralEvent {
+    #[serde(rename = "membership.invalidated")]
+    MembershipInvalidated {
+        conversation_id: ConversationId,
+        membership_id: MembershipId,
+    },
     #[serde(rename = "typing.changed")]
     TypingChanged {
         conversation_id: ConversationId,

@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { Send } from '@lucide/svelte';
+  import { Send, Paperclip } from '@lucide/svelte';
   import type { ChatSync } from './sync.svelte';
+  import { membershipId } from './models';
+  import UploadList from '../media/UploadList.svelte';
 
   let {
     sync,
@@ -12,10 +14,14 @@
 
   let composing = false;
   let input: HTMLTextAreaElement;
+  let files: HTMLInputElement;
 
   let draft = $derived(sync.drafts[id] ?? '');
   // Count Unicode scalars like Rust's chars(), rather than UTF-16 code units.
   let characterCount = $derived([...draft].length);
+  const entries = $derived(sync.uploads.forConversation(id));
+  const attachmentIds = $derived(sync.uploads.readyIds(id));
+  const attachmentsReady = $derived(entries.length === attachmentIds.length);
 
   function resizeAndPublishTyping() {
     sync.drafts[id] = input.value;
@@ -25,14 +31,20 @@
   }
 
   function sendDraft() {
-    if (composing || !draft.trim() || characterCount > 4096 || sync.loading) {
+    if (
+      composing ||
+      (!draft.trim() && !attachmentIds.length) ||
+      !attachmentsReady ||
+      characterCount > 4096 ||
+      sync.loading
+    ) {
       return;
     }
     const body = draft;
     sync.drafts[id] = '';
     input.style.height = 'auto';
     void sync.setTyping(id, false);
-    void sync.send(body);
+    void sync.send(body, undefined, attachmentIds);
     input.focus();
   }
 
@@ -50,6 +62,26 @@
 </script>
 
 <div class="composer-wrap">
+  {#if entries.length}<UploadList uploads={sync.uploads} {entries} />{/if}
+  {#if sync.uploads.error}<p class="form-error" role="alert">
+      {sync.uploads.error}
+    </p>{/if}
+  <input
+    type="file"
+    multiple
+    class="visually-hidden"
+    bind:this={files}
+    aria-label="选择附件"
+    onchange={() => {
+      const selected = Array.from(files.files ?? []);
+      files.value = '';
+      void sync.uploads.add(selected, {
+        purpose: 'message',
+        conversationId: id,
+        membershipId: membershipId(sync.current),
+      });
+    }}
+  />
   <form
     class="composer"
     onsubmit={(e) => {
@@ -57,6 +89,14 @@
       sendDraft();
     }}
   >
+    <button
+      type="button"
+      class="icon-button"
+      aria-label="添加附件"
+      onclick={() => files.click()}
+    >
+      <Paperclip size={19} />
+    </button>
     <textarea
       bind:this={input}
       value={draft}
@@ -70,7 +110,10 @@
     <button
       class="send-button"
       aria-label="发送消息"
-      disabled={!draft.trim() || characterCount > 4096 || sync.loading}
+      disabled={(!draft.trim() && !attachmentIds.length) ||
+        !attachmentsReady ||
+        characterCount > 4096 ||
+        sync.loading}
     >
       <Send size={19} />
     </button>

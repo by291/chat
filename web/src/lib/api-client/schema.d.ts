@@ -106,6 +106,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create an owner-only group with its first durable event. */
+        post: operations["create_group"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{id}": {
         parameters: {
             query?: never;
@@ -140,6 +157,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{id}/group": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename only through an active owner/admin episode. */
+        patch: operations["rename_group"];
+        trace?: never;
+    };
+    "/api/v1/conversations/{id}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Return the single plaintext copy of a new join token. */
+        post: operations["create_group_invitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{id}/invitations/{invitation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke a group token through current managerial authority. */
+        delete: operations["revoke_group_invitation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{id}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leave the current episode; owners must transfer first. */
+        post: operations["leave_group"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read current members and their eligible read cursors. */
+        get: operations["group_members"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an authorized target and invalidate its ended membership episode. */
+        delete: operations["remove_group_member"];
+        options?: never;
+        head?: never;
+        /** An owner promotes/demotes a member; ownership uses the transfer operation. */
+        patch: operations["set_group_role"];
+        trace?: never;
+    };
     "/api/v1/conversations/{id}/messages": {
         parameters: {
             query?: never;
@@ -152,6 +272,23 @@ export interface paths {
         put?: never;
         /** Map idempotent message creation to 201 or 200. */
         post: operations["send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{id}/owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Transfer ownership without leaving a committed ownerless group. */
+        post: operations["transfer_group_owner"];
         delete?: never;
         options?: never;
         head?: never;
@@ -186,6 +323,109 @@ export interface paths {
         put?: never;
         /** Publish a short-lived typing hint after membership authorization. */
         post: operations["typing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/group-invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Atomically accept a live invitation and create a new membership episode. */
+        post: operations["accept_group_invitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Allocate an upload scoped to the current actor and membership episode. */
+        post: operations["media_create_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect owned processing state or an authorized visible reference. */
+        get: operations["media_get_attachment"];
+        put?: never;
+        post?: never;
+        /** Cancel an unreferenced upload, preserving outstanding PUT deadlines for cleanup. */
+        delete: operations["media_cancel_upload"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/{id}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Seal the selected attempt and enqueue processing idempotently. */
+        post: operations["media_complete_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Authorize a short-lived immutable original or sanitized thumbnail download. */
+        get: operations["media_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/media/{id}/upload-url": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Renew a grant with a new independently reserved staging attempt. */
+        post: operations["media_renew_upload"];
         delete?: never;
         options?: never;
         head?: never;
@@ -260,6 +500,41 @@ export interface paths {
         patch: operations["update"];
         trace?: never;
     };
+    "/api/v1/users/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Atomically select a ready avatar belonging to the authenticated actor. */
+        put: operations["users_set_avatar"];
+        post?: never;
+        /** Clear the authenticated actor's avatar while preserving safe cleanup grace. */
+        delete: operations["users_clear_avatar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Resolve a short-lived sanitized avatar grant for an authenticated profile observer. */
+        get: operations["users_avatar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{id}/status": {
         parameters: {
             query?: never;
@@ -281,17 +556,47 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AcceptGroupInvitationInput: {
+            token: string;
+        };
         ApiErrorBody: {
             code: string;
             message: string;
             request_id: string;
+        };
+        /** Format: uuid */
+        AttachmentId: string;
+        /** @enum {string} */
+        AttachmentPurpose: "message" | "avatar";
+        /** @enum {string} */
+        AttachmentState: "uploading" | "processing" | "ready" | "failed" | "expired";
+        AttachmentView: {
+            content_type: string;
+            error_code?: string | null;
+            filename: string;
+            /** Format: int32 */
+            height?: number | null;
+            id: components["schemas"]["AttachmentId"];
+            purpose: components["schemas"]["AttachmentPurpose"];
+            sha256?: string | null;
+            /** Format: int64 */
+            size_bytes: number;
+            state: components["schemas"]["AttachmentState"];
+            /** Format: int32 */
+            width?: number | null;
+        };
+        AvatarInput: {
+            attachment_id: components["schemas"]["AttachmentId"];
+        };
+        CompleteInput: {
+            attempt_id: components["schemas"]["UploadAttemptId"];
         };
         ConversationEvent: {
             envelope: components["schemas"]["EventEnvelope"];
             payload: components["schemas"]["ConversationEventPayload"];
         };
         /** @enum {string} */
-        ConversationEventKind: "conversation.created" | "message.created" | "receipt.updated";
+        ConversationEventKind: "conversation.created" | "message.created" | "receipt.updated" | "group.updated" | "membership.updated";
         ConversationEventPayload: {
             data: {
                 initiator_id: components["schemas"]["UserId"];
@@ -306,9 +611,21 @@ export interface components {
             data: components["schemas"]["ReceiptData"];
             /** @enum {string} */
             type: "receipt.updated";
+        } | {
+            data: {
+                title: string;
+            };
+            /** @enum {string} */
+            type: "group.updated";
+        } | {
+            data: components["schemas"]["MembershipChange"][];
+            /** @enum {string} */
+            type: "membership.updated";
         };
         /** Format: uuid */
         ConversationId: string;
+        /** @description Direct summaries keep their established JSON; only groups carry a kind discriminator. */
+        ConversationSummary: components["schemas"]["ConversationView"] | components["schemas"]["GroupConversationView"];
         ConversationView: {
             id: components["schemas"]["ConversationId"];
             last_message?: null | components["schemas"]["MessageView"];
@@ -322,7 +639,22 @@ export interface components {
         DirectInput: {
             peer_id: components["schemas"]["UserId"];
         };
+        DownloadGrant: {
+            /** Format: date-time */
+            expires_at: string;
+            headers: {
+                [key: string]: string;
+            };
+            url: string;
+        };
+        /** @enum {string} */
+        DownloadVariant: "original" | "thumbnail";
         EphemeralEvent: {
+            conversation_id: components["schemas"]["ConversationId"];
+            /** @enum {string} */
+            kind: "membership.invalidated";
+            membership_id: components["schemas"]["MembershipId"];
+        } | {
             conversation_id: components["schemas"]["ConversationId"];
             /** Format: date-time */
             expires_at: string;
@@ -349,21 +681,79 @@ export interface components {
             events: components["schemas"]["ConversationEvent"][];
             has_more: boolean;
             last_seq: components["schemas"]["Seq"];
+            membership?: null | components["schemas"]["MembershipContext"];
             snapshot_seq: components["schemas"]["Seq"];
+        };
+        GroupActionInput: {
+            membership_id: components["schemas"]["MembershipId"];
+        };
+        GroupConversationView: {
+            id: components["schemas"]["ConversationId"];
+            kind: components["schemas"]["GroupKind"];
+            last_message?: null | components["schemas"]["MessageView"];
+            latest_event_seq: components["schemas"]["Seq"];
+            /** Format: int32 */
+            member_count: number;
+            membership: components["schemas"]["MembershipContext"];
+            my_read_seq: components["schemas"]["Seq"];
+            my_role: components["schemas"]["GroupRole"];
+            title: string;
+            /** Format: int32 */
+            unread_count: number;
+        };
+        GroupInput: {
+            title: string;
+        };
+        GroupInvitationView: {
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: uuid */
+            invitation_id: string;
+            token: string;
+        };
+        /** @enum {string} */
+        GroupKind: "group";
+        GroupMemberView: {
+            joined_seq: components["schemas"]["Seq"];
+            membership_id: components["schemas"]["MembershipId"];
+            read_seq: components["schemas"]["Seq"];
+            role: components["schemas"]["GroupRole"];
+            user: components["schemas"]["UserView"];
+        };
+        /** @enum {string} */
+        GroupRole: "owner" | "admin" | "member";
+        GroupRoleInput: {
+            membership_id: components["schemas"]["MembershipId"];
+            role: components["schemas"]["GroupRole"];
         };
         LoginInput: {
             device_label: string;
             password: string;
             username: string;
         };
+        MembershipChange: {
+            active: boolean;
+            joined_seq: components["schemas"]["Seq"];
+            membership_id: components["schemas"]["MembershipId"];
+            role: components["schemas"]["GroupRole"];
+            user_id: components["schemas"]["UserId"];
+        };
+        MembershipContext: {
+            joined_seq: components["schemas"]["Seq"];
+            membership_id: components["schemas"]["MembershipId"];
+        };
+        /** Format: uuid */
+        MembershipId: string;
         /** Format: uuid */
         MessageId: string;
         MessageSnapshot: {
             items: components["schemas"]["MessageView"][];
+            membership?: null | components["schemas"]["MembershipContext"];
             next_before?: null | components["schemas"]["Seq"];
             snapshot_seq: components["schemas"]["Seq"];
         };
         MessageView: {
+            attachments?: components["schemas"]["AttachmentView"][];
             body: string;
             /** Format: uuid */
             client_message_id: string;
@@ -373,21 +763,14 @@ export interface components {
             created_seq: components["schemas"]["Seq"];
             id: components["schemas"]["MessageId"];
             sender_id: components["schemas"]["UserId"];
+            sender_name?: string | null;
         };
-        Page_ConversationView: {
-            items: {
-                id: components["schemas"]["ConversationId"];
-                last_message?: null | components["schemas"]["MessageView"];
-                latest_event_seq: components["schemas"]["Seq"];
-                my_read_seq: components["schemas"]["Seq"];
-                peer: components["schemas"]["UserView"];
-                peer_read_seq: components["schemas"]["Seq"];
-                /** Format: int32 */
-                unread_count: number;
-            }[];
+        Page_ConversationSummary: {
+            items: (components["schemas"]["ConversationView"] | components["schemas"]["GroupConversationView"])[];
             next_cursor?: string | null;
         };
         ReadInput: {
+            membership_id?: null | components["schemas"]["MembershipId"];
             message_seq: components["schemas"]["Seq"];
         };
         ReadResult: {
@@ -395,6 +778,7 @@ export interface components {
         };
         RealtimeEvent: components["schemas"]["EventEnvelope"] | components["schemas"]["EphemeralEvent"];
         ReceiptData: {
+            membership_id?: null | components["schemas"]["MembershipId"];
             message_seq: components["schemas"]["Seq"];
             user_id: components["schemas"]["UserId"];
         };
@@ -404,10 +788,16 @@ export interface components {
             password: string;
             username: string;
         };
+        RenameGroupInput: {
+            membership_id: components["schemas"]["MembershipId"];
+            title: string;
+        };
         SendMessageInput: {
+            attachment_ids?: components["schemas"]["AttachmentId"][];
             body: string;
             /** Format: uuid */
             client_message_id: string;
+            membership_id?: null | components["schemas"]["MembershipId"];
         };
         Seq: string;
         /** Format: uuid */
@@ -421,11 +811,37 @@ export interface components {
             id: components["schemas"]["SessionId"];
             is_current: boolean;
         };
+        TransferOwnerInput: {
+            membership_id: components["schemas"]["MembershipId"];
+            user_id: components["schemas"]["UserId"];
+        };
         TypingInput: {
             is_typing: boolean;
+            membership_id?: null | components["schemas"]["MembershipId"];
         };
         UpdateProfile: {
             display_name: string;
+        };
+        /** Format: uuid */
+        UploadAttemptId: string;
+        UploadGrant: {
+            attachment: components["schemas"]["AttachmentView"];
+            attempt_id: components["schemas"]["UploadAttemptId"];
+            /** Format: date-time */
+            expires_at: string;
+            headers: {
+                [key: string]: string;
+            };
+            url: string;
+        };
+        UploadInput: {
+            content_type: string;
+            conversation_id?: null | components["schemas"]["ConversationId"];
+            filename: string;
+            membership_id?: null | components["schemas"]["MembershipId"];
+            purpose: components["schemas"]["AttachmentPurpose"];
+            /** Format: int64 */
+            size_bytes: number;
         };
         /** Format: uuid */
         UserId: string;
@@ -577,7 +993,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_ConversationView"];
+                    "application/json": components["schemas"]["Page_ConversationSummary"];
                 };
             };
             401: {
@@ -629,6 +1045,37 @@ export interface operations {
             };
         };
     };
+    create_group: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupConversationView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     get: {
         parameters: {
             query?: never;
@@ -645,7 +1092,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ConversationView"];
+                    "application/json": components["schemas"]["ConversationSummary"];
                 };
             };
             404: {
@@ -662,6 +1109,7 @@ export interface operations {
         parameters: {
             query: {
                 after: components["schemas"]["Seq"];
+                membership_id?: components["schemas"]["MembershipId"];
                 limit?: number;
             };
             header?: never;
@@ -690,10 +1138,235 @@ export interface operations {
             };
         };
     };
+    rename_group: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameGroupInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupConversationView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    create_group_invitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupActionInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupInvitationView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    revoke_group_invitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupActionInput"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    leave_group: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupActionInput"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    group_members: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupMemberView"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    remove_group_member: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+                user_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupActionInput"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    set_group_role: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+                user_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupRoleInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupMemberView"][];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     messages: {
         parameters: {
             query?: {
                 before?: components["schemas"]["Seq"];
+                membership_id?: components["schemas"]["MembershipId"];
                 limit?: number;
             };
             header?: never;
@@ -763,6 +1436,39 @@ export interface operations {
             };
         };
     };
+    transfer_group_owner: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransferOwnerInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupMemberView"][];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     read: {
         parameters: {
             query?: never;
@@ -823,6 +1529,169 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    accept_group_invitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptGroupInvitationInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupConversationView"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    media_create_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UploadInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadGrant"];
+                };
+            };
+        };
+    };
+    media_get_attachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentView"];
+                };
+            };
+        };
+    };
+    media_cancel_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    media_complete_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttachmentView"];
+                };
+            };
+        };
+    };
+    media_download: {
+        parameters: {
+            query?: {
+                variant?: components["schemas"]["DownloadVariant"];
+            };
+            header?: never;
+            path: {
+                id: components["schemas"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadGrant"];
+                };
+            };
+        };
+    };
+    media_renew_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadGrant"];
                 };
             };
         };
@@ -932,6 +1801,81 @@ export interface operations {
                 };
             };
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    users_set_avatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AvatarInput"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    users_clear_avatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    users_avatar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DownloadGrant"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

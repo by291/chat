@@ -18,6 +18,17 @@ pub async fn append(
     kind: ConversationEventKind,
     payload: ConversationEventPayload,
 ) -> Result<EventEnvelope, AppError> {
+    append_with_invalidations(transaction, id, kind, payload, Vec::new()).await
+}
+
+/// Keep removed-episode control hints on the same job as the membership event.
+pub async fn append_with_invalidations(
+    transaction: &mut Transaction<'_, Postgres>,
+    id: ConversationId,
+    kind: ConversationEventKind,
+    payload: ConversationEventPayload,
+    invalidations: Vec<super::model::MembershipInvalidation>,
+) -> Result<EventEnvelope, AppError> {
     let sequence = repository::advance_version(transaction, id).await?;
     let envelope = EventEnvelope {
         schema_version: 1,
@@ -46,7 +57,7 @@ pub async fn append(
         transaction,
         id,
         envelope.event_seq,
-        serde_json::json!({"type":"conversation.event","envelope":envelope}),
+        serde_json::json!({"type":"conversation.event","envelope":envelope,"invalidations":invalidations}),
     )
     .await?;
     Ok(envelope)

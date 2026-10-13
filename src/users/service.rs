@@ -1,12 +1,50 @@
 //! Profile operations and membership-authorized presence transitions.
 
-use super::repository;
+use super::{model::AvatarInput, repository};
 use crate::{
     AppState,
     auth::service::{display_name, username},
     error::AppError,
+    media::{
+        self,
+        model::{DownloadGrant, DownloadVariant},
+    },
     types::{Actor, UpdateProfile, UserId, UserStatus, UserView},
 };
+
+/// Select a ready owned avatar atomically; invalid selections retain the old pointer.
+pub async fn set_avatar(
+    state: &AppState,
+    actor: Actor,
+    input: AvatarInput,
+) -> Result<(), AppError> {
+    let mut transaction = state.pool.begin().await?;
+    media::service::bind_avatar(&mut transaction, actor, Some(input.attachment_id)).await?;
+    transaction.commit().await?;
+    Ok(())
+}
+
+/// Clear the avatar atomically; cleanup retains the superseded object's grace period.
+pub async fn clear_avatar(state: &AppState, actor: Actor) -> Result<(), AppError> {
+    let mut transaction = state.pool.begin().await?;
+    media::service::bind_avatar(&mut transaction, actor, None).await?;
+    transaction.commit().await?;
+    Ok(())
+}
+
+/// Issue a sanitized current-avatar grant to an authenticated profile observer.
+/// A missing user, absent avatar or concurrent supersession returns 404.
+pub async fn avatar(
+    state: &AppState,
+    actor: Actor,
+    user: UserId,
+) -> Result<DownloadGrant, AppError> {
+    let id = media::service::avatar_id(state, user)
+        .await?
+        .ok_or_else(AppError::not_found)?;
+    media::service::download(state, actor, id, DownloadVariant::Thumbnail).await
+}
+
 /// Look up an exact normalized username for an authenticated caller.
 pub async fn get_user_by_username(
     state: &AppState,

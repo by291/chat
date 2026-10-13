@@ -1,0 +1,92 @@
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+}
+
+.upload-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0 0 12px;
+  list-style: none;
+}
+
+.upload-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.upload-description {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+  min-width: 120px;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.upload-description progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.upload-description span {
+  color: var(--muted);
+}
+
+.attachment {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.attachment-preview {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.attachment-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.attachment-download {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.attachment-download small {
+  color: var(--muted);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}

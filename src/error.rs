@@ -52,6 +52,10 @@ impl AppError {
         Self::new(StatusCode::NOT_FOUND, "not_found", "资源不存在")
     }
 
+    pub fn forbidden() -> Self {
+        Self::new(StatusCode::FORBIDDEN, "forbidden", "没有执行此操作的权限")
+    }
+
     pub fn conflict(message: &'static str) -> Self {
         Self::new(StatusCode::CONFLICT, "conflict", message)
     }

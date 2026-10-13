@@ -83,7 +83,8 @@ transaction.commit().await?;
   result to an HTTP response. It must not query PostgreSQL directly.
 - `service.rs` and cohesive workflow modules own validation, authorization, operation
   ordering, and transactions. They use repository operations rather than embedding SQL.
-- `repository.rs` owns SQL, row mappings, and database locking. Repository functions
+- `repository.rs` and named workflow files such as `group_repository.rs` own SQL,
+  row mappings, and database locking. Repository functions
   accept an existing transaction when the caller must compose atomic operations.
   They must not commit that caller-owned transaction or depend on HTTP handlers.
 - `model.rs` owns a feature's DTOs. Shared IDs, authenticated actor, and exact sequence

@@ -1,7 +1,9 @@
 import type { QueryClient } from '@tanstack/svelte-query';
 import { keys } from './cache';
+import { ApiFailure } from '../../api-client/errors';
+import { GroupRecords } from './group-records';
 import type { ChatApi, Conversation, Message, Event } from './models';
-import { sequence as seq } from './models';
+import { sequence as seq, isGroup, membershipId } from './models';
 
 export type ConversationStream = {
   generation: number;
@@ -15,6 +17,7 @@ export type ConversationStream = {
   draining?: Promise<void>;
   lastRead: bigint;
   reading?: string;
+  membershipId?: string;
 };
 
 type StoreOptions = {
@@ -28,6 +31,7 @@ type StoreOptions = {
   failed: (message: string) => void;
   messagesMerged: (messages: Message[]) => void;
   peerSelected: (userId: string) => void;
+  membershipChanged: (id: string) => void;
 };
 
 /** Owns cache mutations and continuous durable replay for one authenticated lifetime.
@@ -37,8 +41,47 @@ export class ConversationStore {
   private streams = new Map<string, ConversationStream>();
   private summaryFlight: Promise<void> | undefined;
   private summaryAgain = false;
+  private summaryRevision = 0;
+  private revoked = new Set<string>();
+  readonly groups: GroupRecords;
 
-  constructor(private options: StoreOptions) {}
+  constructor(private options: StoreOptions) {
+    this.groups = new GroupRecords({
+      ...options,
+      membership: (id) => this.membership(id),
+    });
+  }
+
+  membership(id: string) {
+    return membershipId(
+      this.conversations.find((conversation) => conversation.id === id),
+    );
+  }
+
+  private forget(id: string) {
+    const stream = this.streams.get(id);
+    if (stream) {
+      stream.abort.abort();
+      stream.generation++;
+    }
+    this.streams.delete(id);
+    this.options.queryClient.removeQueries({ queryKey: keys.messages(id) });
+    this.groups.forget(id);
+    this.options.membershipChanged(id);
+  }
+
+  revokeMembership(id: string, membership: string) {
+    if (this.membership(id) && this.membership(id) !== membership) return false;
+    this.revoked.add(`${id}/${membership}`);
+    this.summaryRevision++;
+    this.summaryAgain = true;
+    this.forget(id);
+    this.options.queryClient.setQueryData<Conversation[]>(
+      keys.conversations,
+      (rows) => rows?.filter((row) => row.id !== id),
+    );
+    return true;
+  }
 
   get conversations(): Conversation[] {
     return (
@@ -88,6 +131,7 @@ export class ConversationStore {
         olderLoading: false,
         nextBefore: null,
         lastRead: 0n,
+        membershipId: this.membership(id),
       };
       this.streams.set(id, streamState);
     }
@@ -120,6 +164,7 @@ export class ConversationStore {
     const work = (async () => {
       do {
         this.summaryAgain = false;
+        const revision = this.summaryRevision;
         const items = new Map<string, Conversation>();
         let cursor: string | undefined;
         const seen = new Set<string>();
@@ -129,7 +174,8 @@ export class ConversationStore {
             return;
           }
           for (const item of page.items) {
-            items.set(item.id, item);
+            if (!this.revoked.has(`${item.id}/${membershipId(item)}`))
+              items.set(item.id, item);
           }
           cursor = page.next_cursor ?? undefined;
           if (cursor) {
@@ -141,6 +187,17 @@ export class ConversationStore {
         } while (cursor);
         if (!this.options.active() || epoch !== this.options.epoch()) {
           return;
+        }
+        // A removal can race a paginated response. Reread rather than resurrect
+        // a snapshot authorized before the control hint invalidated its episode.
+        if (revision !== this.summaryRevision) {
+          this.summaryAgain = true;
+          continue;
+        }
+        for (const previous of this.conversations) {
+          const incoming = items.get(previous.id);
+          if (!incoming || membershipId(incoming) !== membershipId(previous))
+            this.forget(previous.id);
         }
         this.options.queryClient.setQueryData(keys.conversations, [
           ...items.values(),
@@ -156,8 +213,10 @@ export class ConversationStore {
               ? stream.lastRead
               : seq(item.my_read_seq);
         }
-        if (this.current) {
+        if (this.current && !isGroup(this.current)) {
           void this.options.peerSelected(this.current.peer.id);
+        } else if (this.current) {
+          void this.groups.load(this.current.id);
         }
       } while (this.summaryAgain && this.options.active());
     })();
@@ -191,9 +250,13 @@ export class ConversationStore {
     if (!this.valid(streamState, generation, epoch)) {
       return;
     }
+    // A deep link can select before startup has fetched any summary. Only an
+    // uninitialized stream may adopt the now-authorized membership identity;
+    // replacement of an established episode still uses forget/generation fences.
+    if (!streamState.ready) streamState.membershipId = this.membership(id);
     if (streamState.ready) {
       await this.drain(id);
-      if (this.current) {
+      if (this.current && !isGroup(this.current)) {
         void this.options.peerSelected(this.current.peer.id);
       }
       return;
@@ -206,10 +269,13 @@ export class ConversationStore {
         id,
         undefined,
         streamState.abort.signal,
+        streamState.membershipId,
       );
       if (!this.valid(streamState, generation, epoch)) {
         return;
       }
+      if (snapshot.membership?.membership_id !== streamState.membershipId)
+        return;
       this.options.queryClient.setQueryData(keys.messages(id), snapshot.items);
       streamState.applied = snapshot.snapshot_seq;
       streamState.target =
@@ -219,6 +285,7 @@ export class ConversationStore {
       streamState.nextBefore = snapshot.next_before ?? null;
       streamState.ready = true;
       this.merge(id, snapshot.items);
+      void this.groups.load(id, streamState.abort.signal);
       await this.drain(id);
     } catch (reason) {
       if (this.valid(streamState, generation, epoch)) {
@@ -253,10 +320,12 @@ export class ConversationStore {
           id,
           streamState.applied,
           streamState.abort.signal,
+          streamState.membershipId,
         );
         if (!this.valid(streamState, generation, epoch)) {
           return;
         }
+        if (page.membership?.membership_id !== streamState.membershipId) return;
         if (seq(page.snapshot_seq) > streamState.target) {
           streamState.target = seq(page.snapshot_seq);
         }
@@ -290,6 +359,17 @@ export class ConversationStore {
       await work;
     } catch (reason) {
       if (this.valid(streamState, generation, epoch)) {
+        if (
+          reason instanceof ApiFailure &&
+          reason.status === 409 &&
+          streamState.membershipId
+        ) {
+          this.forget(id);
+          await this.refreshSummaries();
+          if (this.options.selectedId() === id && this.membership(id))
+            await this.select(id, async () => {});
+          return;
+        }
         this.options.failed(
           reason instanceof Error ? reason.message : '同步暂时中断',
         );
@@ -308,6 +388,8 @@ export class ConversationStore {
       this.merge(id, [payload.data]);
     } else if (payload.type === 'receipt.updated') {
       const receipt = payload.data;
+      if (receipt.membership_id)
+        this.groups.receipt(id, receipt.membership_id, receipt.message_seq);
       const receiptField =
         receipt.user_id === this.options.userId
           ? 'my_read_seq'
@@ -316,12 +398,23 @@ export class ConversationStore {
         keys.conversations,
         (items) =>
           items?.map((item) =>
-            item.id === id
+            item.id === id &&
+            (!isGroup(item) || receipt.user_id === this.options.userId)
               ? {
                   ...item,
                   [receiptField]:
-                    seq(item[receiptField]) > seq(receipt.message_seq)
-                      ? item[receiptField]
+                    seq(
+                      receiptField === 'my_read_seq'
+                        ? item.my_read_seq
+                        : !isGroup(item)
+                          ? item.peer_read_seq
+                          : '0',
+                    ) > seq(receipt.message_seq)
+                      ? receiptField === 'my_read_seq'
+                        ? item.my_read_seq
+                        : !isGroup(item)
+                          ? item.peer_read_seq
+                          : '0'
                       : receipt.message_seq,
                 }
               : item,
@@ -334,6 +427,8 @@ export class ConversationStore {
             ? streamState.lastRead
             : seq(receipt.message_seq);
       }
+    } else if (payload.type === 'membership.updated') {
+      void this.groups.load(id);
     }
   }
 
@@ -377,10 +472,12 @@ export class ConversationStore {
         id,
         before,
         streamState.abort.signal,
+        streamState.membershipId,
       );
       if (!this.valid(streamState, generation, epoch)) {
         return;
       }
+      if (page.membership?.membership_id !== streamState.membershipId) return;
       this.merge(id, page.items);
       streamState.nextBefore = page.next_before ?? null;
       streamState.target =
@@ -407,6 +504,7 @@ export class ConversationStore {
       streamState.abort.abort();
     }
     this.streams.clear();
+    this.revoked.clear();
     this.options.queryClient.clear();
   }
 }

@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::types::UserId;
+use crate::types::{AttachmentId, UserId};
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, ToSchema)]
 pub struct UserView {
@@ -15,6 +15,11 @@ pub struct UserView {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateProfile {
     pub display_name: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AvatarInput {
+    pub attachment_id: AttachmentId,
 }
 
 #[derive(Debug, Serialize, ToSchema)]

@@ -35,6 +35,8 @@ clap = { version = "4", features = ["derive"] }
 rpassword = "7"
 base64 = "0.22"
 cookie = "0.18"
+aws-sdk-s3 = { version = "=1.152.0", default-features = false, features = ["rt-tokio", "default-https-client"] }
+image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 subtle = "2"
 metrics = "0.24"
 metrics-exporter-prometheus = { version = "0.17", default-features = false }

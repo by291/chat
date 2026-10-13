@@ -4,13 +4,18 @@ use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use sqlx::{Postgres, Transaction};
 use time::OffsetDateTime;
 
-use super::{events, repository};
+use super::{
+    events,
+    model::{ConversationSummary, GroupConversationView, GroupKind, GroupRole, MembershipContext},
+    repository,
+};
 use crate::{
     AppState,
     error::AppError,
+    media,
     types::{
         Actor, ConversationEventKind, ConversationEventPayload, ConversationId, ConversationView,
-        Created, Page, PageCursor, Seq, UserId, UserView,
+        Created, MembershipId, Page, PageCursor, Seq, UserId, UserView,
     },
 };
 
@@ -30,6 +35,46 @@ pub async fn require_member(
     repository::member(tx, actor.user_id, id)
         .await?
         .ok_or_else(AppError::not_found)
+}
+
+/// Fence a mutation against the current group episode, including stale rejoined tabs.
+pub async fn require_membership(
+    transaction: &mut Transaction<'_, Postgres>,
+    actor: Actor,
+    id: ConversationId,
+    expected: Option<MembershipId>,
+) -> Result<Member, AppError> {
+    let member = require_member(transaction, actor, id).await?;
+    check_membership(&member, expected, true)?;
+    Ok(member)
+}
+
+/// Lock the aggregate before checking the current episode for composed feature operations.
+/// The caller owns the transaction and must retain this lock until its writes commit.
+pub async fn lock_membership(
+    transaction: &mut Transaction<'_, Postgres>,
+    actor: Actor,
+    id: ConversationId,
+    expected: Option<MembershipId>,
+) -> Result<Member, AppError> {
+    repository::lock_version(transaction, id)
+        .await?
+        .ok_or_else(AppError::not_found)?;
+
+    require_membership(transaction, actor, id, expected).await
+}
+
+pub(crate) fn check_membership(
+    member: &Member,
+    expected: Option<MembershipId>,
+    required: bool,
+) -> Result<(), AppError> {
+    if expected.is_some_and(|identity| identity != member.membership_id)
+        || (required && member.kind == "group" && expected.is_none())
+    {
+        return Err(AppError::conflict("群成员身份已变化，请重新同步"));
+    }
+    Ok(())
 }
 
 /// Create at most one direct conversation per unordered user pair.
@@ -71,8 +116,11 @@ pub async fn ensure_direct(
     };
 
     transaction.commit().await?;
+    let ConversationSummary::Direct(value) = get_conversation(state, actor, id).await? else {
+        return Err(AppError::unavailable());
+    };
     Ok(Created {
-        value: get_conversation(state, actor, id).await?,
+        value,
         is_new: new_id.is_some(),
     })
 }
@@ -82,11 +130,16 @@ pub async fn get_conversation(
     state: &AppState,
     actor: Actor,
     id: ConversationId,
-) -> Result<ConversationView, AppError> {
-    let row = repository::summary(&state.pool, actor.user_id, id)
+) -> Result<ConversationSummary, AppError> {
+    let mut transaction = state.pool.begin().await?;
+    repository::repeatable_read(&mut transaction).await?;
+    let row = repository::summary(&mut transaction, actor.user_id, id)
         .await?
         .ok_or_else(AppError::not_found)?;
-    enrich(state, actor, summary_view(&row)).await
+    let summary = enrich(&mut transaction, actor, &row).await?;
+    transaction.commit().await?;
+
+    Ok(summary)
 }
 
 /// Seek through summaries by the stable (updated_at, id) ordering.
@@ -94,13 +147,16 @@ pub async fn list_conversations(
     state: &AppState,
     actor: Actor,
     page: PageCursor,
-) -> Result<Page<ConversationView>, AppError> {
+) -> Result<Page<ConversationSummary>, AppError> {
     if page.limit == 0 || page.limit > 100 {
         return Err(AppError::invalid("分页大小需要 1–100"));
     }
 
     let cursor = page.cursor.map(decode_cursor).transpose()?;
-    let mut rows = repository::summaries(&state.pool, actor.user_id, cursor, page.limit).await?;
+    let mut transaction = state.pool.begin().await?;
+    repository::repeatable_read(&mut transaction).await?;
+    let mut rows =
+        repository::summaries(&mut transaction, actor.user_id, cursor, page.limit).await?;
     let has_more = rows.len() > usize::from(page.limit);
     rows.truncate(usize::from(page.limit));
     let next_cursor = if has_more {
@@ -111,8 +167,10 @@ pub async fn list_conversations(
 
     let mut items = Vec::with_capacity(rows.len());
     for row in &rows {
-        items.push(enrich(state, actor, summary_view(row)).await?);
+        items.push(enrich(&mut transaction, actor, row).await?);
     }
+    transaction.commit().await?;
+
     Ok(Page { items, next_cursor })
 }
 
@@ -133,31 +191,57 @@ fn encode_cursor(row: &repository::SummaryRow) -> Result<String, AppError> {
     Ok(URL_SAFE_NO_PAD.encode(bytes))
 }
 
-fn summary_view(row: &repository::SummaryRow) -> ConversationView {
-    ConversationView {
+async fn enrich(
+    transaction: &mut Transaction<'_, Postgres>,
+    actor: Actor,
+    row: &repository::SummaryRow,
+) -> Result<ConversationSummary, AppError> {
+    // Authorization, episode bounds and content share the caller's snapshot.
+    // A concurrent removal/rejoin cannot pair old membership with later messages.
+    let mut last_message = repository::last_message(transaction, row.id, row.joined_seq).await?;
+    if let Some(message) = &mut last_message {
+        message.attachments = media::repository::message_views(transaction, message.id).await?;
+    }
+
+    let unread = repository::unread_count(
+        transaction,
+        row.id,
+        actor.user_id,
+        Seq(row.my_read_seq),
+        row.joined_seq,
+    )
+    .await?;
+    let unread_count = u32::try_from(unread).map_err(|_| AppError::unavailable())?;
+
+    if row.kind == "group" {
+        return Ok(ConversationSummary::Group(GroupConversationView {
+            id: row.id,
+            kind: GroupKind::Group,
+            title: row.title.clone().ok_or_else(AppError::unavailable)?,
+            member_count: u32::try_from(row.member_count).map_err(|_| AppError::unavailable())?,
+            membership: MembershipContext {
+                membership_id: row.membership_id,
+                joined_seq: Seq(row.joined_seq),
+            },
+            my_role: GroupRole::from_record(&row.role)?,
+            latest_event_seq: Seq(row.latest_event_seq),
+            last_message,
+            unread_count,
+            my_read_seq: Seq(row.my_read_seq),
+        }));
+    }
+
+    Ok(ConversationSummary::Direct(ConversationView {
         id: row.id,
         peer: UserView {
-            id: row.peer_id,
-            username: row.username.clone(),
-            display_name: row.display_name.clone(),
+            id: row.peer_id.ok_or_else(AppError::unavailable)?,
+            username: row.username.clone().ok_or_else(AppError::unavailable)?,
+            display_name: row.display_name.clone().ok_or_else(AppError::unavailable)?,
         },
         latest_event_seq: Seq(row.latest_event_seq),
-        last_message: None,
-        unread_count: 0,
+        last_message,
+        unread_count,
         my_read_seq: Seq(row.my_read_seq),
-        peer_read_seq: Seq(row.peer_read_seq),
-    }
-}
-
-async fn enrich(
-    state: &AppState,
-    actor: Actor,
-    mut summary: ConversationView,
-) -> Result<ConversationView, AppError> {
-    summary.last_message = repository::last_message(&state.pool, summary.id).await?;
-    let unread =
-        repository::unread_count(&state.pool, summary.id, actor.user_id, summary.my_read_seq)
-            .await?;
-    summary.unread_count = u32::try_from(unread).unwrap_or(u32::MAX);
-    Ok(summary)
+        peer_read_seq: Seq(row.peer_read_seq.ok_or_else(AppError::unavailable)?),
+    }))
 }

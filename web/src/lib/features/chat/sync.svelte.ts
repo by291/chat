@@ -9,7 +9,9 @@ import type {
 import type { RealtimeTransport, ConnectionStatus } from './realtime';
 import { ConversationStore } from './conversation-store';
 import { PeerActivity } from './activity.svelte';
-import { sequence as seq } from './models';
+import { sequence as seq, isGroup, membershipId } from './models';
+import { createMediaApi } from '../media/api';
+import { MediaUploads } from '../media/uploads.svelte';
 
 export type { PendingMessage } from './models';
 
@@ -17,6 +19,7 @@ export type { PendingMessage } from './models';
  * ConversationStore owns durable state; PeerActivity owns disposable peer hints.
  */
 export class ChatSync {
+  readonly uploads: MediaUploads;
   selectedId = $state<string | null>(null);
   pending = $state<PendingMessage[]>([]);
   drafts = $state<Record<string, string>>({});
@@ -26,6 +29,7 @@ export class ChatSync {
   private store: ConversationStore;
   private activity: PeerActivity;
   private active = false;
+  private initialized = false;
   private epoch = 0;
   private visible = false;
   private renderedReadSeq: string | null = null;
@@ -45,6 +49,7 @@ export class ChatSync {
       ...options,
       active: () => this.active,
       epoch: () => this.epoch,
+      membership: (id) => this.store?.membership(id),
     });
     this.store = new ConversationStore({
       ...options,
@@ -60,6 +65,18 @@ export class ChatSync {
       peerSelected: (userId) => {
         void this.activity.refreshStatus(userId);
       },
+      membershipChanged: (id) => {
+        this.uploads?.forgetConversation(id);
+        this.pending = this.pending.filter(
+          (pending) => pending.conversation_id !== id,
+        );
+        delete this.drafts[id];
+        this.activity.forget(id);
+        if (this.selectedId === id) {
+          this.visible = false;
+          this.renderedReadSeq = null;
+        }
+      },
       messagesMerged: (incoming) => {
         // Only our sender/client-ID pair resolves an optimistic send; another
         // member can independently choose the same client-generated UUID.
@@ -73,6 +90,18 @@ export class ChatSync {
             ),
         );
       },
+    });
+    this.uploads = new MediaUploads({
+      queryClient: options.queryClient,
+      api: createMediaApi(),
+      authorized: (scope) =>
+        this.active &&
+        (scope.purpose === 'avatar' ||
+          this.conversations.some(
+            (conversation) =>
+              conversation.id === scope.conversationId &&
+              membershipId(conversation) === scope.membershipId,
+          )),
     });
     this.unsubscribeCache = options.queryClient
       .getQueryCache()
@@ -93,6 +122,39 @@ export class ChatSync {
 
   get userId() {
     return this.options.userId;
+  }
+
+  get alive() {
+    return this.active;
+  }
+
+  senderName(userId: string) {
+    return (
+      this.groupMembers.find((member) => member.user.id === userId)?.user
+        .display_name ?? (userId === this.userId ? '你' : '历史成员')
+    );
+  }
+
+  readCount(sequence: string) {
+    return this.readers(sequence).length;
+  }
+
+  readers(sequence: string) {
+    return this.groupMembers.filter(
+      (member) =>
+        member.user.id !== this.userId &&
+        seq(member.joined_seq) <= seq(sequence) &&
+        seq(member.read_seq) >= seq(sequence),
+    );
+  }
+
+  get groupMembers() {
+    this.revision;
+    return this.selectedId ? this.store.groups.members(this.selectedId) : [];
+  }
+
+  async refreshMembers() {
+    if (this.selectedId) await this.store.groups.load(this.selectedId);
   }
 
   get typingByConversation() {
@@ -139,7 +201,9 @@ export class ChatSync {
 
   get currentPending() {
     return this.pending.filter(
-      (message) => message.conversation_id === this.selectedId,
+      (message) =>
+        message.conversation_id === this.selectedId &&
+        message.membership_id === membershipId(this.current),
     );
   }
 
@@ -177,6 +241,7 @@ export class ChatSync {
         return;
       }
       await this.refreshSummaries();
+      this.initialized = true;
       this.interval = setInterval(() => {
         void this.refresh();
       }, 60000);
@@ -186,6 +251,12 @@ export class ChatSync {
 
   async refreshSummaries() {
     await this.store.refreshSummaries();
+    const id = this.selectedId;
+    if (this.initialized && id && isGroup(this.current)) {
+      const stream = this.store.stream(id);
+      if (!stream.ready && !stream.loading)
+        await this.store.select(id, async () => {});
+    }
   }
 
   async refresh() {
@@ -237,12 +308,26 @@ export class ChatSync {
       void this.refreshSummaries();
       return;
     }
+    if (event.kind === 'membership.invalidated') {
+      if (
+        this.store.revokeMembership(event.conversation_id, event.membership_id)
+      ) {
+        this.error = '你已不在此群聊中';
+        void this.refreshSummaries();
+      }
+      return;
+    }
     this.activity.receive(event);
   }
 
-  async send(body: string, clientMessageId: string = crypto.randomUUID()) {
+  async send(
+    body: string,
+    clientMessageId: string = crypto.randomUUID(),
+    attachmentIds: string[] = [],
+  ) {
     const id = this.selectedId;
-    if (!id || !body.trim() || !this.active) {
+    const membership = id ? this.store.membership(id) : undefined;
+    if (!id || (!body.trim() && !attachmentIds.length) || !this.active) {
       return;
     }
     let pending = this.pending.find(
@@ -260,8 +345,11 @@ export class ChatSync {
         body,
         status: 'sending',
         created_at: new Date().toISOString(),
+        membership_id: membership,
+        attachment_ids: [...attachmentIds],
       };
       this.pending.push(pending);
+      this.uploads.consume(attachmentIds);
     } else {
       pending.status = 'sending';
       body = pending.body;
@@ -272,8 +360,16 @@ export class ChatSync {
       const message = await this.options.api.send(id, {
         client_message_id: clientMessageId,
         body,
+        membership_id: pending.membership_id,
+        ...(pending.attachment_ids.length
+          ? { attachment_ids: pending.attachment_ids }
+          : {}),
       });
-      if (!this.active || epoch !== this.epoch) {
+      if (
+        !this.active ||
+        epoch !== this.epoch ||
+        this.store.membership(id) !== membership
+      ) {
         return;
       }
       this.store.merge(id, [message]);
@@ -281,7 +377,11 @@ export class ChatSync {
       void this.store.drain(id);
       void this.refreshSummaries();
     } catch {
-      if (this.active && epoch === this.epoch) {
+      if (
+        this.active &&
+        epoch === this.epoch &&
+        this.store.membership(id) === membership
+      ) {
         const item = this.pending.find(
           (pendingMessage) =>
             pendingMessage.conversation_id === id &&
@@ -301,7 +401,7 @@ export class ChatSync {
         pendingMessage.conversation_id === this.selectedId,
     );
     if (pending) {
-      await this.send(pending.body, clientMessageId);
+      await this.send(pending.body, clientMessageId, pending.attachment_ids);
     }
   }
 
@@ -341,10 +441,17 @@ export class ChatSync {
     }
     state.reading = cursor;
     const epoch = this.epoch;
+    const generation = state.generation;
+    const membership = state.membershipId;
 
     try {
-      const result = await this.options.api.read(id, cursor);
-      if (this.active && this.epoch === epoch) {
+      const result = await this.options.api.read(id, cursor, membership);
+      if (
+        this.active &&
+        this.epoch === epoch &&
+        state.generation === generation &&
+        this.store.membership(id) === membership
+      ) {
         state.lastRead =
           state.lastRead > seq(result.my_read_seq)
             ? state.lastRead
@@ -385,6 +492,7 @@ export class ChatSync {
       clearInterval(this.interval);
     }
     this.activity.stop();
+    this.uploads.stop();
     this.options.transport.close();
     this.unsubscribeCache();
     this.pending = [];

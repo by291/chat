@@ -16,6 +16,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    MediaInit,
+    MediaCleanupTest,
     Bootstrap {
         #[arg(long)]
         username: String,
@@ -39,11 +41,28 @@ fn password() -> anyhow::Result<String> {
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let config = Config::from_env()?;
+    if matches!(cli.command, Command::MediaInit | Command::MediaCleanupTest) {
+        let storage = config
+            .media_storage
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Media credentials are not configured"))?;
+        let storage = chat_server::infrastructure::object_storage::ObjectStorage::new(storage);
+        if matches!(cli.command, Command::MediaCleanupTest) {
+            storage.destroy_browser_test_bucket().await?;
+            println!("Owned browser-test bucket removed.");
+        } else {
+            storage.ensure_bucket().await?;
+            println!("Media bucket is ready.");
+        }
+        return Ok(());
+    }
     let pool = connect_db(&config).await?;
     sqlx::migrate!("./migrations").run(&pool).await?;
     let state = AppState::new(config, pool).await?;
 
     match cli.command {
+        Command::MediaInit => unreachable!("media initialization returns before database setup"),
+        Command::MediaCleanupTest => unreachable!("test cleanup returns before database setup"),
         Command::Bootstrap {
             username,
             display_name,

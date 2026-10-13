@@ -2,6 +2,8 @@
   import { onMount, tick, untrack } from 'svelte';
   import { Check, CheckCheck, ArrowDown, RotateCcw } from '@lucide/svelte';
   import type { ChatSync } from './sync.svelte';
+  import { isGroup } from './models';
+  import AttachmentList from '../media/AttachmentList.svelte';
 
   let {
     sync,
@@ -60,6 +62,13 @@
     await tick();
     // Anchor the same visible history after prepending older records.
     scroller.scrollTop = top + scroller.scrollHeight - height;
+    confirmRenderedVisibility();
+  }
+
+  async function mediaLayoutChanged() {
+    sync.setVisible(false);
+    await tick();
+    if (following) scroller.scrollTop = scroller.scrollHeight;
     confirmRenderedVisibility();
   }
 
@@ -144,13 +153,29 @@
       {#each sync.messages as message (message.id)}
         <article class="message-row" class:own={message.sender_id === userId}>
           <div class="message-bubble">
-            <p>{message.body}</p>
+            {#if isGroup(sync.current)}
+              <strong class="message-sender">
+                {message.sender_name ?? sync.senderName(message.sender_id)}
+              </strong>
+            {/if}
+            {#if message.body}<p>{message.body}</p>{/if}
+            {#each message.attachments ?? [] as attachment (attachment.id)}
+              <AttachmentList {attachment} onLayout={mediaLayoutChanged} />
+            {/each}
             <div class="message-meta">
               <time datetime={message.created_at}>
                 {formatTime(message.created_at)}
               </time>
               {#if message.sender_id === userId}
-                {#if BigInt(sync.current?.peer_read_seq ?? '0') >= BigInt(message.created_seq)}
+                {#if isGroup(sync.current)}
+                  {#if sync.groupMembers.length}
+                    <span
+                      aria-label={`${sync.readCount(message.created_seq)} 人已读`}
+                    >
+                      {sync.readCount(message.created_seq)} 人已读
+                    </span>
+                  {/if}
+                {:else if BigInt(sync.current?.peer_read_seq ?? '0') >= BigInt(message.created_seq)}
                   <span aria-label="已读">
                     <CheckCheck size={13} />
                   </span>
@@ -171,6 +196,9 @@
             class:failed={message.status === 'failed'}
           >
             <p>{message.body}</p>
+            {#if message.attachment_ids.length}<small>
+                {message.attachment_ids.length} 个附件
+              </small>{/if}
             <div class="message-meta">
               {#if message.status === 'failed'}
                 <button onclick={() => sync.retry(message.client_message_id)}>

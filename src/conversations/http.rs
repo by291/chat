@@ -6,6 +6,8 @@ use axum::{
     http::StatusCode,
 };
 
+use super::model::ConversationSummary;
+
 use crate::{
     AppState,
     error::AppError,
@@ -52,7 +54,7 @@ pub async fn direct(
         ("limit" = Option<u16>, Query)
     ),
     responses(
-        (status = 200, body = Page<ConversationView>),
+        (status = 200, body = Page<ConversationSummary>),
         (status = 401, body = crate::error::ApiErrorBody)
     ),
     tag = "chat"
@@ -62,7 +64,7 @@ pub async fn list(
     State(state): State<AppState>,
     actor: Actor,
     Query(page): Query<PageCursor>,
-) -> Result<Json<Page<ConversationView>>, AppError> {
+) -> Result<Json<Page<ConversationSummary>>, AppError> {
     Ok(Json(
         super::service::list_conversations(&state, actor, page).await?,
     ))
@@ -75,7 +77,7 @@ pub async fn list(
         ("id" = ConversationId, Path)
     ),
     responses(
-        (status = 200, body = ConversationView),
+        (status = 200, body = ConversationSummary),
         (status = 404, body = crate::error::ApiErrorBody)
     ),
     tag = "chat"
@@ -85,7 +87,7 @@ pub async fn get(
     State(state): State<AppState>,
     actor: Actor,
     Path(id): Path<ConversationId>,
-) -> Result<Json<ConversationView>, AppError> {
+) -> Result<Json<ConversationSummary>, AppError> {
     Ok(Json(
         super::service::get_conversation(&state, actor, id).await?,
     ))
@@ -129,6 +131,7 @@ pub async fn send(
     params(
         ("id" = ConversationId, Path),
         ("before" = Option<Seq>, Query),
+        ("membership_id" = Option<crate::types::MembershipId>, Query),
         ("limit" = Option<u16>, Query)
     ),
     responses(
@@ -155,6 +158,7 @@ pub async fn messages(
     params(
         ("id" = ConversationId, Path),
         ("after" = Seq, Query),
+        ("membership_id" = Option<crate::types::MembershipId>, Query),
         ("limit" = Option<u16>, Query)
     ),
     responses(
@@ -171,7 +175,15 @@ pub async fn events(
     Query(page): Query<EventQuery>,
 ) -> Result<Json<EventPage>, AppError> {
     Ok(Json(
-        super::service::events_after(&state, actor, id, page.after, page.limit).await?,
+        super::messages::events_with_membership(
+            &state,
+            actor,
+            id,
+            page.after,
+            page.limit,
+            page.membership_id,
+        )
+        .await?,
     ))
 }
 
@@ -196,7 +208,14 @@ pub async fn read(
     Json(input): Json<ReadInput>,
 ) -> Result<Json<ReadResult>, AppError> {
     Ok(Json(ReadResult {
-        my_read_seq: super::service::mark_read(&state, actor, id, input.message_seq).await?,
+        my_read_seq: super::receipts::mark_read_with_membership(
+            &state,
+            actor,
+            id,
+            input.message_seq,
+            input.membership_id,
+        )
+        .await?,
     }))
 }
 
@@ -220,6 +239,13 @@ pub async fn typing(
     Path(id): Path<ConversationId>,
     Json(input): Json<TypingInput>,
 ) -> Result<StatusCode, AppError> {
-    super::service::set_typing(&state, actor, id, input.is_typing).await?;
+    super::receipts::set_typing_with_membership(
+        &state,
+        actor,
+        id,
+        input.is_typing,
+        input.membership_id,
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }

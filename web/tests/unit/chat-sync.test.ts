@@ -75,6 +75,7 @@ function fixture(overrides: Partial<ChatApi> = {}) {
     read: async (_id, seq) => ({ my_read_seq: seq }),
     typing: async () => {},
     status: async () => ({ online: false }),
+    members: async () => [],
     ...overrides,
   };
   const transport = new Transport();
@@ -193,6 +194,43 @@ test('retry keeps the same client message ID and merges the saved authoritative 
   ]);
   expect(sync.pending).toHaveLength(0);
   expect(sync.messages[0].id).toBe('server');
+});
+
+test('file-only retries freeze the ordered attachment IDs with the original client message ID', async () => {
+  const requests: unknown[] = [];
+  const ids = ['second-file', 'first-file'];
+  const { sync } = fixture({
+    send: async (id, input) => {
+      requests.push(structuredClone(input));
+      if (requests.length === 1) throw new Error('response lost');
+      return {
+        ...message('saved-file', '2', id),
+        body: input.body,
+        client_message_id: input.client_message_id,
+      };
+    },
+  });
+  await sync.start();
+  await sync.select('a');
+  await sync.send('', 'file-client', ids);
+  ids.reverse();
+
+  await sync.retry('file-client');
+
+  expect(requests).toEqual([
+    {
+      client_message_id: 'file-client',
+      body: '',
+      attachment_ids: ['second-file', 'first-file'],
+      membership_id: undefined,
+    },
+    {
+      client_message_id: 'file-client',
+      body: '',
+      attachment_ids: ['second-file', 'first-file'],
+      membership_id: undefined,
+    },
+  ]);
 });
 test('a hidden page never submits a read cursor', async () => {
   const reads: string[] = [];

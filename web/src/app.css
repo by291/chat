@@ -2,6 +2,7 @@
 
 /* Preserve the established cascade: feature blocks, shared controls, then overrides. */
 @import './lib/features/chat/chat.css';
+@import './lib/features/media/media.css';
 @import './lib/styles/foundation.css';
 @import './lib/features/auth/auth.css';
 @import './lib/styles/app-shell.css';

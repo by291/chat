@@ -31,9 +31,17 @@ async fn main() -> anyhow::Result<()> {
         chat_server::realtime::http::metrics_router(state.clone()),
     )
     .with_graceful_shutdown(cancel.clone().cancelled_owned());
+    // S3 processing contains large SDK futures. Keep that independent loop on the
+    // heap so the joined startup future fits Windows' smaller main-thread stack.
+    let media = Box::pin(chat_server::media::worker::run_worker(
+        state.clone(),
+        cancel.clone(),
+    ));
     let jobs = run_worker(state, cancel);
-    tokio::try_join!(async { server.await.map_err(anyhow::Error::from) }, async {
-        jobs.await.map_err(anyhow::Error::from)
-    })?;
+    tokio::try_join!(
+        async { server.await.map_err(anyhow::Error::from) },
+        async { jobs.await.map_err(anyhow::Error::from) },
+        async { media.await.map_err(anyhow::Error::from) }
+    )?;
     Ok(())
 }

@@ -4,6 +4,8 @@ RUN corepack enable && corepack prepare pnpm@12.11.2 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
+ARG CHAT_MEDIA_ORIGIN
+ENV CHAT_MEDIA_ORIGIN=$CHAT_MEDIA_ORIGIN
 RUN pnpm build
 FROM caddy:2.11.7-alpine
 COPY --from=build /web/build /srv

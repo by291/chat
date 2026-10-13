@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, untrack, type Snippet } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { MessageCircle, Settings2, LogOut } from '@lucide/svelte';
   import { auth } from '#lib/features/auth/session.svelte.ts';
   import { QueryClientProvider } from '@tanstack/svelte-query';
@@ -49,7 +50,11 @@
 
   $effect(() => {
     if (!auth.pending && !auth.user) {
-      void goto('/login');
+      const pendingJoin =
+        page.url.pathname === '/app/groups/join'
+          ? `?next=${encodeURIComponent(page.url.pathname + page.url.search)}`
+          : '';
+      void goto(`/login${pendingJoin}`);
     }
   });
 

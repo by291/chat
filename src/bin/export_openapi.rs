@@ -2,6 +2,7 @@
 
 use chat_server::{
     error::ApiErrorBody,
+    media::model::DownloadVariant,
     realtime::client::{EphemeralEvent, RealtimeEvent},
     types::{
         ConversationEvent, ConversationEventPayload, ConversationView, DirectInput, EventEnvelope,
@@ -24,6 +25,9 @@ use utoipa::OpenApi;
         chat_server::users::http::lookup,
         chat_server::users::http::update,
         chat_server::users::http::status,
+        chat_server::users::http::set_avatar,
+        chat_server::users::http::clear_avatar,
+        chat_server::users::http::avatar,
         chat_server::conversations::http::direct,
         chat_server::conversations::http::list,
         chat_server::conversations::http::get,
@@ -31,7 +35,23 @@ use utoipa::OpenApi;
         chat_server::conversations::http::messages,
         chat_server::conversations::http::events,
         chat_server::conversations::http::read,
-        chat_server::conversations::http::typing
+        chat_server::conversations::http::typing,
+        chat_server::conversations::group_http::create,
+        chat_server::conversations::group_http::rename,
+        chat_server::conversations::group_http::members,
+        chat_server::conversations::group_http::role,
+        chat_server::conversations::group_http::remove,
+        chat_server::conversations::group_http::leave,
+        chat_server::conversations::group_http::transfer,
+        chat_server::conversations::group_http::invite,
+        chat_server::conversations::group_http::revoke,
+        chat_server::conversations::group_http::accept,
+        chat_server::media::http::create,
+        chat_server::media::http::renew,
+        chat_server::media::http::complete,
+        chat_server::media::http::get,
+        chat_server::media::http::cancel,
+        chat_server::media::http::download
     ),
     components(schemas(
         UserView,
@@ -55,6 +75,7 @@ use utoipa::OpenApi;
         UserStatus,
         RealtimeEvent,
         EphemeralEvent,
+        DownloadVariant,
         ApiErrorBody
     ))
 )]

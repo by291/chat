@@ -31,17 +31,27 @@ src/
     password.rs           bounded Argon2 work
   conversations/
     http.rs               REST adapters
+    group_http.rs         private group REST adapters
     model.rs              conversation/message/event/pagination DTOs
     service.rs            direct conversation and summary workflows
     messages.rs           send, snapshots and event replay
     receipts.rs           monotonic read receipts and temporary typing
     events.rs             transaction-composed event/outbox append
     repository.rs         conversation/member/message/event SQL
+    groups.rs             roles, membership episodes and single-use invitations
+    group_repository.rs   group/member/invitation SQL and locking
   users/
     http.rs               profile/search/status REST adapters
     model.rs              user/profile/status DTOs
     service.rs            profile rules and relationship-based presence
     repository.rs         profile and presence relationship SQL
+  media/
+    http.rs               authenticated upload/status/download adapters
+    model.rs              stable metadata and short-lived transfer grants
+    service.rs            scoped authorization, quota and composed references
+    repository.rs         attachment/attempt/object/lease/reference SQL and CAS
+    processing.rs         bounded image inspection and sanitized variants
+    worker.rs             independent processing, cleanup and retired-key reconciliation
   realtime/
     http.rs               private Centrifugo and metrics HTTP adapters
     model.rs              proxy request/reply DTOs
@@ -78,6 +88,7 @@ web/src/
     features/
       auth/                     auth API, session lifetime, identity form and styles
       settings/                 profile/device API, forms, theme and styles
+      media/                    scoped uploads, ephemeral transfer state and previews
       chat/
         api.ts                  typed feature HTTP adapter
         models.ts               aliases to generated DTOs and application contracts
@@ -100,6 +111,11 @@ drafts and optimistic sends. The conversation store owns per-conversation reques
 generations and continuous event cursors. Peer activity owns expiring information.
 There is no second mutable copy of authoritative messages.
 
+Media uploads keep files, transfer progress and abort controllers in the authenticated
+lifetime. Stable attachment metadata belongs to the query cache. New membership
+episodes discard related drafts and fence late transfers. Signed URLs are ephemeral
+capabilities; they never become message fields or persistent cache records.
+
 ## Consistency and lifecycle
 
 - A realtime publication raises a target; only contiguous REST events advance the
@@ -112,6 +128,9 @@ There is no second mutable copy of authoritative messages.
   Logout/revocation tears down sockets, pending work, timers and session caches.
 - Typing/presence may expire; durable messages and revoked sessions use the outbox.
   Ephemeral maintenance is bounded and cannot indefinitely block durable jobs.
+- Media retains immutable retired-key tombstones. The worker revisits at most 50
+  oldest-due keys per pass on an hourly schedule, protecting current references and
+  releasing quota only during the original confirmed retirement.
 - Feature styles and shared styles retain the original cascade order in `app.css`.
   Shared overrides remain last because their specificity/order is observable.
 
@@ -130,6 +149,8 @@ Integration checks retain
 real PostgreSQL, Valkey, Centrifugo, SeaweedFS and browsers; they cover the invariants
 above rather than mocking the end-to-end application.
 
-The existing phase-one product scope and deployment limits remain in
-`docs/operations/phase-1-acceptance.md`. This refactor changes readability and ownership,
-not the feature roadmap, storage schema or wire protocol.
+The original phase-one acceptance remains in `docs/operations/phase-1-acceptance.md`.
+Private group episodes, media limits and deployment configuration are documented in
+`docs/operations/groups-and-media.md`. Summary authorization, latest-message metadata
+and unread counts share one repeatable-read transaction, so an old episode cannot
+be paired with content committed after removal or rejoining.

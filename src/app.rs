@@ -20,6 +20,8 @@ pub struct AppState {
     pub limiter: RateLimiter,
     pub dummy_password_hash: Arc<String>,
     pub centrifugo: crate::realtime::client::CentrifugoClient,
+    pub object_storage: Option<crate::infrastructure::object_storage::ObjectStorage>,
+    pub media_processors: Arc<tokio::sync::Semaphore>,
 }
 
 impl AppState {
@@ -30,6 +32,10 @@ impl AppState {
         let dummy_password_hash = Arc::new(passwords.hash("dummy password for timing").await?);
         let limiter = RateLimiter::new(&config.valkey_url, &config.database_url)?;
         let centrifugo = crate::realtime::client::CentrifugoClient::new(&config)?;
+        let object_storage = config
+            .media_storage
+            .as_ref()
+            .map(crate::infrastructure::object_storage::ObjectStorage::new);
         Ok(Self {
             pool,
             config: Arc::new(config),
@@ -37,12 +43,16 @@ impl AppState {
             limiter,
             dummy_password_hash,
             centrifugo,
+            object_storage,
+            media_processors: Arc::new(tokio::sync::Semaphore::new(2)),
         })
     }
 }
 
 /// Compose public routes with Origin protection and request correlation.
 pub fn build_router(state: AppState) -> Router {
+    use crate::conversations::group_http as groups;
+    use crate::media::http as media;
     let api = Router::new()
         .route("/auth/register", axum::routing::post(http::register))
         .route("/auth/login", axum::routing::post(http::login))
@@ -51,13 +61,53 @@ pub fn build_router(state: AppState) -> Router {
         .route("/sessions", get(http::sessions))
         .route("/sessions/{id}", axum::routing::delete(http::revoke))
         .route("/users/me", axum::routing::patch(users::update))
+        .route(
+            "/users/me/avatar",
+            axum::routing::put(users::set_avatar).delete(users::clear_avatar),
+        )
+        .route("/users/{id}/avatar", get(users::avatar))
         .route("/users/by-username/{username}", get(users::lookup))
         .route("/users/{id}/status", get(users::status))
+        .route("/media/uploads", axum::routing::post(media::create))
+        .route("/media/{id}", get(media::get).delete(media::cancel))
+        .route("/media/{id}/upload-url", axum::routing::post(media::renew))
+        .route("/media/{id}/complete", axum::routing::post(media::complete))
+        .route("/media/{id}/download", get(media::download))
         .route(
             "/conversations/direct",
             axum::routing::post(conversations::direct),
         )
         .route("/conversations", get(conversations::list))
+        .route("/conversations/groups", axum::routing::post(groups::create))
+        .route(
+            "/conversations/{id}/group",
+            axum::routing::patch(groups::rename),
+        )
+        .route("/conversations/{id}/members", get(groups::members))
+        .route(
+            "/conversations/{id}/members/{user_id}",
+            axum::routing::patch(groups::role).delete(groups::remove),
+        )
+        .route(
+            "/conversations/{id}/leave",
+            axum::routing::post(groups::leave),
+        )
+        .route(
+            "/conversations/{id}/owner",
+            axum::routing::post(groups::transfer),
+        )
+        .route(
+            "/conversations/{id}/invitations",
+            axum::routing::post(groups::invite),
+        )
+        .route(
+            "/conversations/{id}/invitations/{invitation_id}",
+            axum::routing::delete(groups::revoke),
+        )
+        .route(
+            "/group-invitations/accept",
+            axum::routing::post(groups::accept),
+        )
         .route("/conversations/{id}", get(conversations::get))
         .route(
             "/conversations/{id}/messages",

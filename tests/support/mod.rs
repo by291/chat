@@ -2,6 +2,8 @@
 use chat_server::{AppState, build_router, infrastructure::config::Config};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
+pub mod media;
+
 pub struct TestApp {
     pub base_url: String,
     pub internal_url: String,
@@ -47,7 +49,10 @@ impl TestApp {
 }
 
 pub async fn spawn_test_app() -> TestApp {
-    let mut config = Config::from_env().unwrap();
+    spawn_test_app_with_config(Config::from_env().unwrap()).await
+}
+
+pub async fn spawn_test_app_with_config(mut config: Config) -> TestApp {
     let admin_url = config.database_url.clone();
     assert!(
         admin_url.contains("@127.0.0.1:55432/"),

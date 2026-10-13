@@ -6,8 +6,57 @@ import {
   frontendSourceViolations,
   frontendViolations,
   rustLayerViolations,
+  rustLayerSourceViolations,
+  rustSqlSourceViolations,
   rustSqlViolations,
 } from "../scripts/architecture-rules.mjs";
+
+test("named workflow repositories own SQL but HTTP and services cannot", () => {
+  const source = 'sqlx::query("SELECT 1");';
+
+  for (const filename of [
+    "src/conversations/group_repository.rs",
+    "src/media/repository.rs",
+  ]) {
+    assert.deepEqual(rustSqlSourceViolations(filename, source), []);
+  }
+  for (const filename of [
+    "src/conversations/group_http.rs",
+    "src/media/service.rs",
+    "src/bin/worker.rs",
+  ]) {
+    assert.equal(rustSqlSourceViolations(filename, source).length, 1);
+  }
+});
+
+test("media and group workflows cannot import named HTTP adapters", () => {
+  for (const filename of [
+    "src/media/service.rs",
+    "src/conversations/group_repository.rs",
+  ]) {
+    assert.equal(
+      rustLayerSourceViolations(filename, "use super::group_http::create;")
+        .length,
+      1,
+    );
+    assert.equal(
+      rustLayerSourceViolations(filename, "use crate::media::{http, model};")
+        .length,
+      1,
+    );
+    assert.deepEqual(
+      rustLayerSourceViolations(filename, "use super::repository;"),
+      [],
+    );
+  }
+  assert.deepEqual(
+    rustLayerSourceViolations(
+      "src/conversations/group_http.rs",
+      "use super::http::actor;",
+    ),
+    [],
+  );
+});
 
 test("Rust keeps business SQL in concrete repositories", async () => {
   const violations = await rustSqlViolations();

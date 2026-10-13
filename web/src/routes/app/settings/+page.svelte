@@ -1,5 +1,6 @@
 <script lang="ts">
   import ProfileForm from '#lib/features/settings/ProfileForm.svelte';
+  import AvatarEditor from '#lib/features/settings/AvatarEditor.svelte';
   import SessionsPanel from '#lib/features/settings/SessionsPanel.svelte';
   import { ArrowLeft } from '@lucide/svelte';
   import { theme, type Theme } from '#lib/features/settings/theme.svelte.ts';
@@ -15,6 +16,7 @@
     <p class="muted">你的资料、设备和聊天偏好。</p>
   </header>
   {#if auth.user}
+    <AvatarEditor userId={auth.user.id} name={auth.user.display_name} />
     <ProfileForm
       user={auth.user}
       onSaved={(user) => {

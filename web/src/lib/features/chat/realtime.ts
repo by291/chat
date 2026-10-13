@@ -17,6 +17,12 @@ function isEvent(data: unknown): data is RealtimeEvent {
     return false;
   }
   const candidate = data as Record<string, unknown>;
+  if (candidate.kind === 'membership.invalidated') {
+    return (
+      typeof candidate.conversation_id === 'string' &&
+      typeof candidate.membership_id === 'string'
+    );
+  }
   if (candidate.kind === 'presence.changed') {
     return typeof candidate.user_id === 'string';
   }
@@ -30,9 +36,13 @@ function isEvent(data: unknown): data is RealtimeEvent {
     );
   }
   return (
-    ['conversation.created', 'message.created', 'receipt.updated'].includes(
-      String(candidate.kind),
-    ) &&
+    [
+      'conversation.created',
+      'message.created',
+      'receipt.updated',
+      'group.updated',
+      'membership.updated',
+    ].includes(String(candidate.kind)) &&
     candidate.schema_version === 1 &&
     typeof candidate.event_id === 'string' &&
     typeof candidate.conversation_id === 'string' &&

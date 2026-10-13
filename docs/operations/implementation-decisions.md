@@ -1,7 +1,9 @@
 # Implementation decision record
 
-The entries below retain phase-one rulings in execution order. This directory has
-no Git repository; source and local verification evidence remain in place.
+The entries below retain phase-one rulings in execution order, including the
+historical pre-Git setup. The repository has since been initialized and published
+to GitHub; the original source and local verification evidence remain in place.
+See [phase-two decisions](phase-2-decisions.md) for CI, groups and media work.
 
 - work in current directory, no worktree and no commits — explicit user location and no Git repository — cost if wrong: can initialize Git later.
 - manual ledger/task briefs — skill scripts require a Git repository and bash — cost if wrong: evidence remains local instead of Git history; preserve scratch.
