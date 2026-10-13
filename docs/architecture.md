@@ -176,12 +176,19 @@ prescribe Compose. HTTPS browser checks target an operator-provided staging addr
 Public tooling has three entry points: `scripts/init-env.mjs` creates local secrets,
 `scripts/check.mjs` runs checks, and `scripts/generate-api.mjs` generates the contract.
 `tests/architecture-rules.mjs` owns source boundary inspection.
-`web/tests/integration/runtime.ts` owns test infrastructure, native child processes,
+`tests/infrastructure.mts` owns dependency-free middleware configuration and argv
+execution. It can serve Rust checks without importing frontend packages.
+`web/tests/integration/runtime.ts` owns native child processes,
 unique fixture databases/buckets and cleanup. Browser fixtures share this owner.
 `recovery.ts` coordinates a fixture snapshot and restores it into a fresh project;
 it is a recovery test helper. Production backup procedures remain operator-owned.
 Test logs and protected configuration live in ignored `.local/tests/` directories;
 there are no persisted process IDs or dated scratch paths in the tooling.
+
+CI runs backend, frontend and contract/integration scopes on three independent
+runners. Local full checks remain serial; tests within a scope retain fixed-port
+ownership. See `docs/operations/continuous-integration.md` for scope commands,
+cache ownership and Dependabot updates.
 
 The original phase-one acceptance remains in `docs/operations/phase-1-acceptance.md`.
 Private group episodes, media limits and deployment configuration are documented in

@@ -72,6 +72,9 @@ recovery service.
 ```sh
 node scripts/check.mjs
 node scripts/check.mjs --integration
+node scripts/check.mjs --scope backend
+node scripts/check.mjs --scope frontend
+node scripts/check.mjs --scope integration
 pnpm -C web api:generate
 pnpm -C web api:check
 ```
@@ -85,6 +88,8 @@ pnpm -C web exec playwright install chromium
 The base check includes architecture guards, Rust format/lint/tests (including real
 storage cases), Svelte types, formatting, generated API verification, frontend units
 and the static build. `--integration` also runs real SDK, recovery and browser tests.
+The optional `--scope` runs one CI job locally. Frontend needs no Rust or Docker;
+backend needs no frontend dependencies. Integration also verifies the generated API.
 Rust DTOs own the contract; regenerate `web/openapi.json` and
 `web/src/lib/api-client/schema.d.ts` rather than editing them manually. See
 [the architecture map](../architecture.md) and root `AGENTS.md` for conventions.

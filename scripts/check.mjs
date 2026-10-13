@@ -1,12 +1,29 @@
 /** Shared Windows/Linux checks. Middleware and subprocess cleanup belong to this run. */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { parseArgs } from "node:util";
 
 import {
   repositoryRoot,
   prepareTestInfrastructure,
   runCommand,
-} from "../web/tests/integration/runtime.ts";
+} from "../tests/infrastructure.mts";
+
+const { values } = parseArgs({
+  options: {
+    scope: { type: "string", default: "all" },
+    integration: { type: "boolean", default: false },
+  },
+});
+const scope = values.scope;
+if (!["all", "backend", "frontend", "integration"].includes(scope)) {
+  throw new Error("Expected --scope all, backend, frontend or integration");
+}
+if (values.integration && scope !== "all") {
+  throw new Error(
+    "Use --integration with the default scope, or --scope integration",
+  );
+}
 
 const web = path.join(repositoryRoot, "web");
 const controller = new AbortController();
@@ -18,12 +35,7 @@ const cancel = () => {
 };
 process.once("SIGINT", cancel);
 process.once("SIGTERM", cancel);
-const infrastructure = await prepareTestInfrastructure();
-const env = {
-  ...process.env,
-  ...infrastructure.values,
-  CHAT_TEST_INFRASTRUCTURE_ENV: infrastructure.envFile,
-};
+const env = { ...process.env };
 const command = async (name, args, cwd = repositoryRoot) => {
   controller.signal.throwIfAborted();
   // Killing only Cargo/Vitest/Playwright can orphan their fixture processes on Windows.
@@ -47,11 +59,17 @@ const tool = async (packageName, binName, args) => {
 };
 const steps = [
   [
+    "frontend",
     "Architecture boundaries",
     () => command(process.execPath, ["--test", "tests/architecture.test.mjs"]),
   ],
-  ["Rust format", () => command("cargo", ["fmt", "--all", "--", "--check"])],
   [
+    "backend",
+    "Rust format",
+    () => command("cargo", ["fmt", "--all", "--", "--check"]),
+  ],
+  [
+    "backend",
     "Rust lint",
     () =>
       command("cargo", [
@@ -64,16 +82,23 @@ const steps = [
       ]),
   ],
   [
+    "backend",
     "Rust tests and real media",
     () => command("cargo", ["test", "--", "--include-ignored"]),
   ],
-  ["SvelteKit sync", () => tool("@sveltejs/kit", "svelte-kit", ["sync"])],
   [
+    "frontend",
+    "SvelteKit sync",
+    () => tool("@sveltejs/kit", "svelte-kit", ["sync"]),
+  ],
+  [
+    "frontend",
     "Svelte types",
     () =>
       tool("svelte-check", "svelte-check", ["--tsconfig", "./tsconfig.json"]),
   ],
   [
+    "frontend",
     "Formatting",
     () =>
       tool("prettier", "prettier", [
@@ -85,36 +110,48 @@ const steps = [
         "*.json",
         "../scripts/*.mjs",
         "../tests/*.mjs",
+        "../tests/*.{ts,mts}",
       ]),
   ],
   [
+    "contract",
     "API schema",
     () => command(process.execPath, ["scripts/generate-api.mjs", "--check"]),
   ],
-  ["Frontend unit tests", () => tool("vitest", "vitest", ["run"])],
-  ["Static build", () => tool("vite", "vite", ["build"])],
-];
-if (process.argv.includes("--integration")) {
-  steps.push(
-    [
-      "SDK and recovery integration",
-      () =>
-        tool("vitest", "vitest", [
-          "run",
-          "--config",
-          "vitest.integration.config.ts",
-        ]),
-    ],
-    [
-      "Browser scenarios",
-      () => tool("@playwright/test", "playwright", ["test"]),
-    ],
-  );
-}
+  ["frontend", "Frontend unit tests", () => tool("vitest", "vitest", ["run"])],
+  ["frontend", "Static build", () => tool("vite", "vite", ["build"])],
+  [
+    "integration",
+    "SDK and recovery integration",
+    () =>
+      tool("vitest", "vitest", [
+        "run",
+        "--config",
+        "vitest.integration.config.ts",
+      ]),
+  ],
+  [
+    "integration",
+    "Browser scenarios",
+    () => tool("@playwright/test", "playwright", ["test"]),
+  ],
+].filter(([group]) => {
+  if (scope === "all") return group !== "integration" || values.integration;
+  if (group === "contract") return scope === "integration";
+  return group === scope;
+});
 
 const failures = [];
+let infrastructure;
 try {
-  for (const [name, operation] of steps) {
+  if (scope !== "frontend") {
+    infrastructure = await prepareTestInfrastructure();
+    Object.assign(env, infrastructure.values, {
+      CHAT_TEST_INFRASTRUCTURE_ENV: infrastructure.envFile,
+    });
+  }
+
+  for (const [, name, operation] of steps) {
     console.log(`Checking ${name}`);
     await operation();
   }
@@ -122,7 +159,7 @@ try {
   failures.push(error);
 } finally {
   try {
-    await infrastructure.cleanup();
+    await infrastructure?.cleanup();
   } catch (error) {
     failures.push(error);
   }

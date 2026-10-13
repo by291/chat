@@ -13,14 +13,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  checks:
-    name: Format, contracts, tests and build
+  backend:
+    name: Backend
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    env:
-      CARGO_TERM_COLOR: always
-
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,7 +33,68 @@ jobs:
           node-version: 24.21.0
           package-manager-cache: false
 
-      - name: Set up the repository's pnpm version
+      - name: Install the pinned Rust toolchain
+        run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy
+
+      - name: Restore Rust dependencies and build cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+
+      - name: Check Rust formatting, lint and real storage tests
+        run: node scripts/check.mjs --scope backend
+
+      - name: Stop owned test infrastructure after interruption
+        if: always()
+        run: |
+          if [ -f .local/tests/infrastructure/test.env ]; then
+            docker compose --project-name chat-test --env-file .local/tests/infrastructure/test.env down
+          fi
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+          package-manager-cache: false
+
+      - name: Set up pnpm and dependency cache
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: web/package.json
+          cache: true
+          cache_dependency_path: web/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: pnpm -C web install --frozen-lockfile
+
+      - name: Check boundaries, types, formatting, units and static build
+        run: node scripts/check.mjs --scope frontend
+
+  integration:
+    name: Contracts and integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24.21.0
+          package-manager-cache: false
+
+      - name: Set up pnpm and dependency cache
         uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           package_json_file: web/package.json
@@ -41,7 +102,10 @@ jobs:
           cache_dependency_path: web/pnpm-lock.yaml
 
       - name: Install the pinned Rust toolchain
-        run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy
+        run: rustup toolchain install 1.99.0 --profile minimal
+
+      - name: Restore Rust dependencies and build cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
       - name: Install frontend dependencies
         run: pnpm -C web install --frozen-lockfile
@@ -49,11 +113,10 @@ jobs:
       - name: Install the browser used by integration tests
         run: pnpm -C web exec playwright install --with-deps chromium
 
-      # Local and CI run the same native application and middleware fixtures.
-      - name: Run repository checks
-        run: node scripts/check.mjs --integration
+      - name: Check generated API, SDK, recovery and browser scenarios
+        run: node scripts/check.mjs --scope integration
 
-      - name: Stop owned test infrastructure after an interrupted check
+      - name: Stop owned test infrastructure after interruption
         if: always()
         run: |
           if [ -f .local/tests/infrastructure/test.env ]; then

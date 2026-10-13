@@ -1,32 +1,75 @@
 # Continuous integration
 
-`.github/workflows/ci.yml` runs `node scripts/check.mjs --integration` on pushes,
-pull requests targeting `main`, and manual dispatch. The runner is Ubuntu 24.04;
-Rust, Node, pnpm and action references stay pinned by the repository. The workflow
-installs Chromium and its Linux dependencies before running browser scenarios.
+`.github/workflows/ci.yml` runs on pushes, pull requests targeting `main`, and
+manual dispatch. Three independent jobs start in parallel on Ubuntu 24.04. They
+have no `needs` dependencies and do not share a workspace or test containers.
 
-Local and CI checks share the root `compose.yaml` and the same Node entry point.
-Test helpers start `chat-test` with separate credentials, ports and volumes derived
-from `.env.example`; development `.env` and production secrets are not read. Rust
-tests create unique databases and buckets. SDK/browser suites run native API and
-worker processes with fixture-owned data; recovery tests restore into a fresh
-`chat-restore-drill-*` project. Linux callback listeners are reachable from the
-Docker bridge and authenticated with test-only internal credentials.
+| Job | Shared local command | Responsibilities | Required tools |
+| --- | --- | --- | --- |
+| Backend | `node scripts/check.mjs --scope backend` | Rust fmt/clippy and all Rust tests, including real media/associations | Node, Rust, Docker |
+| Frontend | `node scripts/check.mjs --scope frontend` | Architecture guards, Svelte types, formatting, units and static build | Node, pnpm |
+| Contracts and integration | `node scripts/check.mjs --scope integration` | Generated API consistency, SDK authentication/delivery/presence, recovery and browsers | Node, pnpm, Rust, Docker, Chromium |
 
-The command covers architecture guards, fmt/clippy, real Rust media/association
-tests, Svelte types, formatting, generated API consistency, frontend units, the
-static build, SDK integration, recovery and browser scenarios. Each fixture owns
-its subprocesses; middleware stops in `finally`. The workflow repeats `chat-test`
-shutdown after interruption. Dependency health checks bound startup; the job timeout
-is 30 minutes. Logs and fixture configuration live in `.local/tests/`.
+Contract generation belongs to the integration job because Rust owns the API and
+the TypeScript generator needs frontend dependencies. Frontend checks use the
+committed schema; the integration job rejects any drift. This lets frontend and
+backend jobs start independently without installing each other's toolchains.
 
-The base local command `node scripts/check.mjs` omits SDK/recovery/browser suites.
-HTTPS checks remain separate and target an operator-provided staging deployment;
-see [deployment](deployment.md). CI does not provision production infrastructure.
+Rust, Node, pnpm and Actions references remain pinned. pnpm caches its dependency
+store; the backend and integration jobs cache Cargo dependencies/build artifacts
+under separate job keys. Require all three job results when configuring branch
+protection; a fast frontend result alone does not establish application correctness.
+Update existing protection rules if they required the former combined job name.
 
-The token has `contents: read`; checkout does not persist Git credentials. The
-workflow does not deploy or publish images. Writing a workflow is not an Actions
-run: inspect its first hosted run after an explicitly requested push. Local results
-do not establish the hosted runner's installation or network behavior.
+## Test ownership
 
-Validate workflow syntax with `actionlint .github/workflows/ci.yml` when available.
+Local and CI checks share the root `compose.yaml`. Each infrastructure-dependent
+runner starts its own `chat-test` project with separate credentials, ports and
+volumes derived from `.env.example`. Development `.env` and production secrets are
+not read. The frontend job starts no infrastructure.
+
+`tests/infrastructure.mts` owns middleware, environment and argv execution using
+only Node built-ins, so backend checks do not require frontend dependencies.
+Rust tests create unique databases and buckets. SDK/browser suites run fixture-owned
+native API/worker processes; recovery tests use a fresh `chat-restore-drill-*`
+project. Each suite stays serial inside its own runner to preserve fixed-port and
+native-binary ownership. Parallelism is between isolated CI runners.
+
+Middleware stops in `finally`, and backend/integration jobs repeat `chat-test`
+shutdown after interruption. Logs and protected fixture configuration live in
+`.local/tests/`. Dependency health checks bound startup. Backend/integration have
+30-minute job deadlines; frontend has 15 minutes.
+
+The existing local `node scripts/check.mjs` and
+`node scripts/check.mjs --integration` commands retain their base/full behavior.
+Run infrastructure-dependent scopes serially on one developer machine.
+HTTPS checks still target an operator-provided staging deployment; see
+[deployment](deployment.md).
+
+## Dependency updates
+
+`.github/dependabot.yml` checks Cargo at `/`, pnpm through the `npm` ecosystem at
+`/web`, GitHub Actions at `/`, and root Compose images through `docker-compose`.
+It checks weekly on Mondays at 09:00 Asia/Shanghai, groups minor/patch updates by
+ecosystem, leaves major updates as individual PRs, and allows up to three open
+version-update PRs per ecosystem. Updates require review and the normal CI checks.
+Automatic merging is not enabled.
+
+GitHub's [support matrix](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories)
+currently lists pnpm 7–10. The
+[upstream updater](https://github.com/dependabot/dependabot-core/blob/main/npm_and_yarn/lib/dependabot/npm_and_yarn/helpers.rb)
+already handles pinned pnpm 12 and version-9 lockfiles, which this repository uses.
+The hosted rollout can lag the upstream source; verify the first frontend update
+job before claiming pnpm 12 updater acceptance. The project's package-manager
+version is preserved.
+
+## Verification limits
+
+The workflow token has `contents: read`; checkout does not persist credentials.
+CI does not deploy or publish images. Writing configuration is not a hosted run:
+inspect the first Actions and Dependabot runs after an explicitly requested push.
+Dependabot configuration takes effect on the default branch; security-alert and
+security-update repository settings are separate from scheduled version updates.
+
+Validate the workflow with `actionlint .github/workflows/ci.yml` and validate
+`dependabot.yml` against its JSON Schema when changing their structure.
