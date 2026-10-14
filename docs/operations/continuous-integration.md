@@ -4,10 +4,10 @@
 manual dispatch. Three independent jobs start in parallel on Ubuntu 24.04. They
 have no `needs` dependencies and do not share a workspace or test containers.
 
-| Job | Shared local command | Responsibilities | Required tools |
-| --- | --- | --- | --- |
-| Backend | `node scripts/check.mjs --scope backend` | Rust fmt/clippy and all Rust tests, including real media/associations | Node, Rust, Docker |
-| Frontend | `node scripts/check.mjs --scope frontend` | Architecture guards, Svelte types, formatting, units and static build | Node, pnpm |
+| Job                       | Shared local command                         | Responsibilities                                                                       | Required tools                     |
+| ------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------- |
+| Backend                   | `node scripts/check.mjs --scope backend`     | Rust fmt/clippy and all Rust tests, including real media/associations                  | Node, Rust, Docker                 |
+| Frontend                  | `node scripts/check.mjs --scope frontend`    | Architecture guards, Svelte types, formatting, units and static build                  | Node, pnpm                         |
 | Contracts and integration | `node scripts/check.mjs --scope integration` | Generated API consistency, SDK authentication/delivery/presence, recovery and browsers | Node, pnpm, Rust, Docker, Chromium |
 
 Contract generation belongs to the integration job because Rust owns the API and
@@ -40,6 +40,33 @@ shutdown after interruption. Logs and protected fixture configuration live in
 `.local/tests/`. Dependency health checks bound startup. Backend/integration have
 30-minute job deadlines; frontend has 15 minutes.
 
+SeaweedFS 4.48 drops from root to its `seaweed` user before reading S3 credentials.
+Fixture credential files keep mode `0600` and their host user's ownership. When
+that UID differs from Seaweed's UID 1000, a direct bind mount is unreadable after
+the privilege drop. The root Compose wrapper copies the read-only source into a
+container-private directory (mode `0700`) with a
+`seaweed`-owned file (mode `0600`), then executes the image's original entrypoint.
+This preserves upstream `/data` ownership repair, privilege dropping and FIPS
+configuration without broadening host-file permissions.
+
+On command failure, the launcher includes at most the final 8 KiB of the current
+command's log, redacting known fixture credentials and discarding a truncated
+first line. Failed Compose startup also collects `ps --all` and the last 100 log
+lines per owned service before cleanup, with a 15-second deadline per diagnostic
+command. Each output section is bounded to 8 KiB. A diagnostic or cleanup failure
+is retained alongside the original startup error rather than replacing it.
+Raw command logs and diagnostic reports are created with mode `0600` on Unix.
+Timeout rejection does not wait for inherited pipes or log reading. Unix cancels
+the owned process group; Windows attempts hidden `taskkill /T /F` for a still-running
+owned child, with a bounded fallback to its native process handle. Already-exited
+Windows PIDs are skipped to avoid targeting a reused ID.
+
+The same redacted report is printed and saved as `compose-diagnostics.log` beside
+the fixture environment file. Backend/integration failure artifacts allow only
+`.local/tests/**/compose-diagnostics.log` and expire after seven days. Hidden-file
+upload is enabled for that explicit filename allowlist; raw `compose.log`, `test.env`
+and S3 JSON credential files are never included. Keep those raw local files private.
+
 The existing local `node scripts/check.mjs` and
 `node scripts/check.mjs --integration` commands retain their base/full behavior.
 Run infrastructure-dependent scopes serially on one developer machine.
@@ -68,6 +95,12 @@ version is preserved.
 The workflow token has `contents: read`; checkout does not persist credentials.
 CI does not deploy or publish images. Writing configuration is not a hosted run:
 inspect the first Actions and Dependabot runs after an explicitly requested push.
+The Linux permissions failure was reproduced on an isolated native Linux Docker
+volume. With the private-copy wrapper, all five middleware services became healthy;
+the source remained root-owned `0600`, the private copy was owned by UID 1000, and
+Seaweed ran under UID 1000 with the upstream FIPS setting. A deliberately failed
+Compose startup also verified the real redacted diagnostic and cleanup path.
+These local checks do not establish a hosted result for unpushed changes.
 Dependabot configuration takes effect on the default branch; security-alert and
 security-update repository settings are separate from scheduled version updates.
 

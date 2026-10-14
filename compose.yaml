@@ -12,7 +12,8 @@ services:
     ports: ["127.0.0.1:${POSTGRES_PORT:-55432}:5432"]
     volumes: ["postgres-data:/var/lib/postgresql"]
     healthcheck:
-      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      test:
+        [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 2s
       timeout: 3s
       retries: 30
@@ -42,17 +43,39 @@ services:
     volumes: ["./infra/centrifugo/config.json:/centrifugo/config.json:ro"]
     extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:
-      valkey: {condition: service_healthy}
+      valkey: { condition: service_healthy }
 
   seaweedfs:
     image: chrislusf/seaweedfs:4.48
-    command: [server, -dir=/data, -ip=seaweedfs, -filer, -s3, -s3.config=/etc/seaweedfs/s3.json]
+    # Host credentials are owner-only (0600), and host/container UIDs can differ.
+    # Give only Seaweed a private copy, then retain upstream ownership and privilege drop.
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        install -d -m 0700 -o seaweed -g seaweed /run/seaweedfs
+        install -m 0600 -o seaweed -g seaweed /run/secrets/seaweedfs-s3.json /run/seaweedfs/s3.json
+        exec /entrypoint.sh "$$@"
+      - seaweedfs-config
+    command:
+      [
+        server,
+        -dir=/data,
+        -ip=seaweedfs,
+        -filer,
+        -s3,
+        -s3.config=/run/seaweedfs/s3.json,
+      ]
     ports: ["127.0.0.1:${SEAWEED_S3_PORT:-8333}:8333"]
     volumes:
       - seaweed-data:/data
-      - ${SEAWEED_S3_CONFIG:-./infra/seaweedfs/s3.json}:/etc/seaweedfs/s3.json:ro
+      - ${SEAWEED_S3_CONFIG:-./infra/seaweedfs/s3.json}:/run/secrets/seaweedfs-s3.json:ro
     healthcheck:
-      test: [CMD-SHELL, "wget -S -O /dev/null http://seaweedfs:8333/ 2>&1 | grep -q '403'"]
+      test:
+        [
+          CMD-SHELL,
+          "wget -S -O /dev/null http://seaweedfs:8333/ 2>&1 | grep -q '403'",
+        ]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -68,7 +91,7 @@ services:
       - ./infra/caddy/media.caddy:/etc/caddy/media.caddy:ro
       - ./infra/caddy/logging.caddy:/etc/caddy/logging.caddy:ro
     depends_on:
-      seaweedfs: {condition: service_started}
+      seaweedfs: { condition: service_started }
 
 volumes:
   postgres-data:
