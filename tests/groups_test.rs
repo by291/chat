@@ -162,10 +162,12 @@ async fn summary_snapshot_cannot_mix_an_old_episode_with_later_private_messages(
                 r#"
                 SELECT EXISTS (
                     SELECT 1
-                    FROM pg_stat_activity
-                    WHERE datname = current_database()
-                        AND wait_event_type = 'Lock'
-                        AND query LIKE '%FROM messages WHERE conversation_id%'
+                    FROM pg_stat_activity activity
+                    JOIN pg_locks waiting_lock ON waiting_lock.pid = activity.pid
+                    WHERE activity.datname = current_database()
+                        AND activity.wait_event_type = 'Lock'
+                        AND waiting_lock.relation = 'messages'::regclass
+                        AND NOT waiting_lock.granted
                 )
                 "#,
             )
@@ -204,9 +206,11 @@ async fn summary_snapshot_cannot_mix_an_old_episode_with_later_private_messages(
     sqlx::query(
         r#"
         INSERT INTO messages(
-            id, conversation_id, sender_id, client_message_id, created_seq, body, sender_name
+            id, conversation_id, sender_id, client_message_id, created_seq, body, sender_name,
+            revision_seq, original_body_hash
         )
-        VALUES ($1, $2, $3, $4, $5, 'outside membership', 'owner')
+        VALUES ($1, $2, $3, $4, $5, 'outside membership', 'owner', $5,
+                encode(sha256(convert_to('outside membership', 'UTF8')), 'hex'))
         "#,
     )
     .bind(uuid::Uuid::new_v4())

@@ -18,6 +18,8 @@ function message(id: string, seq: string, conversation = 'a'): Message {
   return {
     id,
     created_seq: seq,
+    revision_seq: seq,
+    withdrawn: false,
     conversation_id: conversation,
     client_message_id: id,
     sender_id: 'alice',
@@ -72,6 +74,21 @@ function fixture(overrides: Partial<ChatApi> = {}) {
     send: async () => {
       throw new Error('offline');
     },
+    edit: async () => {
+      throw new Error('not needed');
+    },
+    withdraw: async () => {
+      throw new Error('not needed');
+    },
+    search: async () => ({ items: [], next_before: null, snapshot_seq: '1' }),
+    context: async () => ({
+      items: [],
+      target_message_id: '',
+      next_before: null,
+      next_after: null,
+      snapshot_seq: '1',
+    }),
+    preferences: async () => ({ pinned: false, muted: false, archived: false }),
     read: async (_id, seq) => ({ my_read_seq: seq }),
     typing: async () => {},
     status: async () => ({ online: false }),

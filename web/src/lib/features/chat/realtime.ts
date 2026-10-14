@@ -17,6 +17,8 @@ function isEvent(data: unknown): data is RealtimeEvent {
     return false;
   }
   const candidate = data as Record<string, unknown>;
+  if (candidate.kind === 'conversation.preferences.updated')
+    return typeof candidate.conversation_id === 'string';
   if (candidate.kind === 'membership.invalidated') {
     return (
       typeof candidate.conversation_id === 'string' &&
@@ -39,6 +41,8 @@ function isEvent(data: unknown): data is RealtimeEvent {
     [
       'conversation.created',
       'message.created',
+      'message.edited',
+      'message.withdrawn',
       'receipt.updated',
       'group.updated',
       'membership.updated',

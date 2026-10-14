@@ -36,6 +36,7 @@ function group(membership = 'old', sequence = '1'): Group {
     last_message: null,
     unread_count: 0,
     my_read_seq: '0',
+    preferences: { pinned: false, muted: false, archived: false },
   };
 }
 
@@ -47,6 +48,8 @@ function message(id: string, sequence = '1'): Message {
     client_message_id: id,
     body: id,
     created_seq: sequence,
+    revision_seq: sequence,
+    withdrawn: false,
     created_at: '2026-10-13T00:00:00Z',
   };
 }
@@ -88,6 +91,21 @@ function fixture(overrides: Partial<ChatApi> = {}) {
       throw new Error('offline');
     },
     read: async (_id, sequence) => ({ my_read_seq: sequence }),
+    edit: async () => {
+      throw new Error('not needed');
+    },
+    withdraw: async () => {
+      throw new Error('not needed');
+    },
+    search: async () => ({ items: [], next_before: null, snapshot_seq: '1' }),
+    context: async () => ({
+      items: [],
+      target_message_id: '',
+      next_before: null,
+      next_after: null,
+      snapshot_seq: '1',
+    }),
+    preferences: async () => ({ pinned: false, muted: false, archived: false }),
     typing: async () => {},
     status: async () => ({ online: false }),
     members: async () => [],

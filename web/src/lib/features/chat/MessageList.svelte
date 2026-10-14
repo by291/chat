@@ -2,10 +2,9 @@
   import { Button } from '#lib/components/ui/button/index.js';
 
   import { onMount, tick, untrack } from 'svelte';
-  import { Check, CheckCheck, ArrowDown, RotateCcw } from '@lucide/svelte';
+  import { ArrowDown, RotateCcw } from '@lucide/svelte';
   import type { ChatSync } from './sync.svelte';
-  import { isGroup } from './models';
-  import AttachmentList from '../media/AttachmentList.svelte';
+  import MessageBubble from './MessageBubble.svelte';
 
   let {
     sync,
@@ -22,15 +21,16 @@
   let following = $state(true);
   let renderGeneration = 0;
   let renderedId = '';
-  const formatTime = (value: string) =>
-    new Date(value).toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  let renderedTarget: string | null = null;
 
   // A received/cached message is not read until its rendered bottom is inside
   // the focused visible viewport. Every DOM update invalidates this confirmation.
   function confirmRenderedVisibility() {
+    const focused =
+      document.visibilityState === 'visible' &&
+      document.hasFocus() &&
+      sync.selectedId === id;
+    sync.setFocused(focused);
     if (!scroller || !bottom || sync.selectedId !== id || sync.loading) {
       sync.setVisible(false);
       return;
@@ -38,10 +38,7 @@
     const viewport = scroller.getBoundingClientRect();
     const end = bottom.getBoundingClientRect();
     sync.setVisible(
-      document.visibilityState === 'visible' &&
-        document.hasFocus() &&
-        end.top >= viewport.top &&
-        end.bottom <= viewport.bottom + 2,
+      focused && end.top >= viewport.top && end.bottom <= viewport.bottom + 2,
     );
   }
 
@@ -51,7 +48,9 @@
     confirmRenderedVisibility();
   }
 
-  function scrollToLatest() {
+  async function scrollToLatest() {
+    if (sync.history.contextual) await sync.history.latest();
+    await tick();
     following = true;
     scroller.scrollTop = scroller.scrollHeight;
     confirmRenderedVisibility();
@@ -70,17 +69,22 @@
   async function mediaLayoutChanged() {
     sync.setVisible(false);
     await tick();
-    if (following) scroller.scrollTop = scroller.scrollHeight;
+    if (following && !sync.history.contextual)
+      scroller.scrollTop = scroller.scrollHeight;
     confirmRenderedVisibility();
   }
 
   $effect(() => {
-    sync.messages.length;
+    sync.messages;
     sync.currentPending.length;
     sync.loading;
     // Replay can advance without changing row count, so the applied cursor is
     // also a dependency for a new rendered-read confirmation.
     sync.appliedSeq;
+    const contextual = sync.history.contextual;
+    const target = sync.history.targetId;
+    const jump = target !== renderedTarget;
+    renderedTarget = target;
     const conversation = id;
     const generation = ++renderGeneration;
     sync.setVisible(false);
@@ -96,7 +100,14 @@
       ) {
         return;
       }
-      if (changed || wasFollowing) {
+      if (contextual) {
+        following = false;
+        if (target && jump) {
+          const element = document.getElementById(`message-${target}`);
+          element?.scrollIntoView({ block: 'center' });
+          element?.focus({ preventScroll: true });
+        }
+      } else if (changed || wasFollowing) {
         scroller.scrollTop = scroller.scrollHeight;
       }
       confirmRenderedVisibility();
@@ -105,7 +116,7 @@
 
   onMount(() => {
     const observer = new ResizeObserver(() => {
-      if (following) {
+      if (following && !sync.history.contextual) {
         scroller.scrollTop = scroller.scrollHeight;
       }
       confirmRenderedVisibility();
@@ -123,6 +134,7 @@
         confirmRenderedVisibility,
       );
       sync.setVisible(false);
+      sync.setFocused(false);
     };
   });
 </script>
@@ -155,42 +167,16 @@
         </div>
       {/if}
       {#each sync.messages as message (message.id)}
-        <article class="message-row" class:own={message.sender_id === userId}>
-          <div class="message-bubble">
-            {#if isGroup(sync.current)}
-              <strong class="message-sender">
-                {message.sender_name ?? sync.senderName(message.sender_id)}
-              </strong>
-            {/if}
-            {#if message.body}<p>{message.body}</p>{/if}
-            {#each message.attachments ?? [] as attachment (attachment.id)}
-              <AttachmentList {attachment} onLayout={mediaLayoutChanged} />
-            {/each}
-            <div class="message-meta">
-              <time datetime={message.created_at}>
-                {formatTime(message.created_at)}
-              </time>
-              {#if message.sender_id === userId}
-                {#if isGroup(sync.current)}
-                  {#if sync.groupMembers.length}
-                    <span
-                      aria-label={`${sync.readCount(message.created_seq)} 人已读`}
-                    >
-                      {sync.readCount(message.created_seq)} 人已读
-                    </span>
-                  {/if}
-                {:else if BigInt(sync.current?.peer_read_seq ?? '0') >= BigInt(message.created_seq)}
-                  <span aria-label="已读">
-                    <CheckCheck size={13} />
-                  </span>
-                {:else}
-                  <span aria-label="已保存">
-                    <Check size={13} />
-                  </span>
-                {/if}
-              {/if}
-            </div>
-          </div>
+        <article
+          id={`message-${message.id}`}
+          data-message-id={message.id}
+          tabindex="-1"
+          class="message-row"
+          class:own={message.sender_id === userId}
+          class:context-target={sync.history.contextual &&
+            sync.history.targetId === message.id}
+        >
+          <MessageBubble {sync} {message} onLayout={mediaLayoutChanged} />
         </article>
       {/each}
       {#each sync.currentPending as message (message.client_message_id)}
@@ -200,9 +186,11 @@
             class:failed={message.status === 'failed'}
           >
             <p>{message.body}</p>
-            {#if message.attachment_ids.length}<small>
+            {#if message.attachment_ids.length}
+              <small>
                 {message.attachment_ids.length} 个附件
-              </small>{/if}
+              </small>
+            {/if}
             <div class="message-meta">
               {#if message.status === 'failed'}
                 <Button
@@ -223,9 +211,11 @@
       <div class="message-bottom" bind:this={bottom}></div>
     </div>
   </div>
-  {#if !following}
+  {#if !following || sync.history.contextual}
     <Button variant="secondary" class="jump-latest" onclick={scrollToLatest}>
-      <ArrowDown size={15} />查看最新消息
+      <ArrowDown size={15} />{sync.history.contextual
+        ? '返回最新消息'
+        : '查看最新消息'}
     </Button>
   {/if}
 </div>

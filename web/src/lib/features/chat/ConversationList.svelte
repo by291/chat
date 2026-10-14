@@ -2,9 +2,11 @@
   import * as Avatar from '#lib/components/ui/avatar/index.js';
   import { Badge } from '#lib/components/ui/badge/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
 
   import ProfileAvatar from '../settings/ProfileAvatar.svelte';
-  import { Search, MessageCircle } from '@lucide/svelte';
+  import { Search, MessageCircle, Pin, BellOff } from '@lucide/svelte';
+  import NotificationSettings from './NotificationSettings.svelte';
   import StartConversationDialog from './StartConversationDialog.svelte';
   import GroupDialog from './GroupDialog.svelte';
   import { isGroup, conversationName } from './models';
@@ -17,13 +19,21 @@
   } = $props();
 
   let filter = $state('');
+  let archived = $state(false);
 
   let conversations = $derived(
-    sync.conversations.filter((c) =>
-      `${conversationName(c)} ${isGroup(c) ? '' : c.peer.username}`
-        .toLowerCase()
-        .includes(filter.toLowerCase()),
-    ),
+    sync.conversations
+      .filter(
+        (conversation) =>
+          conversation.preferences.archived === archived &&
+          `${conversationName(conversation)} ${isGroup(conversation) ? '' : conversation.peer.username}`
+            .toLowerCase()
+            .includes(filter.toLowerCase()),
+      )
+      .sort(
+        (left, right) =>
+          Number(right.preferences.pinned) - Number(left.preferences.pinned),
+      ),
   );
 
   const time = (value: string) =>
@@ -45,6 +55,7 @@
     <div class="group-actions">
       <StartConversationDialog {sync} />
       <GroupDialog {sync} />
+      <NotificationSettings {sync} />
     </div>
   </header>
   <div class="search-field">
@@ -54,6 +65,28 @@
       bind:value={filter}
       placeholder="搜索你的聊天"
     />
+  </div>
+  <div class="archive-tabs" aria-label="会话视图">
+    <Button
+      type="button"
+      variant={archived ? 'ghost' : 'secondary'}
+      size="sm"
+      aria-pressed={!archived}
+      onclick={() => (archived = false)}
+    >
+      聊天
+    </Button>
+    <Button
+      type="button"
+      variant={archived ? 'secondary' : 'ghost'}
+      size="sm"
+      aria-pressed={archived}
+      onclick={() => (archived = true)}
+    >
+      归档 ({sync.conversations.filter(
+        (conversation) => conversation.preferences.archived,
+      ).length})
+    </Button>
   </div>
   <div class="connection-status" aria-live="polite">
     <span
@@ -89,6 +122,12 @@
         <div class="conversation-copy">
           <div class="conversation-name">
             <strong>{conversationName(conversation)}</strong>
+            {#if conversation.preferences.pinned}
+              <Pin size={12} aria-label="已置顶" />
+            {/if}
+            {#if conversation.preferences.muted}
+              <BellOff size={12} aria-label="已静音" />
+            {/if}
             {#if conversation.last_message}
               <time>
                 {time(conversation.last_message.created_at)}
@@ -106,7 +145,9 @@
             <p>
               {sync.typingByConversation[conversation.id]
                 ? '正在输入…'
-                : (conversation.last_message?.body ?? '开始你们的第一段对话')}
+                : conversation.last_message?.withdrawn
+                  ? '此消息已撤回'
+                  : (conversation.last_message?.body ?? '开始你们的第一段对话')}
             </p>
             {#if conversation.unread_count > 0}
               <Badge>
@@ -122,7 +163,13 @@
     {#if !conversations.length}
       <div class="sidebar-empty">
         <MessageCircle size={28} />
-        <p>{filter ? '没有匹配的聊天' : '还没有聊天'}</p>
+        <p>
+          {filter
+            ? '没有匹配的聊天'
+            : archived
+              ? '没有归档的聊天'
+              : '还没有聊天'}
+        </p>
         <span>
           {filter ? '试试另一位伙伴的名字' : '点击右上角，找到你的伙伴'}
         </span>

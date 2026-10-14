@@ -161,7 +161,7 @@ test('a hidden chat page does not mark a new message read', async ({
     await context.close();
   }
 });
-test('HTML is displayed as plain text and theme is the only persisted preference', async ({
+test('HTML is displayed as plain text and the local theme survives reload', async ({
   page,
   browser,
   stack,

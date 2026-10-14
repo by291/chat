@@ -52,7 +52,15 @@ pub async fn spawn_test_app() -> TestApp {
     spawn_test_app_with_config(Config::from_env().unwrap()).await
 }
 
-pub async fn spawn_test_app_with_config(mut config: Config) -> TestApp {
+pub async fn spawn_test_app_with_config(config: Config) -> TestApp {
+    spawn_test_app_with_migrator(config, &sqlx::migrate!("./migrations")).await
+}
+
+/// Migration regressions can start at an older schema while retaining owned cleanup.
+pub async fn spawn_test_app_with_migrator(
+    mut config: Config,
+    migrator: &sqlx::migrate::Migrator,
+) -> TestApp {
     let admin_url = config.database_url.clone();
     assert!(
         admin_url.contains("@127.0.0.1:55433/"),
@@ -75,7 +83,7 @@ pub async fn spawn_test_app_with_config(mut config: Config) -> TestApp {
         .connect(&config.database_url)
         .await
         .unwrap();
-    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    migrator.run(&pool).await.unwrap();
     admin.close().await;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base_url = format!("http://{}", listener.local_addr().unwrap());

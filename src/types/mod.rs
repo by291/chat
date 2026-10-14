@@ -13,9 +13,11 @@ pub use sequence::Seq;
 pub use crate::auth::model::{LoginInput, RegisterInput, SessionView};
 
 pub use crate::conversations::model::{
-    ConversationEvent, ConversationEventKind, ConversationEventPayload, ConversationView,
-    DirectInput, EventEnvelope, EventPage, EventQuery, MessagePage, MessageSnapshot, MessageView,
-    Page, PageCursor, ReadInput, ReadResult, ReceiptData, SendMessageInput, TypingInput,
+    ConversationEvent, ConversationEventKind, ConversationEventPayload, ConversationPreferences,
+    ConversationPreferencesInput, ConversationView, DirectInput, EditMessageInput, EventEnvelope,
+    EventPage, EventQuery, MessageContext, MessagePage, MessageReplyView, MessageSearchQuery,
+    MessageSearchResult, MessageSnapshot, MessageTargetQuery, MessageView, Page, PageCursor,
+    ReadInput, ReadResult, ReceiptData, SendMessageInput, TypingInput,
 };
 
 pub use crate::users::model::{UpdateProfile, UserStatus, UserView};

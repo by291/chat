@@ -14,6 +14,7 @@
   import { createChatSync } from '#lib/features/chat/sync.svelte.ts';
   import { createRealtimeTransport } from '#lib/features/chat/realtime.ts';
   import { provideChat } from '#lib/features/chat/context.svelte.ts';
+  import NotificationCenter from '#lib/features/chat/NotificationCenter.svelte';
 
   const queryClient = createQueryClient();
   const chat = provideChat();
@@ -131,6 +132,9 @@
           </p>
         {/if}
       </div>
+      {#if chat.sync}
+        <NotificationCenter sync={chat.sync} />
+      {/if}
     </div>
   </QueryClientProvider>
 {:else}

@@ -33,6 +33,14 @@ export function membershipId(
 
 export type Message = components['schemas']['MessageView'];
 
+export type Reply = components['schemas']['MessageReplyView'];
+
+export type Preferences = components['schemas']['ConversationPreferences'];
+
+export type SearchResult = components['schemas']['MessageSearchResult'];
+
+export type MessageContext = components['schemas']['MessageContext'];
+
 export type Envelope = components['schemas']['EventEnvelope'];
 
 export type Event = components['schemas']['ConversationEvent'];
@@ -66,6 +74,35 @@ export interface ChatApi {
     id: string,
     input: components['schemas']['SendMessageInput'],
   ): Promise<Message>;
+  edit(
+    id: string,
+    messageId: string,
+    body: string,
+    membershipId?: string,
+  ): Promise<Message>;
+  withdraw(
+    id: string,
+    messageId: string,
+    membershipId?: string,
+  ): Promise<Message>;
+  search(
+    id: string,
+    query: string,
+    before?: string,
+    signal?: AbortSignal,
+    membershipId?: string,
+  ): Promise<SearchResult>;
+  context(
+    id: string,
+    messageId: string,
+    signal?: AbortSignal,
+    membershipId?: string,
+  ): Promise<MessageContext>;
+  preferences(
+    id: string,
+    patch: Partial<Preferences>,
+    membershipId?: string,
+  ): Promise<Preferences>;
   read(
     id: string,
     seq: string,
@@ -83,4 +120,5 @@ export type PendingMessage = {
   created_at: string;
   membership_id?: string;
   attachment_ids: string[];
+  reply_to_message_id?: string;
 };

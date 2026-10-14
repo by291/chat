@@ -12,6 +12,9 @@ import { PeerActivity } from './activity.svelte';
 import { sequence as seq, isGroup, membershipId } from './models';
 import { createMediaApi } from '../media/api';
 import { MediaUploads } from '../media/uploads.svelte';
+import { HistoryNavigation } from './history.svelte';
+import { MessageActions } from './message-actions.svelte';
+import { ChatNotifications } from './notifications.svelte';
 
 export type { PendingMessage } from './models';
 
@@ -20,6 +23,9 @@ export type { PendingMessage } from './models';
  */
 export class ChatSync {
   readonly uploads: MediaUploads;
+  readonly history: HistoryNavigation;
+  readonly actions: MessageActions;
+  readonly notifications: ChatNotifications;
   selectedId = $state<string | null>(null);
   pending = $state<PendingMessage[]>([]);
   drafts = $state<Record<string, string>>({});
@@ -30,8 +36,11 @@ export class ChatSync {
   private activity: PeerActivity;
   private active = false;
   private initialized = false;
+  private notificationsReady = false;
+  private notificationGeneration = 0;
   private epoch = 0;
   private visible = false;
+  private focused = false;
   private renderedReadSeq: string | null = null;
   private readiness: Promise<void> | null = null;
   private interval: ReturnType<typeof setInterval> | undefined;
@@ -45,6 +54,11 @@ export class ChatSync {
       userId: string;
     },
   ) {
+    this.notifications = new ChatNotifications({
+      userId: options.userId,
+      selectedId: () => this.selectedId,
+      visible: () => this.focused,
+    });
     this.activity = new PeerActivity({
       ...options,
       active: () => this.active,
@@ -73,10 +87,20 @@ export class ChatSync {
         delete this.drafts[id];
         this.activity.forget(id);
         if (this.selectedId === id) {
+          this.actions?.reset();
+          this.history?.reset();
           this.visible = false;
           this.renderedReadSeq = null;
         }
       },
+      messageApplied: (message, fresh) =>
+        this.notifications.applied(
+          message,
+          this.conversations.find(
+            (conversation) => conversation.id === message.conversation_id,
+          ),
+          fresh,
+        ),
       messagesMerged: (incoming) => {
         // Only our sender/client-ID pair resolves an optimistic send; another
         // member can independently choose the same client-generated UUID.
@@ -89,6 +113,29 @@ export class ChatSync {
                 message.client_message_id === pending.client_message_id,
             ),
         );
+      },
+    });
+    this.actions = new MessageActions({
+      ...options,
+      store: this.store,
+      selectedId: () => this.selectedId,
+      active: () => this.active,
+      failed: (reason) => {
+        this.error = reason;
+      },
+    });
+    this.history = new HistoryNavigation({
+      ...options,
+      store: this.store,
+      selectedId: () => this.selectedId,
+      active: () => this.active,
+      failed: (reason) => {
+        this.error = reason;
+      },
+      hide: () => this.setVisible(false),
+      reload: () => this.reload(),
+      changed: () => {
+        this.revision++;
       },
     });
     this.uploads = new MediaUploads({
@@ -117,7 +164,26 @@ export class ChatSync {
 
   get messages(): Message[] {
     this.revision;
-    return this.selectedId ? this.store.messages(this.selectedId) : [];
+    return this.history.contextual
+      ? this.history.messages
+      : this.selectedId
+        ? this.store.messages(this.selectedId)
+        : [];
+  }
+
+  get searchResults() {
+    this.revision;
+    return this.history.results;
+  }
+
+  get replyTarget() {
+    this.revision;
+    return this.actions.replyTarget;
+  }
+
+  get canSaveEdit() {
+    this.revision;
+    return this.actions.canSaveEdit;
   }
 
   get userId() {
@@ -129,6 +195,15 @@ export class ChatSync {
   }
 
   senderName(userId: string) {
+    const conversation = this.current;
+    if (
+      conversation &&
+      !isGroup(conversation) &&
+      conversation.peer.id === userId
+    ) {
+      return conversation.peer.display_name;
+    }
+
     return (
       this.groupMembers.find((member) => member.user.id === userId)?.user
         .display_name ?? (userId === this.userId ? '你' : '历史成员')
@@ -180,23 +255,30 @@ export class ChatSync {
 
   get loading() {
     this.revision;
-    return this.selectedId
-      ? (this.store.stream(this.selectedId)?.loading ?? false)
-      : false;
+    return (
+      this.history.loading ||
+      (this.selectedId
+        ? (this.store.stream(this.selectedId)?.loading ?? false)
+        : false)
+    );
   }
 
   get loadingOlder() {
     this.revision;
-    return this.selectedId
-      ? (this.store.stream(this.selectedId)?.olderLoading ?? false)
-      : false;
+    return this.history.contextual
+      ? this.history.loading
+      : this.selectedId
+        ? (this.store.stream(this.selectedId)?.olderLoading ?? false)
+        : false;
   }
 
   get hasOlder() {
     this.revision;
-    return this.selectedId
-      ? !!this.store.stream(this.selectedId)?.nextBefore
-      : false;
+    return this.history.contextual
+      ? this.history.hasOlder
+      : this.selectedId
+        ? !!this.store.stream(this.selectedId)?.nextBefore
+        : false;
   }
 
   get currentPending() {
@@ -219,14 +301,17 @@ export class ChatSync {
         await this.options.transport.subscribe(
           (event) => this.receive(event),
           () => {
-            void this.refresh();
+            void this.restoreConnection();
           },
           (status) => {
             const previous = this.connection;
             this.connection = status;
-            if (status === 'online' && previous === 'offline') {
-              void this.refresh();
-            }
+            if (status !== 'online') {
+              this.notificationsReady = false;
+              this.notificationGeneration++;
+              this.store.clearFresh();
+            } else if (this.initialized && previous !== 'online')
+              void this.restoreConnection();
           },
         );
         if (this.active) {
@@ -241,7 +326,10 @@ export class ChatSync {
         return;
       }
       await this.refreshSummaries();
+      if (!this.active || this.epoch !== epoch) return;
+      this.store.captureNotificationBaseline();
       this.initialized = true;
+      this.notificationsReady = this.connection === 'online';
       this.interval = setInterval(() => {
         void this.refresh();
       }, 60000);
@@ -266,12 +354,34 @@ export class ChatSync {
     }
   }
 
+  private async restoreConnection() {
+    // Reconciliation fences publications queued while disconnected. After the
+    // summary/replay baseline catches up, new envelopes can become candidates.
+    const generation = ++this.notificationGeneration;
+    this.notificationsReady = false;
+    this.store.clearFresh();
+    await this.refresh();
+    if (
+      this.active &&
+      this.connection === 'online' &&
+      generation === this.notificationGeneration
+    ) {
+      this.store.captureNotificationBaseline();
+      this.notificationsReady = true;
+    }
+  }
+
   async select(id: string) {
+    if (this.selectedId !== id) {
+      this.history.reset();
+      this.actions.reset();
+    }
     if (this.selectedId && this.selectedId !== id) {
       this.store.invalidate(this.selectedId);
     }
     this.selectedId = id;
     this.visible = false;
+    this.focused = false;
     this.error = '';
     await this.store.select(id, () => this.readiness ?? this.start());
   }
@@ -281,16 +391,20 @@ export class ChatSync {
       return;
     }
     this.store.stream(this.selectedId).ready = false;
+    this.store.stream(this.selectedId).hasSnapshot = false;
     await this.select(this.selectedId);
   }
 
   clearSelection() {
+    this.history.reset();
+    this.actions.reset();
     if (this.selectedId) {
       this.store.invalidate(this.selectedId);
       void this.setTyping(this.selectedId, false);
     }
     this.selectedId = null;
     this.visible = false;
+    this.focused = false;
   }
 
   private receive(event: RealtimeEvent) {
@@ -298,14 +412,18 @@ export class ChatSync {
       return;
     }
     if ('event_seq' in event) {
-      this.store.raiseTarget(event.conversation_id, event.event_seq);
-      if (
-        event.conversation_id === this.selectedId &&
-        this.store.stream(event.conversation_id).ready
-      ) {
-        void this.store.drain(event.conversation_id);
-      }
+      this.store.liveHint(
+        event.conversation_id,
+        event.event_seq,
+        this.notificationsReady &&
+          this.connection === 'online' &&
+          event.kind === 'message.created',
+      );
       void this.refreshSummaries();
+      return;
+    }
+    if (event.kind === 'conversation.preferences.updated') {
+      this.store.preferencesChanged();
       return;
     }
     if (event.kind === 'membership.invalidated') {
@@ -347,9 +465,13 @@ export class ChatSync {
         created_at: new Date().toISOString(),
         membership_id: membership,
         attachment_ids: [...attachmentIds],
+        ...(this.replyTarget
+          ? { reply_to_message_id: this.replyTarget.id }
+          : {}),
       };
       this.pending.push(pending);
       this.uploads.consume(attachmentIds);
+      this.actions.replyId = null;
     } else {
       pending.status = 'sending';
       body = pending.body;
@@ -361,6 +483,9 @@ export class ChatSync {
         client_message_id: clientMessageId,
         body,
         membership_id: pending.membership_id,
+        ...(pending.reply_to_message_id
+          ? { reply_to_message_id: pending.reply_to_message_id }
+          : {}),
         ...(pending.attachment_ids.length
           ? { attachment_ids: pending.attachment_ids }
           : {}),
@@ -406,6 +531,10 @@ export class ChatSync {
   }
 
   async loadOlder() {
+    if (this.history.contextual) {
+      await this.history.older();
+      return;
+    }
     if (this.selectedId) {
       await this.store.loadOlder(this.selectedId);
     }
@@ -423,10 +552,21 @@ export class ChatSync {
     }
   }
 
+  /** Page focus suppresses current-chat alerts independently of the rendered read cursor. */
+  setFocused(visible: boolean) {
+    this.focused = visible;
+  }
+
   private async readLatest() {
     const id = this.selectedId;
     const cursor = this.renderedReadSeq;
-    if (!this.active || !this.visible || !id || !cursor) {
+    if (
+      !this.active ||
+      !this.visible ||
+      this.history.contextual ||
+      !id ||
+      !cursor
+    ) {
       return;
     }
     const state = this.store.stream(id);
@@ -486,12 +626,18 @@ export class ChatSync {
 
   stop() {
     this.active = false;
+    this.notificationsReady = false;
+    this.notificationGeneration++;
     this.epoch++;
     this.visible = false;
+    this.focused = false;
     if (this.interval) {
       clearInterval(this.interval);
     }
     this.activity.stop();
+    this.history.reset();
+    this.actions.reset();
+    this.notifications.stop();
     this.uploads.stop();
     this.options.transport.close();
     this.unsubscribeCache();

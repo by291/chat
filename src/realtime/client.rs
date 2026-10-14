@@ -25,6 +25,8 @@ pub enum RealtimeEvent {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind")]
 pub enum EphemeralEvent {
+    #[serde(rename = "conversation.preferences.updated")]
+    ConversationPreferencesUpdated { conversation_id: ConversationId },
     #[serde(rename = "membership.invalidated")]
     MembershipInvalidated {
         conversation_id: ConversationId,

@@ -278,6 +278,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{id}/messages/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraw an author's message, including authorized idempotent repeats. */
+        delete: operations["withdraw"];
+        options?: never;
+        head?: never;
+        /** Edit an authorized author's active message without replacing its identity. */
+        patch: operations["edit"];
+        trace?: never;
+    };
+    "/api/v1/conversations/{id}/messages/{message_id}/context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Return an authorized window around a target, with independent history edges. */
+        get: operations["context"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{id}/owner": {
         parameters: {
             query?: never;
@@ -295,6 +330,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{id}/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Apply actor-owned partial preferences with a durable private refresh hint. */
+        patch: operations["preferences"];
+        trace?: never;
+    };
     "/api/v1/conversations/{id}/read": {
         parameters: {
             query?: never;
@@ -306,6 +358,23 @@ export interface paths {
         put?: never;
         /** Advance a receipt through the monotonic application operation. */
         post: operations["read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversations/{id}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search literal text within the actor's current conversation history. */
+        get: operations["search"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -596,7 +665,7 @@ export interface components {
             payload: components["schemas"]["ConversationEventPayload"];
         };
         /** @enum {string} */
-        ConversationEventKind: "conversation.created" | "message.created" | "receipt.updated" | "group.updated" | "membership.updated";
+        ConversationEventKind: "conversation.created" | "message.created" | "message.edited" | "message.withdrawn" | "receipt.updated" | "group.updated" | "membership.updated";
         ConversationEventPayload: {
             data: {
                 initiator_id: components["schemas"]["UserId"];
@@ -607,6 +676,20 @@ export interface components {
             data: components["schemas"]["MessageView"];
             /** @enum {string} */
             type: "message.created";
+        } | {
+            data: components["schemas"]["MessageView"];
+            /** @enum {string} */
+            type: "message.edited";
+        } | {
+            data: components["schemas"]["MessageView"];
+            /** @enum {string} */
+            type: "message.withdrawn";
+        } | {
+            data: {
+                message_id: components["schemas"]["MessageId"];
+            };
+            /** @enum {string} */
+            type: "message.unavailable";
         } | {
             data: components["schemas"]["ReceiptData"];
             /** @enum {string} */
@@ -624,6 +707,17 @@ export interface components {
         };
         /** Format: uuid */
         ConversationId: string;
+        ConversationPreferences: {
+            archived: boolean;
+            muted: boolean;
+            pinned: boolean;
+        };
+        ConversationPreferencesInput: {
+            archived?: boolean | null;
+            membership_id?: null | components["schemas"]["MembershipId"];
+            muted?: boolean | null;
+            pinned?: boolean | null;
+        };
         /** @description Direct summaries keep their established JSON; only groups carry a kind discriminator. */
         ConversationSummary: components["schemas"]["ConversationView"] | components["schemas"]["GroupConversationView"];
         ConversationView: {
@@ -633,6 +727,7 @@ export interface components {
             my_read_seq: components["schemas"]["Seq"];
             peer: components["schemas"]["UserView"];
             peer_read_seq: components["schemas"]["Seq"];
+            preferences: components["schemas"]["ConversationPreferences"];
             /** Format: int32 */
             unread_count: number;
         };
@@ -649,7 +744,15 @@ export interface components {
         };
         /** @enum {string} */
         DownloadVariant: "original" | "thumbnail";
+        EditMessageInput: {
+            body: string;
+            membership_id?: null | components["schemas"]["MembershipId"];
+        };
         EphemeralEvent: {
+            conversation_id: components["schemas"]["ConversationId"];
+            /** @enum {string} */
+            kind: "conversation.preferences.updated";
+        } | {
             conversation_id: components["schemas"]["ConversationId"];
             /** @enum {string} */
             kind: "membership.invalidated";
@@ -697,6 +800,7 @@ export interface components {
             membership: components["schemas"]["MembershipContext"];
             my_read_seq: components["schemas"]["Seq"];
             my_role: components["schemas"]["GroupRole"];
+            preferences: components["schemas"]["ConversationPreferences"];
             title: string;
             /** Format: int32 */
             unread_count: number;
@@ -744,8 +848,31 @@ export interface components {
         };
         /** Format: uuid */
         MembershipId: string;
+        MessageContext: {
+            items: components["schemas"]["MessageView"][];
+            membership?: null | components["schemas"]["MembershipContext"];
+            next_after?: null | components["schemas"]["Seq"];
+            next_before?: null | components["schemas"]["Seq"];
+            snapshot_seq: components["schemas"]["Seq"];
+            target_message_id: components["schemas"]["MessageId"];
+        };
         /** Format: uuid */
         MessageId: string;
+        MessageReplyView: {
+            body: string;
+            created_seq: components["schemas"]["Seq"];
+            id: components["schemas"]["MessageId"];
+            revision_seq: components["schemas"]["Seq"];
+            sender_id: components["schemas"]["UserId"];
+            sender_name?: string | null;
+            withdrawn: boolean;
+        };
+        MessageSearchResult: {
+            items: components["schemas"]["MessageView"][];
+            membership?: null | components["schemas"]["MembershipContext"];
+            next_before?: null | components["schemas"]["Seq"];
+            snapshot_seq: components["schemas"]["Seq"];
+        };
         MessageSnapshot: {
             items: components["schemas"]["MessageView"][];
             membership?: null | components["schemas"]["MembershipContext"];
@@ -761,9 +888,15 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             created_seq: components["schemas"]["Seq"];
+            /** Format: date-time */
+            edited_at?: string | null;
             id: components["schemas"]["MessageId"];
+            reply?: null | components["schemas"]["MessageReplyView"];
+            reply_to_message_id?: null | components["schemas"]["MessageId"];
+            revision_seq: components["schemas"]["Seq"];
             sender_id: components["schemas"]["UserId"];
             sender_name?: string | null;
+            withdrawn: boolean;
         };
         Page_ConversationSummary: {
             items: (components["schemas"]["ConversationView"] | components["schemas"]["GroupConversationView"])[];
@@ -798,6 +931,7 @@ export interface components {
             /** Format: uuid */
             client_message_id: string;
             membership_id?: null | components["schemas"]["MembershipId"];
+            reply_to_message_id?: null | components["schemas"]["MessageId"];
         };
         Seq: string;
         /** Format: uuid */
@@ -1436,6 +1570,113 @@ export interface operations {
             };
         };
     };
+    withdraw: {
+        parameters: {
+            query?: {
+                membership_id?: components["schemas"]["MembershipId"];
+            };
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+                message_id: components["schemas"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    edit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+                message_id: components["schemas"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EditMessageInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    context: {
+        parameters: {
+            query?: {
+                limit?: number;
+                membership_id?: components["schemas"]["MembershipId"];
+            };
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+                message_id: components["schemas"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageContext"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     transfer_group_owner: {
         parameters: {
             query?: never;
@@ -1469,6 +1710,39 @@ export interface operations {
             };
         };
     };
+    preferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationPreferencesInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationPreferences"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
     read: {
         parameters: {
             query?: never;
@@ -1490,6 +1764,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                q: string;
+                before?: components["schemas"]["Seq"];
+                limit?: number;
+                membership_id?: components["schemas"]["MembershipId"];
+            };
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageSearchResult"];
                 };
             };
             400: {

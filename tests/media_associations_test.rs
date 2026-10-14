@@ -92,6 +92,82 @@ fn message_scope(conversation: &Value) -> Value {
         "filename":"safe\"name.html", "content_type":"application/octet-stream", "size_bytes":4})
 }
 
+#[tokio::test]
+#[ignore = "requires local PostgreSQL, Valkey and SeaweedFS"]
+async fn withdrawal_hides_replayed_attachments_and_rejects_fresh_download_grants() {
+    let (app, _storage) = support::media::setup(1_073_741_824).await;
+    let (author, _) = support::register_user(&app, "withdraw_author").await;
+    let (reader, reader_user) = support::register_user(&app, "withdraw_reader").await;
+    let conversation = direct(&app, &author, reader_user.id).await;
+    let attachment = allocate(&app, &author, message_scope(&conversation), b"safe", true).await;
+    let id = conversation["id"].as_str().unwrap();
+    let send_path = format!("/conversations/{id}/messages");
+    let input = json!({"client_message_id":uuid::Uuid::new_v4(),"body":"original",
+        "attachment_ids":[attachment.attachment.id]});
+    let response = request(&app, &author, Method::POST, &send_path, input.clone()).await;
+    assert_eq!(response.status(), 201);
+    let message: Value = response.json().await.unwrap();
+    let path = format!("{send_path}/{}", message["id"].as_str().unwrap());
+    let download_path = format!("/media/{}/download", attachment.attachment.id);
+    assert_eq!(
+        request(&app, &reader, Method::GET, &download_path, Value::Null)
+            .await
+            .status(),
+        200
+    );
+
+    let response = request(
+        &app,
+        &author,
+        Method::PATCH,
+        &path,
+        json!({"body":"edited"}),
+    )
+    .await;
+    assert_eq!(response.status(), 200);
+    let edited: Value = response.json().await.unwrap();
+    assert_eq!(edited["attachments"], message["attachments"]);
+    let retry = request(&app, &author, Method::POST, &send_path, input.clone()).await;
+    assert_eq!(retry.status(), 200);
+    assert_eq!(retry.json::<Value>().await.unwrap(), edited);
+
+    assert_eq!(
+        request(&app, &author, Method::DELETE, &path, Value::Null)
+            .await
+            .status(),
+        200
+    );
+
+    for client in [&author, &reader] {
+        assert_eq!(
+            request(&app, client, Method::GET, &download_path, Value::Null)
+                .await
+                .status(),
+            404
+        );
+        let replay = request(
+            &app,
+            client,
+            Method::GET,
+            &format!("/conversations/{id}/events?after=1"),
+            Value::Null,
+        )
+        .await
+        .json::<Value>()
+        .await
+        .unwrap();
+        for event in replay["events"].as_array().unwrap() {
+            assert_eq!(event["payload"]["data"]["body"], "");
+            assert!(event["payload"]["data"].get("attachments").is_none());
+        }
+    }
+    let retry = request(&app, &author, Method::POST, &send_path, input).await;
+    assert_eq!(retry.status(), 200);
+    let tombstone: Value = retry.json().await.unwrap();
+    assert_eq!(tombstone["withdrawn"], true);
+    assert!(tombstone.get("attachments").is_none());
+}
+
 async fn direct(
     app: &support::TestApp,
     client: &reqwest::Client,

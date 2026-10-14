@@ -3,7 +3,7 @@
   import { Input } from '#lib/components/ui/input/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
 
-  import { Send, Paperclip } from '@lucide/svelte';
+  import { Send, Paperclip, X } from '@lucide/svelte';
   import type { ChatSync } from './sync.svelte';
   import { membershipId } from './models';
   import UploadList from '../media/UploadList.svelte';
@@ -68,10 +68,38 @@
 </script>
 
 <div class="composer-wrap">
-  {#if entries.length}<UploadList uploads={sync.uploads} {entries} />{/if}
-  {#if sync.uploads.error}<p class="form-error" role="alert">
+  {#if sync.replyTarget}
+    <div class="composer-reply" role="status">
+      <div>
+        <strong>
+          回复 {sync.replyTarget.sender_name ??
+            sync.senderName(sync.replyTarget.sender_id)}
+        </strong>
+        <span>
+          {sync.replyTarget.withdrawn
+            ? '此消息已撤回'
+            : sync.replyTarget.body || '附件'}
+        </span>
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        aria-label="取消回复"
+        onclick={() => (sync.actions.replyId = null)}
+      >
+        <X size={14} />
+      </Button>
+    </div>
+  {/if}
+  {#if entries.length}
+    <UploadList uploads={sync.uploads} {entries} />
+  {/if}
+  {#if sync.uploads.error}
+    <p class="form-error" role="alert">
       {sync.uploads.error}
-    </p>{/if}
+    </p>
+  {/if}
   <Input
     type="file"
     multiple

@@ -44,6 +44,46 @@ export function createChatApi(api: ApiClient): ChatApi {
           body,
         }),
       ),
+    edit: (id, message_id, body, membership_id) =>
+      unwrap(
+        api.PATCH('/api/v1/conversations/{id}/messages/{message_id}', {
+          params: { path: { id, message_id } },
+          body: { body, membership_id },
+        }),
+      ),
+    withdraw: (id, message_id, membership_id) =>
+      unwrap(
+        api.DELETE('/api/v1/conversations/{id}/messages/{message_id}', {
+          params: { path: { id, message_id }, query: { membership_id } },
+        }),
+      ),
+    search: (id, q, before, signal, membership_id) =>
+      unwrap(
+        api.GET('/api/v1/conversations/{id}/search', {
+          params: {
+            path: { id },
+            query: { q, before, limit: 50, membership_id },
+          },
+          signal,
+        }),
+      ),
+    context: (id, message_id, signal, membership_id) =>
+      unwrap(
+        api.GET('/api/v1/conversations/{id}/messages/{message_id}/context', {
+          params: {
+            path: { id, message_id },
+            query: { limit: 50, membership_id },
+          },
+          signal,
+        }),
+      ),
+    preferences: (id, patch, membership_id) =>
+      unwrap(
+        api.PATCH('/api/v1/conversations/{id}/preferences', {
+          params: { path: { id } },
+          body: { ...patch, membership_id },
+        }),
+      ),
     members: (id, signal) =>
       unwrap(
         api.GET('/api/v1/conversations/{id}/members', {

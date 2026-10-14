@@ -40,7 +40,7 @@ export class PeerActivity {
       void this.refreshStatus(event.user_id);
       return;
     }
-    if (event.kind === 'membership.invalidated') return;
+    if (event.kind !== 'typing.changed') return;
     if (event.user_id === this.options.userId) {
       return;
     }

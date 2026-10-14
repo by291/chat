@@ -19,6 +19,10 @@ fn default_event_limit() -> u16 {
     100
 }
 
+fn legacy_revision() -> Seq {
+    Seq(0)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, ToSchema)]
 pub struct MessageView {
     pub id: MessageId,
@@ -26,6 +30,23 @@ pub struct MessageView {
     pub sender_id: UserId,
     pub client_message_id: Uuid,
     pub created_seq: Seq,
+    #[serde(default = "legacy_revision")]
+    #[schema(required = true)]
+    pub revision_seq: Seq,
+    #[serde(default)]
+    #[schema(required = true)]
+    pub withdrawn: bool,
+    #[serde(
+        default,
+        with = "time::serde::rfc3339::option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub edited_at: Option<OffsetDateTime>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reply_to_message_id: Option<MessageId>,
+    #[sqlx(skip)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reply: Option<MessageReplyView>,
     pub body: String,
     #[sqlx(skip)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -37,6 +58,33 @@ pub struct MessageView {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct MessageReplyView {
+    pub id: MessageId,
+    pub sender_id: UserId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sender_name: Option<String>,
+    pub created_seq: Seq,
+    pub revision_seq: Seq,
+    pub body: String,
+    pub withdrawn: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ConversationPreferences {
+    pub pinned: bool,
+    pub muted: bool,
+    pub archived: bool,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct ConversationPreferencesInput {
+    pub pinned: Option<bool>,
+    pub muted: Option<bool>,
+    pub archived: Option<bool>,
+    pub membership_id: Option<MembershipId>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ConversationView {
     pub id: ConversationId,
     pub peer: UserView,
@@ -45,6 +93,9 @@ pub struct ConversationView {
     pub unread_count: u32,
     pub my_read_seq: Seq,
     pub peer_read_seq: Seq,
+    #[serde(default)]
+    #[schema(required = true)]
+    pub preferences: ConversationPreferences,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
@@ -98,6 +149,9 @@ pub struct GroupConversationView {
     pub last_message: Option<MessageView>,
     pub unread_count: u32,
     pub my_read_seq: Seq,
+    #[serde(default)]
+    #[schema(required = true)]
+    pub preferences: ConversationPreferences,
 }
 
 /// Direct summaries keep their established JSON; only groups carry a kind discriminator.
@@ -197,6 +251,10 @@ pub enum ConversationEventKind {
     ConversationCreated,
     #[serde(rename = "message.created")]
     MessageCreated,
+    #[serde(rename = "message.edited")]
+    MessageEdited,
+    #[serde(rename = "message.withdrawn")]
+    MessageWithdrawn,
     #[serde(rename = "receipt.updated")]
     ReceiptUpdated,
     #[serde(rename = "group.updated")]
@@ -229,6 +287,12 @@ pub enum ConversationEventPayload {
     ConversationCreated { initiator_id: UserId },
     #[serde(rename = "message.created")]
     MessageCreated(MessageView),
+    #[serde(rename = "message.edited")]
+    MessageEdited(MessageView),
+    #[serde(rename = "message.withdrawn")]
+    MessageWithdrawn(MessageView),
+    #[serde(rename = "message.unavailable")]
+    MessageUnavailable { message_id: MessageId },
     #[serde(rename = "receipt.updated")]
     ReceiptUpdated(ReceiptData),
     #[serde(rename = "group.updated")]
@@ -250,6 +314,49 @@ pub struct SendMessageInput {
     #[serde(default)]
     pub attachment_ids: Vec<AttachmentId>,
     pub membership_id: Option<MembershipId>,
+    pub reply_to_message_id: Option<MessageId>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct EditMessageInput {
+    pub body: String,
+    pub membership_id: Option<MembershipId>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct MessageTargetQuery {
+    #[serde(default = "default_page_limit")]
+    pub limit: u16,
+    pub membership_id: Option<MembershipId>,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct MessageSearchQuery {
+    pub q: String,
+    pub before: Option<Seq>,
+    #[serde(default = "default_page_limit")]
+    pub limit: u16,
+    pub membership_id: Option<MembershipId>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct MessageSearchResult {
+    pub items: Vec<MessageView>,
+    pub next_before: Option<Seq>,
+    pub snapshot_seq: Seq,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub membership: Option<MembershipContext>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct MessageContext {
+    pub target_message_id: MessageId,
+    pub items: Vec<MessageView>,
+    pub next_before: Option<Seq>,
+    pub next_after: Option<Seq>,
+    pub snapshot_seq: Seq,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub membership: Option<MembershipContext>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

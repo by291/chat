@@ -52,6 +52,7 @@ impl AppState {
 /// Compose public routes with Origin protection and request correlation.
 pub fn build_router(state: AppState) -> Router {
     use crate::conversations::group_http as groups;
+    use crate::conversations::message_http as messages;
     use crate::media::http as media;
     let api = Router::new()
         .route("/auth/register", axum::routing::post(http::register))
@@ -109,6 +110,19 @@ pub fn build_router(state: AppState) -> Router {
             axum::routing::post(groups::accept),
         )
         .route("/conversations/{id}", get(conversations::get))
+        .route(
+            "/conversations/{id}/preferences",
+            axum::routing::patch(conversations::preferences),
+        )
+        .route("/conversations/{id}/search", get(messages::search))
+        .route(
+            "/conversations/{id}/messages/{message_id}",
+            axum::routing::patch(messages::edit).delete(messages::withdraw),
+        )
+        .route(
+            "/conversations/{id}/messages/{message_id}/context",
+            get(messages::context),
+        )
         .route(
             "/conversations/{id}/messages",
             get(conversations::messages).post(conversations::send),

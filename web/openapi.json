@@ -154,6 +154,8 @@
         "enum": [
           "conversation.created",
           "message.created",
+          "message.edited",
+          "message.withdrawn",
           "receipt.updated",
           "group.updated",
           "membership.updated"
@@ -196,6 +198,68 @@
               "type": {
                 "enum": [
                   "message.created"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "data",
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/MessageView"
+              },
+              "type": {
+                "enum": [
+                  "message.edited"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "data",
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/MessageView"
+              },
+              "type": {
+                "enum": [
+                  "message.withdrawn"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "data",
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "data": {
+                "properties": {
+                  "message_id": {
+                    "$ref": "#/components/schemas/MessageId"
+                  }
+                },
+                "required": [
+                  "message_id"
+                ],
+                "type": "object"
+              },
+              "type": {
+                "enum": [
+                  "message.unavailable"
                 ],
                 "type": "string"
               }
@@ -277,6 +341,58 @@
         "format": "uuid",
         "type": "string"
       },
+      "ConversationPreferences": {
+        "properties": {
+          "archived": {
+            "type": "boolean"
+          },
+          "muted": {
+            "type": "boolean"
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pinned",
+          "muted",
+          "archived"
+        ],
+        "type": "object"
+      },
+      "ConversationPreferencesInput": {
+        "properties": {
+          "archived": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "membership_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MembershipId"
+              }
+            ]
+          },
+          "muted": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "pinned": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "ConversationSummary": {
         "description": "Direct summaries keep their established JSON; only groups carry a kind discriminator.",
         "oneOf": [
@@ -315,6 +431,9 @@
           "peer_read_seq": {
             "$ref": "#/components/schemas/Seq"
           },
+          "preferences": {
+            "$ref": "#/components/schemas/ConversationPreferences"
+          },
           "unread_count": {
             "format": "int32",
             "minimum": 0,
@@ -327,7 +446,8 @@
           "latest_event_seq",
           "unread_count",
           "my_read_seq",
-          "peer_read_seq"
+          "peer_read_seq",
+          "preferences"
         ],
         "type": "object"
       },
@@ -375,8 +495,47 @@
         ],
         "type": "string"
       },
+      "EditMessageInput": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "membership_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MembershipId"
+              }
+            ]
+          }
+        },
+        "required": [
+          "body"
+        ],
+        "type": "object"
+      },
       "EphemeralEvent": {
         "oneOf": [
+          {
+            "properties": {
+              "conversation_id": {
+                "$ref": "#/components/schemas/ConversationId"
+              },
+              "kind": {
+                "enum": [
+                  "conversation.preferences.updated"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "conversation_id",
+              "kind"
+            ],
+            "type": "object"
+          },
           {
             "properties": {
               "conversation_id": {
@@ -565,6 +724,9 @@
           "my_role": {
             "$ref": "#/components/schemas/GroupRole"
           },
+          "preferences": {
+            "$ref": "#/components/schemas/ConversationPreferences"
+          },
           "title": {
             "type": "string"
           },
@@ -583,7 +745,8 @@
           "my_role",
           "latest_event_seq",
           "unread_count",
-          "my_read_seq"
+          "my_read_seq",
+          "preferences"
         ],
         "type": "object"
       },
@@ -740,9 +903,136 @@
         "format": "uuid",
         "type": "string"
       },
+      "MessageContext": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MessageView"
+            },
+            "type": "array"
+          },
+          "membership": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MembershipContext"
+              }
+            ]
+          },
+          "next_after": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Seq"
+              }
+            ]
+          },
+          "next_before": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Seq"
+              }
+            ]
+          },
+          "snapshot_seq": {
+            "$ref": "#/components/schemas/Seq"
+          },
+          "target_message_id": {
+            "$ref": "#/components/schemas/MessageId"
+          }
+        },
+        "required": [
+          "target_message_id",
+          "items",
+          "snapshot_seq"
+        ],
+        "type": "object"
+      },
       "MessageId": {
         "format": "uuid",
         "type": "string"
+      },
+      "MessageReplyView": {
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "created_seq": {
+            "$ref": "#/components/schemas/Seq"
+          },
+          "id": {
+            "$ref": "#/components/schemas/MessageId"
+          },
+          "revision_seq": {
+            "$ref": "#/components/schemas/Seq"
+          },
+          "sender_id": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "sender_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "withdrawn": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "sender_id",
+          "created_seq",
+          "revision_seq",
+          "body",
+          "withdrawn"
+        ],
+        "type": "object"
+      },
+      "MessageSearchResult": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MessageView"
+            },
+            "type": "array"
+          },
+          "membership": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MembershipContext"
+              }
+            ]
+          },
+          "next_before": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Seq"
+              }
+            ]
+          },
+          "snapshot_seq": {
+            "$ref": "#/components/schemas/Seq"
+          }
+        },
+        "required": [
+          "items",
+          "snapshot_seq"
+        ],
+        "type": "object"
       },
       "MessageSnapshot": {
         "properties": {
@@ -807,8 +1097,38 @@
           "created_seq": {
             "$ref": "#/components/schemas/Seq"
           },
+          "edited_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "$ref": "#/components/schemas/MessageId"
+          },
+          "reply": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MessageReplyView"
+              }
+            ]
+          },
+          "reply_to_message_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MessageId"
+              }
+            ]
+          },
+          "revision_seq": {
+            "$ref": "#/components/schemas/Seq"
           },
           "sender_id": {
             "$ref": "#/components/schemas/UserId"
@@ -818,6 +1138,9 @@
               "string",
               "null"
             ]
+          },
+          "withdrawn": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -826,6 +1149,8 @@
           "sender_id",
           "client_message_id",
           "created_seq",
+          "revision_seq",
+          "withdrawn",
           "body",
           "created_at"
         ],
@@ -986,6 +1311,16 @@
               },
               {
                 "$ref": "#/components/schemas/MembershipId"
+              }
+            ]
+          },
+          "reply_to_message_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MessageId"
               }
             ]
           }
@@ -2078,6 +2413,197 @@
         ]
       }
     },
+    "/api/v1/conversations/{id}/messages/{message_id}": {
+      "delete": {
+        "operationId": "withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          },
+          {
+            "in": "query",
+            "name": "membership_id",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MembershipId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageView"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Withdraw an author's message, including authorized idempotent repeats.",
+        "tags": [
+          "chat"
+        ]
+      },
+      "patch": {
+        "operationId": "edit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditMessageInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageView"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Edit an authorized author's active message without replacing its identity.",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/conversations/{id}/messages/{message_id}/context": {
+      "get": {
+        "operationId": "context",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "membership_id",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MembershipId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageContext"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Return an authorized window around a target, with independent history edges.",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
     "/api/v1/conversations/{id}/owner": {
       "post": {
         "operationId": "transfer_group_owner",
@@ -2132,6 +2658,57 @@
         ]
       }
     },
+    "/api/v1/conversations/{id}/preferences": {
+      "patch": {
+        "operationId": "preferences",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationPreferencesInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationPreferences"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Apply actor-owned partial preferences with a durable private refresh hint.",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
     "/api/v1/conversations/{id}/read": {
       "post": {
         "operationId": "read",
@@ -2178,6 +2755,81 @@
           }
         },
         "summary": "Advance a receipt through the monotonic application operation.",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/conversations/{id}/search": {
+      "get": {
+        "operationId": "search",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Seq"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "membership_id",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MembershipId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSearchResult"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Search literal text within the actor's current conversation history.",
         "tags": [
           "chat"
         ]

@@ -5,14 +5,17 @@ use sqlx::{Postgres, Transaction};
 use time::OffsetDateTime;
 
 use super::{
-    events,
-    model::{ConversationSummary, GroupConversationView, GroupKind, GroupRole, MembershipContext},
+    events, message_repository,
+    messages::enrich_message,
+    model::{
+        ConversationPreferences, ConversationSummary, GroupConversationView, GroupKind, GroupRole,
+        MembershipContext,
+    },
     repository,
 };
 use crate::{
     AppState,
     error::AppError,
-    media,
     types::{
         Actor, ConversationEventKind, ConversationEventPayload, ConversationId, ConversationView,
         Created, MembershipId, Page, PageCursor, Seq, UserId, UserView,
@@ -20,7 +23,8 @@ use crate::{
 };
 
 // Retain the established application facade while workflows have distinct owners.
-pub use super::messages::{events_after, message_snapshot, send_message};
+pub use super::message_queries::{events_after, message_snapshot};
+pub use super::messages::send_message;
 
 pub use super::receipts::{mark_read, set_typing};
 
@@ -174,20 +178,30 @@ pub async fn list_conversations(
     Ok(Page { items, next_cursor })
 }
 
-fn decode_cursor(raw: String) -> Result<(OffsetDateTime, uuid::Uuid), AppError> {
+fn decode_cursor(raw: String) -> Result<(bool, OffsetDateTime, uuid::Uuid), AppError> {
     let invalid = || AppError::invalid("分页游标无效");
     let bytes = URL_SAFE_NO_PAD.decode(raw).map_err(|_| invalid())?;
-    let (timestamp, id): (String, uuid::Uuid) =
-        serde_json::from_slice(&bytes).map_err(|_| invalid())?;
+    // Previously issued opaque cursors contain only timestamp/ID. Decode them as
+    // the unpinned tier; newly issued cursors carry all sort keys for seek paging.
+    let (pinned, timestamp, id): (bool, String, uuid::Uuid) = serde_json::from_slice(&bytes)
+        .or_else(|_| {
+            serde_json::from_slice::<(String, uuid::Uuid)>(&bytes)
+                .map(|(timestamp, id)| (false, timestamp, id))
+        })
+        .map_err(|_| invalid())?;
     let timestamp =
         OffsetDateTime::from_unix_timestamp_nanos(timestamp.parse().map_err(|_| invalid())?)
             .map_err(|_| invalid())?;
-    Ok((timestamp, id))
+    Ok((pinned, timestamp, id))
 }
 
 fn encode_cursor(row: &repository::SummaryRow) -> Result<String, AppError> {
-    let bytes = serde_json::to_vec(&(row.updated_at.unix_timestamp_nanos().to_string(), row.id.0))
-        .map_err(|_| AppError::unavailable())?;
+    let bytes = serde_json::to_vec(&(
+        row.pinned,
+        row.updated_at.unix_timestamp_nanos().to_string(),
+        row.id.0,
+    ))
+    .map_err(|_| AppError::unavailable())?;
     Ok(URL_SAFE_NO_PAD.encode(bytes))
 }
 
@@ -198,9 +212,10 @@ async fn enrich(
 ) -> Result<ConversationSummary, AppError> {
     // Authorization, episode bounds and content share the caller's snapshot.
     // A concurrent removal/rejoin cannot pair old membership with later messages.
-    let mut last_message = repository::last_message(transaction, row.id, row.joined_seq).await?;
+    let mut last_message =
+        message_repository::last_message(transaction, row.id, row.joined_seq).await?;
     if let Some(message) = &mut last_message {
-        message.attachments = media::repository::message_views(transaction, message.id).await?;
+        enrich_message(transaction, message, row.joined_seq).await?;
     }
 
     let unread = repository::unread_count(
@@ -212,6 +227,11 @@ async fn enrich(
     )
     .await?;
     let unread_count = u32::try_from(unread).map_err(|_| AppError::unavailable())?;
+    let preferences = ConversationPreferences {
+        pinned: row.pinned,
+        muted: row.muted,
+        archived: row.archived,
+    };
 
     if row.kind == "group" {
         return Ok(ConversationSummary::Group(GroupConversationView {
@@ -228,6 +248,7 @@ async fn enrich(
             last_message,
             unread_count,
             my_read_seq: Seq(row.my_read_seq),
+            preferences,
         }));
     }
 
@@ -243,5 +264,6 @@ async fn enrich(
         unread_count,
         my_read_seq: Seq(row.my_read_seq),
         peer_read_seq: Seq(row.peer_read_seq.ok_or_else(AppError::unavailable)?),
+        preferences,
     }))
 }

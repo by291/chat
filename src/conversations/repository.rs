@@ -4,7 +4,7 @@ use sqlx::{Postgres, Transaction};
 use time::OffsetDateTime;
 
 use super::model::MembershipContext;
-use crate::types::{ConversationId, EventId, MembershipId, MessageId, MessageView, Seq, UserId};
+use crate::types::{ConversationId, EventId, MembershipId, Seq, UserId};
 
 #[derive(sqlx::FromRow)]
 pub struct Member {
@@ -41,6 +41,9 @@ pub struct SummaryRow {
     pub my_read_seq: i64,
     pub peer_read_seq: Option<i64>,
     pub updated_at: OffsetDateTime,
+    pub pinned: bool,
+    pub muted: bool,
+    pub archived: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -147,6 +150,9 @@ pub async fn summary(
     sqlx::query_as(
         r#"
         SELECT c.id, c.kind, c.title, c.latest_event_seq, c.updated_at,
+               coalesce(preferences.pinned, false) AS pinned,
+               coalesce(preferences.muted, false) AS muted,
+               coalesce(preferences.archived, false) AS archived,
                peer.peer_id, peer.username, peer.display_name, peer.peer_read_seq,
                m.membership_id, m.joined_seq, m.role,
                m.last_read_message_seq AS my_read_seq,
@@ -155,6 +161,8 @@ pub async fn summary(
         FROM conversations c
         JOIN conversation_members m ON m.conversation_id = c.id
              AND m.user_id = $1 AND m.left_at IS NULL
+        LEFT JOIN conversation_preferences preferences
+             ON preferences.conversation_id = c.id AND preferences.user_id = $1
         LEFT JOIN LATERAL (
             SELECT u.id AS peer_id, u.username, u.display_name,
                    p.last_read_message_seq AS peer_read_seq
@@ -175,12 +183,15 @@ pub async fn summary(
 pub async fn summaries(
     tx: &mut Transaction<'_, Postgres>,
     user_id: UserId,
-    cursor: Option<(OffsetDateTime, uuid::Uuid)>,
+    cursor: Option<(bool, OffsetDateTime, uuid::Uuid)>,
     limit: u16,
 ) -> Result<Vec<SummaryRow>, sqlx::Error> {
     sqlx::query_as(
         r#"
         SELECT c.id, c.kind, c.title, c.latest_event_seq, c.updated_at,
+               coalesce(preferences.pinned, false) AS pinned,
+               coalesce(preferences.muted, false) AS muted,
+               coalesce(preferences.archived, false) AS archived,
                peer.peer_id, peer.username, peer.display_name, peer.peer_read_seq,
                m.membership_id, m.joined_seq, m.role,
                m.last_read_message_seq AS my_read_seq,
@@ -189,6 +200,8 @@ pub async fn summaries(
         FROM conversations c
         JOIN conversation_members m ON m.conversation_id = c.id
              AND m.user_id = $1 AND m.left_at IS NULL
+        LEFT JOIN conversation_preferences preferences
+             ON preferences.conversation_id = c.id AND preferences.user_id = $1
         LEFT JOIN LATERAL (
             SELECT u.id AS peer_id, u.username, u.display_name,
                    p.last_read_message_seq AS peer_read_seq
@@ -197,34 +210,17 @@ pub async fn summaries(
                   AND p.left_at IS NULL AND c.kind = 'direct'
             LIMIT 1
         ) peer ON TRUE
-        WHERE ($2::timestamptz IS NULL OR (c.updated_at, c.id) < ($2, $3))
-        ORDER BY c.updated_at DESC, c.id DESC
-        LIMIT $4
+        WHERE ($2::boolean IS NULL OR (coalesce(preferences.pinned, false), c.updated_at, c.id) < ($2, $3, $4))
+        ORDER BY coalesce(preferences.pinned, false) DESC, c.updated_at DESC, c.id DESC
+        LIMIT $5
     "#,
     )
     .bind(user_id)
     .bind(cursor.map(|position| position.0))
     .bind(cursor.map(|position| position.1))
+    .bind(cursor.map(|position| position.2))
     .bind(i64::from(limit) + 1)
     .fetch_all(&mut **tx)
-    .await
-}
-
-pub async fn last_message(
-    tx: &mut Transaction<'_, Postgres>,
-    id: ConversationId,
-    joined_seq: i64,
-) -> Result<Option<MessageView>, sqlx::Error> {
-    sqlx::query_as(
-        r#"
-        SELECT id, conversation_id, sender_id, client_message_id, created_seq, body, created_at, sender_name
-        FROM messages WHERE conversation_id = $1 AND created_seq >= $2
-        ORDER BY created_seq DESC LIMIT 1
-    "#,
-    )
-    .bind(id)
-    .bind(joined_seq)
-    .fetch_optional(&mut **tx)
     .await
 }
 
@@ -238,7 +234,7 @@ pub async fn unread_count(
     sqlx::query_scalar(
         r#"
         SELECT count(*) FROM messages
-        WHERE conversation_id = $1 AND sender_id != $2 AND created_seq > $3 AND created_seq >= $4
+        WHERE conversation_id = $1 AND sender_id != $2 AND created_seq > $3 AND created_seq >= $4 AND NOT withdrawn
     "#,
     )
     .bind(id)
@@ -259,54 +255,6 @@ pub async fn lock_version(
         .await
 }
 
-pub async fn existing_message(
-    tx: &mut Transaction<'_, Postgres>,
-    id: ConversationId,
-    user_id: UserId,
-    client_id: uuid::Uuid,
-) -> Result<Option<MessageView>, sqlx::Error> {
-    sqlx::query_as(
-        r#"
-        SELECT id, conversation_id, sender_id, client_message_id, created_seq, body, created_at, sender_name
-        FROM messages
-        WHERE conversation_id = $1 AND sender_id = $2 AND client_message_id = $3
-    "#,
-    )
-    .bind(id)
-    .bind(user_id)
-    .bind(client_id)
-    .fetch_optional(&mut **tx)
-    .await
-}
-
-pub async fn insert_message(
-    tx: &mut Transaction<'_, Postgres>,
-    id: ConversationId,
-    user_id: UserId,
-    client_id: uuid::Uuid,
-    seq: i64,
-    body: &str,
-) -> Result<MessageView, sqlx::Error> {
-    sqlx::query_as(
-        r#"
-        INSERT INTO messages(id, conversation_id, sender_id, client_message_id, created_seq, body, sender_name)
-        SELECT $1, $2, $3, $4, $5, $6,
-               CASE WHEN conversation.kind='group' THEN sender.display_name ELSE NULL END
-        FROM users sender JOIN conversations conversation ON conversation.id=$2
-        WHERE sender.id=$3
-        RETURNING id, conversation_id, sender_id, client_message_id, created_seq, body, created_at, sender_name
-    "#,
-    )
-    .bind(MessageId::new())
-    .bind(id)
-    .bind(user_id)
-    .bind(client_id)
-    .bind(seq)
-    .bind(body)
-    .fetch_one(&mut **tx)
-    .await
-}
-
 pub async fn repeatable_read(tx: &mut Transaction<'_, Postgres>) -> Result<(), sqlx::Error> {
     sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
         .execute(&mut **tx)
@@ -322,30 +270,6 @@ pub async fn version(
         .bind(id)
         .fetch_one(&mut **tx)
         .await
-}
-
-pub async fn messages(
-    tx: &mut Transaction<'_, Postgres>,
-    id: ConversationId,
-    joined_seq: i64,
-    before: Option<Seq>,
-    limit: u16,
-) -> Result<Vec<MessageView>, sqlx::Error> {
-    sqlx::query_as(
-        r#"
-        SELECT id, conversation_id, sender_id, client_message_id, created_seq, body, created_at, sender_name
-        FROM messages
-        WHERE conversation_id = $1 AND created_seq >= $2
-              AND ($3::bigint IS NULL OR created_seq < $3)
-        ORDER BY created_seq DESC LIMIT $4
-    "#,
-    )
-    .bind(id)
-    .bind(joined_seq)
-    .bind(before)
-    .bind(i64::from(limit) + 1)
-    .fetch_all(&mut **tx)
-    .await
 }
 
 pub async fn events(

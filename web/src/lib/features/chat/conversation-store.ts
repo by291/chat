@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/svelte-query';
 import { keys } from './cache';
 import { ApiFailure } from '../../api-client/errors';
 import { GroupRecords } from './group-records';
+import { mergeMessageRecords } from './message-records';
 import type { ChatApi, Conversation, Message, Event } from './models';
 import { sequence as seq, isGroup, membershipId } from './models';
 
@@ -11,6 +12,7 @@ export type ConversationStream = {
   applied: string;
   target: bigint;
   ready: boolean;
+  hasSnapshot: boolean;
   loading: boolean;
   olderLoading: boolean;
   nextBefore: string | null;
@@ -18,6 +20,7 @@ export type ConversationStream = {
   lastRead: bigint;
   reading?: string;
   membershipId?: string;
+  notificationFloor: bigint;
 };
 
 type StoreOptions = {
@@ -32,6 +35,7 @@ type StoreOptions = {
   messagesMerged: (messages: Message[]) => void;
   peerSelected: (userId: string) => void;
   membershipChanged: (id: string) => void;
+  messageApplied?: (message: Message, fresh: boolean) => void;
 };
 
 /** Owns cache mutations and continuous durable replay for one authenticated lifetime.
@@ -43,6 +47,7 @@ export class ConversationStore {
   private summaryAgain = false;
   private summaryRevision = 0;
   private revoked = new Set<string>();
+  private fresh = new Set<string>();
   readonly groups: GroupRecords;
 
   constructor(private options: StoreOptions) {
@@ -59,6 +64,8 @@ export class ConversationStore {
   }
 
   private forget(id: string) {
+    for (const candidate of this.fresh)
+      if (candidate.startsWith(`${id}/`)) this.fresh.delete(candidate);
     const stream = this.streams.get(id);
     if (stream) {
       stream.abort.abort();
@@ -106,6 +113,7 @@ export class ConversationStore {
   invalidate(id: string) {
     const streamState = this.stream(id);
     streamState.abort.abort();
+    streamState.abort = new AbortController();
     streamState.generation++;
     streamState.draining = undefined;
     streamState.loading = false;
@@ -127,11 +135,13 @@ export class ConversationStore {
         applied: '0',
         target: 0n,
         ready: false,
+        hasSnapshot: false,
         loading: false,
         olderLoading: false,
         nextBefore: null,
         lastRead: 0n,
         membershipId: this.membership(id),
+        notificationFloor: 0n,
       };
       this.streams.set(id, streamState);
     }
@@ -199,6 +209,24 @@ export class ConversationStore {
           if (!incoming || membershipId(incoming) !== membershipId(previous))
             this.forget(previous.id);
         }
+        for (const item of items.values()) {
+          const previous = this.conversations.find(
+            (conversation) => conversation.id === item.id,
+          );
+          const known =
+            membershipId(previous) === membershipId(item)
+              ? previous?.last_message
+              : undefined;
+          // Summary pages can have been read before a message mutation. Use the
+          // same revision fence as the timeline so their preview cannot leak it.
+          const previews = [
+            known,
+            this.messages(item.id).at(-1),
+            item.last_message,
+          ].filter((record): record is Message => !!record);
+          if (previews.length)
+            item.last_message = mergeMessageRecords([], previews).at(-1)!;
+        }
         this.options.queryClient.setQueryData(keys.conversations, [
           ...items.values(),
         ]);
@@ -212,6 +240,10 @@ export class ConversationStore {
             stream.lastRead > seq(item.my_read_seq)
               ? stream.lastRead
               : seq(item.my_read_seq);
+          if (this.firstFresh(item.id) !== undefined) {
+            this.initializeLive(item.id);
+            if (stream.ready) void this.drain(item.id);
+          }
         }
         if (this.current && !isGroup(this.current)) {
           void this.options.peerSelected(this.current.peer.id);
@@ -254,7 +286,7 @@ export class ConversationStore {
     // uninitialized stream may adopt the now-authorized membership identity;
     // replacement of an established episode still uses forget/generation fences.
     if (!streamState.ready) streamState.membershipId = this.membership(id);
-    if (streamState.ready) {
+    if (streamState.ready && streamState.hasSnapshot) {
       await this.drain(id);
       if (this.current && !isGroup(this.current)) {
         void this.options.peerSelected(this.current.peer.id);
@@ -276,15 +308,18 @@ export class ConversationStore {
       }
       if (snapshot.membership?.membership_id !== streamState.membershipId)
         return;
-      this.options.queryClient.setQueryData(keys.messages(id), snapshot.items);
-      streamState.applied = snapshot.snapshot_seq;
+      // Snapshot responses can race a newer acknowledgement or replay revision.
+      this.merge(id, snapshot.items);
+      const baseline = this.liveBaseline(id, snapshot.snapshot_seq);
+      if (baseline > seq(streamState.applied))
+        streamState.applied = baseline.toString();
       streamState.target =
         streamState.target > seq(snapshot.snapshot_seq)
           ? streamState.target
           : seq(snapshot.snapshot_seq);
       streamState.nextBefore = snapshot.next_before ?? null;
       streamState.ready = true;
-      this.merge(id, snapshot.items);
+      streamState.hasSnapshot = true;
       void this.groups.load(id, streamState.abort.signal);
       await this.drain(id);
     } catch (reason) {
@@ -384,8 +419,19 @@ export class ConversationStore {
 
   private apply(id: string, event: Event) {
     const payload = event.payload;
-    if (payload.type === 'message.created') {
+    if (
+      payload.type === 'message.created' ||
+      payload.type === 'message.edited' ||
+      payload.type === 'message.withdrawn'
+    ) {
       this.merge(id, [payload.data]);
+      if (payload.type === 'message.created') {
+        const fresh = this.fresh.delete(`${id}/${event.envelope.event_seq}`);
+        this.options.messageApplied?.(
+          this.messages(id).find((message) => message.id === payload.data.id)!,
+          fresh,
+        );
+      }
     } else if (payload.type === 'receipt.updated') {
       const receipt = payload.data;
       if (receipt.membership_id)
@@ -435,25 +481,142 @@ export class ConversationStore {
   merge(id: string, incoming: Message[]) {
     this.options.queryClient.setQueryData<Message[]>(
       keys.messages(id),
-      (existing) => {
-        const messages = new Map(
-          (existing ?? []).map((message) => [message.id, message]),
-        );
-        for (const message of incoming) {
-          if (message.conversation_id === id) {
-            messages.set(message.id, message);
-          }
-        }
-        return [...messages.values()].sort((left, right) =>
-          seq(left.created_seq) < seq(right.created_seq)
-            ? -1
-            : seq(left.created_seq) > seq(right.created_seq)
-              ? 1
-              : 0,
-        );
-      },
+      (existing) =>
+        mergeMessageRecords(
+          existing ?? [],
+          incoming.filter((message) => message.conversation_id === id),
+        ),
     );
     this.options.messagesMerged(incoming);
+    this.options.queryClient.setQueryData<Conversation[]>(
+      keys.conversations,
+      (items) =>
+        items?.map((item) => {
+          if (item.id !== id || !item.last_message) return item;
+          const current = this.messages(id).find(
+            (message) => message.id === item.last_message!.id,
+          );
+          return current
+            ? {
+                ...item,
+                last_message: mergeMessageRecords(
+                  [item.last_message],
+                  [current],
+                )[0],
+              }
+            : item;
+        }),
+    );
+  }
+
+  /** Live publications are exact candidates, never a license to notify replay backlog.
+   * Retain unknown candidates until metadata authorizes their episode. Replay
+   * starts before the earliest candidate even if that summary already includes it.
+   * Selection still loads a latest snapshot before rendering/acknowledging history.
+   */
+  liveHint(id: string, eventSeq: string, notify: boolean) {
+    const state = this.stream(id);
+    if (
+      notify &&
+      seq(eventSeq) > state.notificationFloor &&
+      seq(eventSeq) <= seq(state.applied)
+    ) {
+      const conversation = this.conversations.find(
+        (record) => record.id === id,
+      );
+      const message = this.messages(id).find(
+        (record) => record.created_seq === eventSeq,
+      );
+      // A preceding receipt can replay this message before its own publication.
+      // The exact live hint may announce its authorized canonical record once;
+      // initial/reconnect history and a cursor already read elsewhere stay silent.
+      if (
+        message &&
+        conversation &&
+        seq(conversation.my_read_seq) < seq(message.created_seq) &&
+        state.lastRead < seq(message.created_seq)
+      ) {
+        this.options.messageApplied?.(message, true);
+      }
+    }
+    if (
+      notify &&
+      seq(eventSeq) > seq(state.applied) &&
+      seq(eventSeq) > state.notificationFloor
+    ) {
+      this.fresh.add(`${id}/${eventSeq}`);
+      if (this.fresh.size > 200)
+        this.fresh.delete(this.fresh.values().next().value!);
+    }
+    this.raiseTarget(id, eventSeq);
+    this.initializeLive(id);
+    if (state.ready) void this.drain(id);
+  }
+
+  private firstFresh(id: string) {
+    const conversation = this.conversations.find((record) => record.id === id);
+    const joined = isGroup(conversation)
+      ? seq(conversation.membership.joined_seq)
+      : 0n;
+    const state = this.stream(id);
+    let first: bigint | undefined;
+    for (const candidate of this.fresh) {
+      if (!candidate.startsWith(`${id}/`)) continue;
+      const sequence = seq(candidate.slice(id.length + 1));
+      if (sequence < joined || sequence <= state.notificationFloor) {
+        this.fresh.delete(candidate);
+        continue;
+      }
+      if (first === undefined || sequence < first) first = sequence;
+    }
+    return first;
+  }
+
+  private liveBaseline(id: string, snapshotSequence: string) {
+    const first = this.firstFresh(id);
+    return first !== undefined && first <= seq(snapshotSequence)
+      ? first - 1n
+      : seq(snapshotSequence);
+  }
+
+  private initializeLive(id: string) {
+    const conversation = this.conversations.find((record) => record.id === id);
+    const state = this.stream(id);
+    if (!conversation || state.ready || state.loading) return;
+    const first = this.firstFresh(id);
+    // Metadata received after a creation hint may already contain the first
+    // message. Await its exact live candidate instead of adopting that summary
+    // as applied history. Startup/reconnect floors distinguish old outbox hints.
+    if (first === undefined && state.notificationFloor === 0n) return;
+
+    // Only an uninitialized stream adopts an episode. Established episodes are
+    // replaced by forget(), so old HTTP generations cannot cross a rejoin.
+    state.membershipId = membershipId(conversation);
+    state.applied = this.liveBaseline(
+      id,
+      conversation.latest_event_seq,
+    ).toString();
+    state.ready = true;
+  }
+
+  /** Freeze known history after startup/reconnect, not after live metadata refreshes. */
+  captureNotificationBaseline() {
+    this.fresh.clear();
+    for (const conversation of this.conversations) {
+      this.stream(conversation.id).notificationFloor = seq(
+        conversation.latest_event_seq,
+      );
+    }
+  }
+
+  clearFresh() {
+    this.fresh.clear();
+  }
+
+  /** Reread after a preference mutation/hint fences a list authorized before it. */
+  preferencesChanged() {
+    this.summaryRevision++;
+    void this.refreshSummaries();
   }
 
   async loadOlder(id: string) {
@@ -505,6 +668,7 @@ export class ConversationStore {
     }
     this.streams.clear();
     this.revoked.clear();
+    this.fresh.clear();
     this.options.queryClient.clear();
   }
 }

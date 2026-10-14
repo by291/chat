@@ -7,7 +7,7 @@ use super::{
 use crate::{
     AppState,
     error::AppError,
-    types::{EventEnvelope, SessionId, UserId},
+    types::{ConversationId, EventEnvelope, SessionId, UserId},
 };
 
 /// Deliver a leased job; completion is a separate CAS operation after the network call.
@@ -49,6 +49,22 @@ pub async fn deliver(state: &AppState, job: &LeasedJob) -> Result<(), AppError> 
                     )
                     .await?;
             }
+        }
+        Some("conversation.preferences") => {
+            let user_id: UserId = serde_json::from_value(job.payload["user_id"].clone())
+                .map_err(|_| AppError::unavailable())?;
+            let conversation_id: ConversationId =
+                serde_json::from_value(job.payload["conversation_id"].clone())
+                    .map_err(|_| AppError::unavailable())?;
+            state
+                .centrifugo
+                .publish(
+                    &format!("personal:#{user_id}"),
+                    &RealtimeEvent::Ephemeral(EphemeralEvent::ConversationPreferencesUpdated {
+                        conversation_id,
+                    }),
+                )
+                .await?;
         }
         Some("session.revoked") => {
             let session: SessionId = serde_json::from_value(job.payload["session_id"].clone())

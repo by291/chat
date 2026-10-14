@@ -10,6 +10,8 @@
   import MessageList from './MessageList.svelte';
   import Composer from './Composer.svelte';
   import GroupDetails from './GroupDetails.svelte';
+  import ConversationTools from './ConversationTools.svelte';
+  import MessageDialogs from './MessageDialogs.svelte';
   import ProfileAvatar from '../settings/ProfileAvatar.svelte';
   import { isGroup, conversationName } from './models';
 
@@ -99,7 +101,12 @@
               {/if}
             </p>
           </div>
-          {#if isGroup(current)}<GroupDetails {sync} />{/if}
+          {#if isGroup(current)}
+            <GroupDetails {sync} />
+          {/if}
+          {#if current}
+            <ConversationTools {sync} />
+          {/if}
         </header>
         {#if sync.error}
           <div class="sync-error" role="alert">
@@ -137,6 +144,7 @@
         </div>
       {/if}
     </section>
+    <MessageDialogs {sync} />
   </main>
 {:else}
   <main class="loading-page">正在准备聊天…</main>

@@ -6,7 +6,7 @@ use axum::{
     http::StatusCode,
 };
 
-use super::model::ConversationSummary;
+use super::model::{ConversationPreferences, ConversationPreferencesInput, ConversationSummary};
 
 use crate::{
     AppState,
@@ -175,7 +175,7 @@ pub async fn events(
     Query(page): Query<EventQuery>,
 ) -> Result<Json<EventPage>, AppError> {
     Ok(Json(
-        super::messages::events_with_membership(
+        super::message_queries::events_with_membership(
             &state,
             actor,
             id,
@@ -184,6 +184,26 @@ pub async fn events(
             page.membership_id,
         )
         .await?,
+    ))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/conversations/{id}/preferences",
+    request_body = ConversationPreferencesInput,
+    params(("id" = ConversationId, Path)),
+    responses((status = 200, body = ConversationPreferences), (status = 404, body = crate::error::ApiErrorBody)),
+    tag = "chat"
+)]
+/// Apply actor-owned partial preferences with a durable private refresh hint.
+pub async fn preferences(
+    State(state): State<AppState>,
+    actor: Actor,
+    Path(id): Path<ConversationId>,
+    Json(input): Json<ConversationPreferencesInput>,
+) -> Result<Json<ConversationPreferences>, AppError> {
+    Ok(Json(
+        super::preferences::update_preferences(&state, actor, id, input).await?,
     ))
 }
 

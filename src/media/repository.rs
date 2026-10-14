@@ -789,7 +789,8 @@ pub async fn visible_message(
             JOIN messages m ON m.id = ma.message_id
             WHERE ma.attachment_id = $1
                 AND m.conversation_id = $2
-                AND m.created_seq >= $3)
+                AND m.created_seq >= $3
+                AND NOT m.withdrawn)
     "#,
     )
     .bind(id)
