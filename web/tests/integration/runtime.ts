@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import pg from 'pg';
+import type { SmtpFixtureEnvironment } from './mail-support';
 
 import {
   repositoryRoot,
@@ -176,7 +177,7 @@ export class TestRuntime {
     this.ownsData = ownsData;
   }
 
-  static async start() {
+  static async start(options: { mail?: SmtpFixtureEnvironment } = {}) {
     const borrowed = process.env.CHAT_TEST_INFRASTRUCTURE_ENV;
     const infrastructure = borrowed
       ? undefined
@@ -198,6 +199,7 @@ export class TestRuntime {
         ...base,
         DATABASE_URL: databaseUrl.toString(),
         MEDIA_S3_BUCKET: `chat-e2e-${identity}`,
+        ...options.mail,
       });
       runtime.infrastructureCleanup = infrastructure?.cleanup;
 
@@ -217,7 +219,9 @@ export class TestRuntime {
       );
       runtime.databaseCreated = true;
 
-      await runCommand('cargo', ['build', '--bins'], {
+      const buildArguments = ['build', '--bins'];
+      if (options.mail) buildArguments.push('--features', 'test-failpoints');
+      await runCommand('cargo', buildArguments, {
         logFile: path.join(directory, 'build.log'),
       });
       await runCommand(nativeBinaryPath('admin'), ['media-init'], {
@@ -279,7 +283,11 @@ export class TestRuntime {
         'build',
         '--bin',
         'worker',
-        ...(pauseAfterPublish ? ['--features', 'test-failpoints'] : []),
+        ...(pauseAfterPublish ||
+        this.env.CHAT_TEST_SMTP_CAPTURE === 'true' ||
+        this.env.CHAT_TEST_SMTP_CA_FILE
+          ? ['--features', 'test-failpoints']
+          : []),
       ],
       { logFile: path.join(this.directory, 'worker-build.log') },
     );

@@ -1,14 +1,18 @@
 //! Export the Rust-owned wire contract for the generated TypeScript client.
 
+use chat_server::auth::model::{
+    EmailEnrollmentInput, EmailStatus, EmailVerificationInput, PasswordRecoveryInput,
+    PasswordResetInput,
+};
 use chat_server::{
     error::ApiErrorBody,
     media::model::DownloadVariant,
     realtime::client::{EphemeralEvent, RealtimeEvent},
     types::{
         ConversationEvent, ConversationEventPayload, ConversationView, DirectInput, EventEnvelope,
-        EventPage, LoginInput, MessageSnapshot, MessageView, ReadInput, ReadResult, ReceiptData,
-        RegisterInput, SendMessageInput, SessionView, TypingInput, UpdateProfile, UserStatus,
-        UserView,
+        EventPage, LoginInput, MessageSnapshot, MessageView, PasswordChangeInput, ReadInput,
+        ReadResult, ReceiptData, RegisterInput, SendMessageInput, SessionView, TypingInput,
+        UpdateProfile, UserStatus, UserView,
     },
 };
 use utoipa::OpenApi;
@@ -19,6 +23,12 @@ use utoipa::OpenApi;
         chat_server::auth::http::register,
         chat_server::auth::http::login,
         chat_server::auth::http::logout,
+        chat_server::auth::http::change_password,
+        chat_server::auth::http::request_password_recovery,
+        chat_server::auth::http::reset_password_from_token,
+        chat_server::auth::http::email_status,
+        chat_server::auth::http::enroll_email,
+        chat_server::auth::http::verify_email,
         chat_server::auth::http::me,
         chat_server::auth::http::sessions,
         chat_server::auth::http::revoke,
@@ -63,6 +73,12 @@ use utoipa::OpenApi;
         SessionView,
         RegisterInput,
         LoginInput,
+        PasswordChangeInput,
+        EmailStatus,
+        EmailEnrollmentInput,
+        EmailVerificationInput,
+        PasswordRecoveryInput,
+        PasswordResetInput,
         UpdateProfile,
         DirectInput,
         ConversationView,

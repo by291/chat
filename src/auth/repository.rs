@@ -63,7 +63,8 @@ pub async fn update_password(
 ) -> Result<Option<UserId>, sqlx::Error> {
     sqlx::query_scalar(
         r#"
-        UPDATE users SET password_hash = $2
+        UPDATE users
+        SET password_hash = $2, credential_version = credential_version + 1
         WHERE username = $1
         RETURNING id
         "#,

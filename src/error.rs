@@ -78,9 +78,25 @@ impl IntoResponse for AppError {
 }
 
 impl From<sqlx::Error> for AppError {
-    fn from(_error: sqlx::Error) -> Self {
-        // Do not log SQL or connection parameters, which may contain private data.
-        tracing::error!(category = "database", "database operation failed");
+    fn from(error: sqlx::Error) -> Self {
+        // SQLSTATE and typed categories identify failures without logging SQL,
+        // parameters, constraint details or rows containing private capabilities.
+        let sql_state = error.as_database_error().and_then(|error| error.code());
+        let error_kind = match &error {
+            sqlx::Error::Database(_) => "database",
+            sqlx::Error::ColumnNotFound(_) => "column_not_found",
+            sqlx::Error::ColumnDecode { .. } => "column_decode",
+            sqlx::Error::Decode(_) => "decode",
+            sqlx::Error::PoolTimedOut => "pool_timed_out",
+            sqlx::Error::PoolClosed => "pool_closed",
+            _ => "other",
+        };
+        tracing::error!(
+            category = "database",
+            sql_state = sql_state.as_deref(),
+            error_kind,
+            "database operation failed"
+        );
         Self::unavailable()
     }
 }

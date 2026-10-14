@@ -22,6 +22,7 @@ pub struct AppState {
     pub centrifugo: crate::realtime::client::CentrifugoClient,
     pub object_storage: Option<crate::infrastructure::object_storage::ObjectStorage>,
     pub media_processors: Arc<tokio::sync::Semaphore>,
+    pub mail: Option<crate::infrastructure::mail::MailDelivery>,
 }
 
 impl AppState {
@@ -36,6 +37,11 @@ impl AppState {
             .media_storage
             .as_ref()
             .map(crate::infrastructure::object_storage::ObjectStorage::new);
+        let mail = config
+            .mail
+            .as_ref()
+            .map(crate::infrastructure::mail::MailDelivery::new)
+            .transpose()?;
         Ok(Self {
             pool,
             config: Arc::new(config),
@@ -45,6 +51,7 @@ impl AppState {
             centrifugo,
             object_storage,
             media_processors: Arc::new(tokio::sync::Semaphore::new(2)),
+            mail,
         })
     }
 }
@@ -58,6 +65,23 @@ pub fn build_router(state: AppState) -> Router {
         .route("/auth/register", axum::routing::post(http::register))
         .route("/auth/login", axum::routing::post(http::login))
         .route("/auth/logout", axum::routing::post(http::logout))
+        .route("/auth/password", axum::routing::post(http::change_password))
+        .route(
+            "/auth/password/recovery",
+            axum::routing::post(http::request_password_recovery),
+        )
+        .route(
+            "/auth/password/reset",
+            axum::routing::post(http::reset_password_from_token),
+        )
+        .route(
+            "/auth/email",
+            get(http::email_status).post(http::enroll_email),
+        )
+        .route(
+            "/auth/email/verify",
+            axum::routing::post(http::verify_email),
+        )
         .route("/auth/me", get(http::me))
         .route("/sessions", get(http::sessions))
         .route("/sessions/{id}", axum::routing::delete(http::revoke))
@@ -148,6 +172,7 @@ pub fn build_router(state: AppState) -> Router {
         .layer(axum::middleware::from_fn(
             crate::infrastructure::observability::http,
         ))
+        .layer(axum::middleware::from_fn(http::security_cache_guard))
 }
 
 async fn ready(State(state): State<AppState>) -> Result<StatusCode, AppError> {

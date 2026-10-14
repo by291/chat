@@ -1,19 +1,22 @@
 import { test, expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import {
-  startIntegrationStack,
-  account,
-  api,
-  eventually,
-  startWorker,
-} from './support';
+import { account, api, eventually, startWorker } from './support';
 import { readyUpload, sendAttachments } from './media-support';
 import { restoreSnapshot, cleanupRestored } from './recovery';
-import type { TestRuntime } from './runtime';
+import { TestRuntime } from './runtime';
+import { TestSmtpServer } from './mail-support';
 
 test('coordinated backup restores media bytes, avatars, queued uploads and revoked sessions into an isolated project', async () => {
-  const stack = await startIntegrationStack();
+  const mail = new TestSmtpServer();
+  await mail.start();
+  let stack: TestRuntime;
+  try {
+    stack = await TestRuntime.start({ mail: mail.environment() });
+  } catch (error) {
+    await mail.stop();
+    throw error;
+  }
   let restored: TestRuntime | undefined;
   try {
     const a = await account(stack),
@@ -24,6 +27,25 @@ test('coordinated backup restores media bytes, avatars, queued uploads and revok
       })
     ).json();
     await startWorker(stack);
+    expect(
+      (
+        await api(stack, a.cookie, '/auth/email', 'POST', {
+          email: 'backup-owner@example.test',
+          current_password: 'correct horse battery',
+        })
+      ).status,
+    ).toBe(202);
+    await eventually(async () => mail.messages().length === 1);
+    const verificationToken = new URL(mail.messages()[0].link!).hash.slice(
+      '#token='.length,
+    );
+    expect(
+      (
+        await api(stack, a.cookie, '/auth/email/verify', 'POST', {
+          token: verificationToken,
+        })
+      ).status,
+    ).toBe(200);
     const picture = Uint8Array.from(
       await readFile(new URL('../fixtures/sample.png', import.meta.url)),
     );
@@ -70,6 +92,27 @@ test('coordinated backup restores media bytes, avatars, queued uploads and revok
     // Stop only the owned idle test worker, then seal a genuine queued upload.
     // Recovery must process it rather than relying on a fabricated ready row.
     await stack.stopWorker();
+    expect(
+      (
+        await api(stack, b.cookie, '/auth/email', 'POST', {
+          email: 'backup-peer@example.test',
+          current_password: 'correct horse battery',
+        })
+      ).status,
+    ).toBe(202);
+    expect(
+      (
+        await api(stack, '', '/auth/password/recovery', 'POST', {
+          email: 'backup-owner@example.test',
+        })
+      ).status,
+    ).toBe(202);
+    const pendingMail = (
+      await stack.db.query(
+        "SELECT id, encrypted_payload FROM account_mail_jobs WHERE status='pending' ORDER BY id",
+      )
+    ).rows;
+    expect(pendingMail).toHaveLength(2);
     const pendingResponse = await api(
       stack,
       a.cookie,
@@ -114,6 +157,16 @@ test('coordinated backup restores media bytes, avatars, queued uploads and revok
       204,
     );
     restored = await restoreSnapshot(stack);
+    expect(restored.env.MAIL_QUEUE_ENCRYPTION_KEY).toBe(
+      stack.env.MAIL_QUEUE_ENCRYPTION_KEY,
+    );
+    expect(
+      (
+        await restored.db.query(
+          "SELECT id, encrypted_payload FROM account_mail_jobs WHERE status='pending' ORDER BY id",
+        )
+      ).rows,
+    ).toEqual(pendingMail);
     expect(
       (
         await fetch(`${restored.apiUrl}/api/v1/auth/me`, {
@@ -189,11 +242,49 @@ test('coordinated backup restores media bytes, avatars, queued uploads and revok
         ).state === 'ready',
       15000,
     );
+    await eventually(async () => mail.messages().length === 3);
+    const restoredVerification = mail
+      .messages()
+      .find((message) => message.recipient === 'backup-peer@example.test')!;
+    expect(
+      (
+        await api(restored, b.cookie, '/auth/email/verify', 'POST', {
+          token: new URL(restoredVerification.link!).hash.slice(
+            '#token='.length,
+          ),
+        })
+      ).status,
+    ).toBe(200);
+    const resetMail = mail
+      .messages()
+      .find((message) => message.link?.includes('/reset-password#'))!;
+    expect(
+      (
+        await api(restored, '', '/auth/password/reset', 'POST', {
+          token: new URL(resetMail.link!).hash.slice('#token='.length),
+          new_password: 'restored correct password',
+        })
+      ).status,
+    ).toBe(204);
+    expect((await api(restored, cookie, '/auth/me')).status).toBe(401);
+    expect(
+      (
+        await api(restored, '', '/auth/login', 'POST', {
+          username: a.user.username,
+          password: 'restored correct password',
+          device_label: 'Recovered account',
+        })
+      ).status,
+    ).toBe(200);
   } finally {
     try {
       if (restored) await cleanupRestored(restored);
     } finally {
-      await stack.cleanup();
+      try {
+        await stack.cleanup();
+      } finally {
+        await mail.stop();
+      }
     }
   }
 }, 120000);

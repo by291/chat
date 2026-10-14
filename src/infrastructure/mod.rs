@@ -2,6 +2,8 @@
 
 pub mod config;
 pub mod db;
+pub mod mail;
+pub(crate) mod mail_config;
 pub mod object_storage;
 pub mod observability;
 pub mod rate_limit;

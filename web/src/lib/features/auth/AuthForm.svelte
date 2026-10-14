@@ -11,8 +11,10 @@
 
   let {
     mode = 'login',
+    onAuthenticated,
   }: {
     mode?: 'login' | 'register';
+    onAuthenticated?: () => void | Promise<void>;
   } = $props();
 
   let username = $state('');
@@ -28,10 +30,13 @@
     if (!next) return '/app';
     try {
       const target = new URL(next, page.url.origin);
-      // Only the new same-origin join workflow may retain a token through login.
+      // Retain only the join workflow or a notification's existing conversation
+      // route. Chat return paths carry no query/hash tokens and still authorize via REST.
       return target.origin === page.url.origin &&
-        target.pathname === '/app/groups/join'
-        ? target.pathname + target.search
+        (target.pathname === '/app/groups/join' ||
+          /^\/app\/chats\/[0-9a-f-]{36}$/.test(target.pathname))
+        ? target.pathname +
+            (target.pathname === '/app/groups/join' ? target.search : '')
         : '/app';
     } catch {
       // Untrusted malformed redirect values fall back to the ordinary application entry.
@@ -43,7 +48,8 @@
     invitation = page.url.searchParams.get('invite') ?? '';
     void auth.restore().then(() => {
       if (auth.user) {
-        void goto(destination());
+        if (onAuthenticated) void onAuthenticated();
+        else void goto(destination());
       }
     });
   });
@@ -71,7 +77,8 @@
         });
       }
       password = '';
-      await goto(destination());
+      if (onAuthenticated) await onAuthenticated();
+      else await goto(destination());
     } catch (reason) {
       error = reason instanceof Error ? reason.message : '请稍后重试';
     }
@@ -173,6 +180,9 @@
               : '登录'}<ArrowRight size={18} />
         </Button>
       </form>
+      {#if !registering}
+        <p><a href="/forgot-password">忘记密码？</a></p>
+      {/if}
       <p class="auth-switch">
         {registering ? '已有账号？' : '第一次来到这里？'}
         <a href={registering ? '/login' : '/register'}>

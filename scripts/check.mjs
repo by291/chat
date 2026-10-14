@@ -84,7 +84,8 @@ const steps = [
   [
     "backend",
     "Rust tests and real media",
-    () => command("cargo", ["test", "--", "--include-ignored"]),
+    () =>
+      command("cargo", ["test", "--all-features", "--", "--include-ignored"]),
   ],
   [
     "frontend",

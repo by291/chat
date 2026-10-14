@@ -13,9 +13,18 @@ export class SessionState {
 
   constructor(client: ApiClient = api) {
     this.requests = createAuthApi(client);
+    const requestGenerations = new WeakMap<Request, number>();
     client.use({
-      onResponse: ({ response }) => {
-        if (response.status === 401) {
+      onRequest: ({ request }) => {
+        requestGenerations.set(request, this.generation);
+      },
+      onResponse: ({ request, response }) => {
+        // A revoked request from an older identity must not sign out the new
+        // login. Weak keys also expire when a request fails without a response.
+        if (
+          response.status === 401 &&
+          requestGenerations.get(request) === this.generation
+        ) {
           this.reset();
         }
       },
@@ -37,8 +46,16 @@ export class SessionState {
     try {
       const user = await this.requests.currentUser();
       if (generation === this.generation) {
+        // Cookie changes in another tab can restore a different account without
+        // calling login here. Start a new lifetime, while same-user profile
+        // revalidation keeps drafts, caches and outstanding requests intact.
+        if (this.user?.id !== user.id) {
+          if (this.user) this.reset();
+          else this.generation++;
+        }
         this.user = user;
         this.error = '';
+        this.pending = false;
       }
     } catch (error) {
       if (
@@ -86,6 +103,18 @@ export class SessionState {
   async logout() {
     await this.requests.logout();
     this.reset();
+  }
+
+  /** Revoke this lifetime only after the password change commits on the server. */
+  async changePassword(
+    input: components['schemas']['PasswordChangeInput'],
+  ): Promise<void> {
+    const generation = this.generation;
+
+    await this.requests.changePassword(input);
+    if (generation === this.generation) {
+      this.reset();
+    }
   }
 
   onReset(callback: () => void) {

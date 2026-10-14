@@ -60,6 +60,7 @@ pub async fn reset_password(state: &AppState, name: &str, password: &str) -> Res
     let user_id = repository::update_password(&mut transaction, &username(name)?, &password_hash)
         .await?
         .ok_or_else(AppError::not_found)?;
+    super::security::invalidate_security_challenges(&mut transaction, user_id).await?;
     let sessions = repository::revoke_all_sessions(&mut transaction, user_id).await?;
 
     for session_id in sessions {

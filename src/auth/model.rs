@@ -32,6 +32,43 @@ pub struct LoginInput {
     pub device_label: String,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct PasswordChangeInput {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct EmailStatus {
+    pub enabled: bool,
+    pub verified_email: Option<String>,
+    pub pending_email: Option<String>,
+    #[serde(with = "time::serde::rfc3339::option")]
+    pub verification_expires_at: Option<OffsetDateTime>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct EmailEnrollmentInput {
+    pub email: String,
+    pub current_password: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct EmailVerificationInput {
+    pub token: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct PasswordRecoveryInput {
+    pub email: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct PasswordResetInput {
+    pub token: String,
+    pub new_password: String,
+}
+
 pub struct AuthenticatedUser {
     pub user: UserView,
     pub session_id: SessionId,

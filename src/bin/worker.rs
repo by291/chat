@@ -37,11 +37,16 @@ async fn main() -> anyhow::Result<()> {
         state.clone(),
         cancel.clone(),
     ));
+    let mail = Box::pin(chat_server::auth::mail_worker::run_worker(
+        state.clone(),
+        cancel.clone(),
+    ));
     let jobs = run_worker(state, cancel);
     tokio::try_join!(
         async { server.await.map_err(anyhow::Error::from) },
         async { jobs.await.map_err(anyhow::Error::from) },
-        async { media.await.map_err(anyhow::Error::from) }
+        async { media.await.map_err(anyhow::Error::from) },
+        async { mail.await.map_err(anyhow::Error::from) },
     )?;
     Ok(())
 }

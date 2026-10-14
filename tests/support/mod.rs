@@ -2,6 +2,7 @@
 use chat_server::{AppState, build_router, infrastructure::config::Config};
 use sqlx::{PgPool, postgres::PgPoolOptions};
 
+pub mod mail;
 pub mod media;
 
 pub struct TestApp {

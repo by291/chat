@@ -6,6 +6,8 @@
   import ProfileForm from '#lib/features/settings/ProfileForm.svelte';
   import AvatarEditor from '#lib/features/settings/AvatarEditor.svelte';
   import SessionsPanel from '#lib/features/settings/SessionsPanel.svelte';
+  import PasswordForm from '#lib/features/settings/PasswordForm.svelte';
+  import EmailForm from '#lib/features/settings/EmailForm.svelte';
   import { ArrowLeft } from '@lucide/svelte';
   import { theme, type Theme } from '#lib/features/settings/theme.svelte.ts';
   import { auth } from '#lib/features/auth/session.svelte.ts';
@@ -27,6 +29,8 @@
         auth.user = user;
       }}
     />
+    <PasswordForm />
+    <EmailForm />
   {/if}
   <Card.Root
     class="settings-card gap-0 p-6"

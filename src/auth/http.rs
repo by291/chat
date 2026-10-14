@@ -11,7 +11,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use super::service;
+use super::{
+    model::{EmailEnrollmentInput, EmailStatus, EmailVerificationInput, PasswordChangeInput},
+    recovery, security, service,
+};
 use crate::{
     AppState,
     error::AppError,
@@ -193,6 +196,10 @@ pub async fn me(State(state): State<AppState>, actor: Actor) -> Result<Json<User
 pub async fn logout(State(state): State<AppState>, actor: Actor) -> Result<Response, AppError> {
     service::revoke_session(&state, actor, actor.session_id).await?;
 
+    clear_session_response(&state)
+}
+
+fn clear_session_response(state: &AppState) -> Result<Response, AppError> {
     let cookie = cookie::Cookie::build((state.config.cookie_name(), ""))
         .path("/")
         .http_only(true)
@@ -206,6 +213,135 @@ pub async fn logout(State(state): State<AppState>, actor: Actor) -> Result<Respo
         HeaderValue::from_str(&cookie.to_string()).map_err(|_| AppError::unavailable())?,
     );
     Ok(response)
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/password",
+    request_body = PasswordChangeInput,
+    responses(
+        (status = 204),
+        (status = 400, body = crate::error::ApiErrorBody),
+        (status = 401, body = crate::error::ApiErrorBody),
+        (status = 429, body = crate::error::ApiErrorBody)
+    ),
+    tag = "auth"
+)]
+/// Change the password and revoke every existing session atomically.
+pub async fn change_password(
+    State(state): State<AppState>,
+    actor: Actor,
+    Json(input): Json<PasswordChangeInput>,
+) -> Result<Response, AppError> {
+    state
+        .limiter
+        .check(
+            "current-password",
+            &actor.user_id.to_string(),
+            5,
+            Duration::from_secs(60),
+        )
+        .await?;
+    security::change_password(&state, actor, input).await?;
+
+    // A delayed deletion cookie can erase a newer login in the same browser. The
+    // revoked cookie is inert; only login replaces it, and the client fences reset.
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store"),
+    );
+    Ok(response)
+}
+
+#[utoipa::path(get, path = "/api/v1/auth/email", responses((status=200, body=EmailStatus),
+    (status=401, body=crate::error::ApiErrorBody)), tag="auth")]
+/// Return private recovery email status for the authenticated owner.
+pub async fn email_status(
+    State(state): State<AppState>,
+    actor: Actor,
+) -> Result<Response, AppError> {
+    let status = security::email_status(&state, actor).await?;
+    Ok(no_store(Json(status).into_response()))
+}
+
+#[utoipa::path(post, path = "/api/v1/auth/email", request_body=EmailEnrollmentInput,
+    responses((status=202), (status=400, body=crate::error::ApiErrorBody),
+    (status=401, body=crate::error::ApiErrorBody), (status=503, body=crate::error::ApiErrorBody)), tag="auth")]
+/// Persist a verification intent after proving the current password and active session.
+pub async fn enroll_email(
+    State(state): State<AppState>,
+    actor: Actor,
+    Json(input): Json<EmailEnrollmentInput>,
+) -> Result<Response, AppError> {
+    security::enroll_email(&state, actor, input).await?;
+    Ok(no_store(StatusCode::ACCEPTED.into_response()))
+}
+
+#[utoipa::path(post, path = "/api/v1/auth/email/verify", request_body=EmailVerificationInput,
+    responses((status=200, body=EmailStatus), (status=400, body=crate::error::ApiErrorBody),
+    (status=403, body=crate::error::ApiErrorBody), (status=409, body=crate::error::ApiErrorBody)), tag="auth")]
+/// Consume a mailbox challenge only for its initiating authenticated account.
+pub async fn verify_email(
+    State(state): State<AppState>,
+    actor: Actor,
+    Json(input): Json<EmailVerificationInput>,
+) -> Result<Response, AppError> {
+    let status = security::verify_email(&state, actor, &input.token).await?;
+    Ok(no_store(Json(status).into_response()))
+}
+
+fn no_store(mut response: Response) -> Response {
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store"),
+    );
+    response
+}
+
+#[utoipa::path(post, path = "/api/v1/auth/password/recovery", request_body=super::model::PasswordRecoveryInput,
+    responses((status=202), (status=400, body=crate::error::ApiErrorBody),
+    (status=429, body=crate::error::ApiErrorBody), (status=503, body=crate::error::ApiErrorBody)), tag="auth")]
+/// Accept anonymous recovery requests without exposing verified mailbox ownership.
+pub async fn request_password_recovery(
+    State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(input): Json<super::model::PasswordRecoveryInput>,
+) -> Result<Response, AppError> {
+    recovery::request_password_recovery(
+        &state,
+        &input.email,
+        state.config.client_ip(peer.ip(), &headers),
+    )
+    .await?;
+    Ok(no_store(StatusCode::ACCEPTED.into_response()))
+}
+
+#[utoipa::path(post, path = "/api/v1/auth/password/reset", request_body=super::model::PasswordResetInput,
+    responses((status=204), (status=400, body=crate::error::ApiErrorBody),
+    (status=503, body=crate::error::ApiErrorBody)), tag="auth")]
+/// Reset credentials using a one-time link without issuing or modifying a browser cookie.
+pub async fn reset_password_from_token(
+    State(state): State<AppState>,
+    Json(input): Json<super::model::PasswordResetInput>,
+) -> Result<Response, AppError> {
+    recovery::reset_password_from_token(&state, input).await?;
+    Ok(no_store(StatusCode::NO_CONTENT.into_response()))
+}
+
+/// Prevent caching security responses, including extractor and Origin failures.
+pub async fn security_cache_guard(request: Request, next: Next) -> Response {
+    let path = request.uri().path();
+    let sensitive = path.starts_with("/api/v1/notifications")
+        || path.starts_with("/api/v1/auth/email")
+        || path.starts_with("/api/v1/auth/password");
+    let response = next.run(request).await;
+    if sensitive {
+        no_store(response)
+    } else {
+        response
+    }
 }
 
 #[utoipa::path(

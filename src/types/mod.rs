@@ -10,7 +10,7 @@ pub use ids::{
 
 pub use sequence::Seq;
 
-pub use crate::auth::model::{LoginInput, RegisterInput, SessionView};
+pub use crate::auth::model::{LoginInput, PasswordChangeInput, RegisterInput, SessionView};
 
 pub use crate::conversations::model::{
     ConversationEvent, ConversationEventKind, ConversationEventPayload, ConversationPreferences,
