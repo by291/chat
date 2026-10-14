@@ -28,7 +28,7 @@ argon2 = "0.5"
 rand = "0.8"
 sha2 = "0.10"
 hex = "0.4"
-redis = { version = "0.32", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "1.7", features = ["tokio-comp", "connection-manager"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "cookies"] }
 utoipa = { version = "5", features = ["axum_extras", "uuid", "time"] }
 clap = { version = "4", features = ["derive"] }
