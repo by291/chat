@@ -4,7 +4,7 @@
 
 Start with `AGENTS.md` for the conventions, then follow one complete operation:
 
-1. Sending a message: `conversations/http.rs` → `messages.rs` → `repository.rs`
+1. Sending a message: `conversations/http.rs` → `messages.rs` → `message_repository.rs`
    and `events.rs` → `realtime/outbox.rs` → `delivery.rs`.
 2. Rendering it: chat `api.ts` → `conversation-store.ts` → `sync.svelte.ts`
    → `MessageList.svelte`.
@@ -34,7 +34,12 @@ src/
     group_http.rs         private group REST adapters
     model.rs              conversation/message/event/pagination DTOs
     service.rs            direct conversation and summary workflows
-    messages.rs           send, snapshots and event replay
+    messages.rs           immutable send identity, author mutations and content projection
+    message_http.rs       message mutation/search/context REST adapters
+    message_queries.rs    repeatable history/search/context and authorized replay
+    message_repository.rs message rows, immutable retry metadata and discovery SQL
+    preferences.rs        actor preferences and private durable refresh hints
+    preferences_repository.rs preference persistence and targeted outbox SQL
     receipts.rs           monotonic read receipts and temporary typing
     events.rs             transaction-composed event/outbox append
     repository.rs         conversation/member/message/event SQL
@@ -96,6 +101,10 @@ web/src/
         models.ts               aliases to generated DTOs and application contracts
         cache.ts                query cache configuration and key ownership
         conversation-store.ts   summaries, snapshots, history, continuous replay
+        message-records.ts      revision fences and independently revised reply previews
+        history.svelte.ts       search/context ID windows and latest-history navigation
+        message-actions.svelte.ts reply selection, edit drafts and personal preferences
+        notifications.svelte.ts open-page alert policy and ephemeral browser capabilities
         activity.svelte.ts      temporary typing/presence and timer cleanup
         sync.svelte.ts          authenticated chat coordinator and UI state
         realtime.ts             Centrifugo SDK and publication validation
@@ -125,6 +134,29 @@ The query cache owns authoritative server records. The coordinator owns selectio
 drafts and optimistic sends. The conversation store owns per-conversation request
 generations and continuous event cursors. Peer activity owns expiring information.
 There is no second mutable copy of authoritative messages.
+
+Every message source uses the same `revision_seq` merge, including HTTP mutation
+acknowledgements, summaries, snapshots, search/context pages and durable replay.
+Reply previews carry the target's separate revision: editing or withdrawing a
+target refreshes cached quotes without changing the replying message's revision.
+Search and context state retain IDs into the canonical message cache rather than
+copies of records. Their requests are fenced by selection, session lifetime and
+membership episode. Context windows suppress read acknowledgements until an
+explicit return to the latest rendered timeline.
+
+Live message envelopes identify bounded notification candidates. Continuous replay
+must apply the exact candidate before announcing it; initial snapshots, replay
+backlog and reconnect reconciliation remain silent. Current-chat focus is separate
+from bottom-of-timeline visibility, so scrolling history neither triggers alerts
+nor acknowledges unseen latest messages. User gestures enable sound and system
+permission; system alerts contain no message bodies and open their conversation.
+The authenticated coordinator closes browser capabilities and clears alerts on
+logout. Its layout renders the in-app alert center on every authenticated route,
+including settings and group invitations. Startup/reconnect floors distinguish
+backlog from live candidates; metadata initialization retains unknown candidates
+and adopts their authorized membership before continuous replay. Personal
+preference hints invalidate/refetch summaries without advancing
+the conversation cursor. See [chat experience](operations/chat-experience.md).
 
 Media uploads keep files, transfer progress and abort controllers in the authenticated
 lifetime. Stable attachment metadata belongs to the query cache. New membership

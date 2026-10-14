@@ -94,10 +94,11 @@ cannot obtain fresh attachment download links.
 ### Phase three: experience improvements
 
 Replies, editing/deleting one's own messages for everyone, reactions; per-user synced
-pin/mute/archive preferences; conversation search, initially PostgreSQL `pg_trgm`
-substring matching for Chinese; PWA shell. No initial offline send queue or promise of
-notifications after the browser closes. These phases form the full initial roadmap,
-each with a separate implementation/acceptance plan.
+pin/mute/archive preferences; conversation search and a PWA shell. The implemented
+experience batch uses literal PostgreSQL substring matching for Chinese and open-page
+notifications; see [its design](2026-10-14-chat-experience.md). Reactions and the PWA
+shell remain future work. No initial offline send queue or promise of notifications
+after the browser closes. Each batch has its own implementation/acceptance plan.
 
 Later designs may cover channels/large groups, contacts, forwarding/saved messages,
 Web Push, audio/video, bot APIs, Tauri, native mobile, and E2EE. Evaluate LiveKit for

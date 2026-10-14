@@ -6,8 +6,9 @@ lives at the repository root; the SvelteKit frontend lives in `web/`.
 The application provides invitation-based registration, device sessions, exact
 username lookup, direct and private group conversations, durable messages,
 idempotent retries, reconnect replay, read receipts, typing/presence, images/files,
-profile avatars, a responsive Chinese UI, and themes. Editing/search and PWA support
-remain future work.
+profile avatars, message replies/edits/withdrawal, Chinese substring search,
+personal pin/mute/archive preferences, open-page notifications, a responsive Chinese
+UI, and themes. Reactions, PWA installation and Web Push remain future work.
 
 The locked stack uses Rust 1.99, Axum, SQLx, PostgreSQL 18, Svelte 5, SvelteKit 3,
 TypeScript, Tailwind CSS 4, TanStack Query, Bits UI, Centrifugo 6, Valkey 9,
@@ -23,6 +24,7 @@ Comments and documentation are English; product localization remains Chinese.
 - [Production deployment](docs/operations/deployment.md)
 - [Continuous integration](docs/operations/continuous-integration.md)
 - [Private groups and media](docs/operations/groups-and-media.md)
+- [Messages, search, preferences and notifications](docs/operations/chat-experience.md)
 - [Backup and recovery](docs/operations/backup-restore.md)
 - [Phase-one acceptance](docs/operations/phase-1-acceptance.md)
 - [Groups and media acceptance](docs/operations/phase-2-acceptance.md)
