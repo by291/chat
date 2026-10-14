@@ -4,8 +4,8 @@ mod ids;
 mod sequence;
 
 pub use ids::{
-    AttachmentId, ConversationId, EventId, MembershipId, MessageId, SessionId, UploadAttemptId,
-    UserId,
+    AttachmentId, ConversationId, EventId, MembershipId, MessageId, PushSubscriptionId, SessionId,
+    UploadAttemptId, UserId,
 };
 
 pub use sequence::Seq;

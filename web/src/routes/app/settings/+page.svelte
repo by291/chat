@@ -8,6 +8,8 @@
   import SessionsPanel from '#lib/features/settings/SessionsPanel.svelte';
   import PasswordForm from '#lib/features/settings/PasswordForm.svelte';
   import EmailForm from '#lib/features/settings/EmailForm.svelte';
+  import InstallHelp from '#lib/features/pwa/InstallHelp.svelte';
+  import BackgroundPushSettings from '#lib/features/notifications/BackgroundPushSettings.svelte';
   import { ArrowLeft } from '@lucide/svelte';
   import { theme, type Theme } from '#lib/features/settings/theme.svelte.ts';
   import { auth } from '#lib/features/auth/session.svelte.ts';
@@ -54,4 +56,6 @@
     </NativeSelect.Root>
   </Card.Root>
   <SessionsPanel />
+  <BackgroundPushSettings />
+  <InstallHelp />
 </main>

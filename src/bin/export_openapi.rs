@@ -20,6 +20,10 @@ use utoipa::OpenApi;
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        chat_server::notifications::http::config,
+        chat_server::notifications::http::register,
+        chat_server::notifications::http::remove,
+        chat_server::notifications::http::activity,
         chat_server::auth::http::register,
         chat_server::auth::http::login,
         chat_server::auth::http::logout,
@@ -69,6 +73,10 @@ use utoipa::OpenApi;
         chat_server::media::http::download
     ),
     components(schemas(
+        chat_server::notifications::model::PushConfigView,
+        chat_server::notifications::model::SubscriptionInput,
+        chat_server::notifications::model::SubscriptionBinding,
+        chat_server::notifications::model::ActivityInput,
         UserView,
         SessionView,
         RegisterInput,

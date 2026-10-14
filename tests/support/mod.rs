@@ -4,6 +4,7 @@ use sqlx::{PgPool, postgres::PgPoolOptions};
 
 pub mod mail;
 pub mod media;
+pub mod push;
 
 pub struct TestApp {
     pub base_url: String,

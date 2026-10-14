@@ -587,6 +587,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Return the authenticated background capability configuration without private signing material. */
+        get: operations["get_push_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bind an endpoint to the current actor's valid session after capability and cap checks. */
+        post: operations["register_push_subscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/subscriptions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke the owned current-session binding; foreign or other-device IDs return not-found. */
+        delete: operations["remove_push_subscription"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/subscriptions/{id}/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a bounded activity lease without changing a conversation or read receipt. */
+        post: operations["record_push_activity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions": {
         parameters: {
             query?: never;
@@ -713,6 +781,11 @@ export interface components {
     schemas: {
         AcceptGroupInvitationInput: {
             token: string;
+        };
+        ActivityInput: {
+            conversation_id?: null | components["schemas"]["ConversationId"];
+            focused: boolean;
+            visible: boolean;
         };
         ApiErrorBody: {
             code: string;
@@ -1013,6 +1086,12 @@ export interface components {
             new_password: string;
             token: string;
         };
+        PushConfigView: {
+            enabled: boolean;
+            vapid_public_key?: string | null;
+        };
+        /** Format: uuid */
+        PushSubscriptionId: string;
         ReadInput: {
             membership_id?: null | components["schemas"]["MembershipId"];
             message_seq: components["schemas"]["Seq"];
@@ -1055,6 +1134,16 @@ export interface components {
             expires_at: string;
             id: components["schemas"]["SessionId"];
             is_current: boolean;
+        };
+        SubscriptionBinding: {
+            /** Format: uuid */
+            generation: string;
+            id: components["schemas"]["PushSubscriptionId"];
+        };
+        SubscriptionInput: {
+            auth: string;
+            endpoint: string;
+            p256dh: string;
         };
         TransferOwnerInput: {
             membership_id: components["schemas"]["MembershipId"];
@@ -2358,6 +2447,98 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UploadGrant"];
                 };
+            };
+        };
+    };
+    get_push_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushConfigView"];
+                };
+            };
+        };
+    };
+    register_push_subscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SubscriptionInput"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionBinding"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    remove_push_subscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["PushSubscriptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    record_push_activity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["PushSubscriptionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivityInput"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

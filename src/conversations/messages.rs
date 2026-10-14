@@ -110,11 +110,19 @@ pub async fn send_message(
 
     enrich_message(&mut transaction, &mut message, member.joined_seq).await?;
 
-    events::append(
+    let envelope = events::append(
         &mut transaction,
         id,
         ConversationEventKind::MessageCreated,
         ConversationEventPayload::MessageCreated(message.clone()),
+    )
+    .await?;
+    crate::notifications::job_repository::enqueue_message_push(
+        &mut transaction,
+        actor.user_id,
+        id,
+        message.id,
+        &envelope,
     )
     .await?;
     transaction.commit().await?;

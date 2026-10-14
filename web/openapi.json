@@ -12,6 +12,31 @@
         ],
         "type": "object"
       },
+      "ActivityInput": {
+        "properties": {
+          "conversation_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ConversationId"
+              }
+            ]
+          },
+          "focused": {
+            "type": "boolean"
+          },
+          "visible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "visible",
+          "focused"
+        ],
+        "type": "object"
+      },
       "ApiErrorBody": {
         "properties": {
           "code": {
@@ -1281,6 +1306,27 @@
         ],
         "type": "object"
       },
+      "PushConfigView": {
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "vapid_public_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "type": "object"
+      },
+      "PushSubscriptionId": {
+        "format": "uuid",
+        "type": "string"
+      },
       "ReadInput": {
         "properties": {
           "membership_id": {
@@ -1462,6 +1508,41 @@
           "created_at",
           "expires_at",
           "is_current"
+        ],
+        "type": "object"
+      },
+      "SubscriptionBinding": {
+        "properties": {
+          "generation": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/PushSubscriptionId"
+          }
+        },
+        "required": [
+          "id",
+          "generation"
+        ],
+        "type": "object"
+      },
+      "SubscriptionInput": {
+        "properties": {
+          "auth": {
+            "type": "string"
+          },
+          "endpoint": {
+            "type": "string"
+          },
+          "p256dh": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint",
+          "p256dh",
+          "auth"
         ],
         "type": "object"
       },
@@ -3505,6 +3586,126 @@
         "summary": "Renew a grant with a new independently reserved staging attempt.",
         "tags": [
           "chat_server::media::http"
+        ]
+      }
+    },
+    "/api/v1/notifications/config": {
+      "get": {
+        "operationId": "get_push_config",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushConfigView"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Return the authenticated background capability configuration without private signing material.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/subscriptions": {
+      "post": {
+        "operationId": "register_push_subscription",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionBinding"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Bind an endpoint to the current actor's valid session after capability and cap checks.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/subscriptions/{id}": {
+      "delete": {
+        "operationId": "remove_push_subscription",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PushSubscriptionId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke the owned current-session binding; foreign or other-device IDs return not-found.",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/subscriptions/{id}/activity": {
+      "post": {
+        "operationId": "record_push_activity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/PushSubscriptionId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActivityInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Record a bounded activity lease without changing a conversation or read receipt.",
+        "tags": [
+          "notifications"
         ]
       }
     },

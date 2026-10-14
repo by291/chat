@@ -34,6 +34,7 @@ test('frontend checks run without Rust, Docker, pg or infrastructure initializat
     for (const name of [
       '@sveltejs/kit',
       'svelte-check',
+      'typescript',
       'prettier',
       'vitest',
       'vite',
@@ -58,6 +59,7 @@ test('frontend checks run without Rust, Docker, pg or infrastructure initializat
     );
 
     expect(stdout).toContain('Checking Svelte types');
+    expect(stdout).toContain('Checking Service worker types');
     expect(stdout).toContain('Checking Static build');
     expect(stdout).not.toContain('Checking Rust');
     await expect(access(path.join(directory, '.local'))).rejects.toThrow();

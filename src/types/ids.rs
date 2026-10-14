@@ -51,3 +51,4 @@ id_type!(EventId);
 id_type!(MembershipId);
 id_type!(AttachmentId);
 id_type!(UploadAttemptId);
+id_type!(PushSubscriptionId);

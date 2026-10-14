@@ -1,12 +1,21 @@
 /** Fixture-owned native processes, database and bucket; middleware is shared separately. */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { openSync, closeSync } from 'node:fs';
-import { writeFile, copyFile, rm, mkdtemp } from 'node:fs/promises';
+import {
+  writeFile,
+  copyFile,
+  rm,
+  mkdtemp,
+  mkdir,
+  symlink,
+  readlink,
+} from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import pg from 'pg';
 import type { SmtpFixtureEnvironment } from './mail-support';
+import type { PushFixtureEnvironment } from './push-support';
 
 import {
   repositoryRoot,
@@ -177,7 +186,12 @@ export class TestRuntime {
     this.ownsData = ownsData;
   }
 
-  static async start(options: { mail?: SmtpFixtureEnvironment } = {}) {
+  static async start(
+    options: {
+      mail?: SmtpFixtureEnvironment;
+      push?: PushFixtureEnvironment;
+    } = {},
+  ) {
     const borrowed = process.env.CHAT_TEST_INFRASTRUCTURE_ENV;
     const infrastructure = borrowed
       ? undefined
@@ -200,6 +214,7 @@ export class TestRuntime {
         DATABASE_URL: databaseUrl.toString(),
         MEDIA_S3_BUCKET: `chat-e2e-${identity}`,
         ...options.mail,
+        ...options.push,
       });
       runtime.infrastructureCleanup = infrastructure?.cleanup;
 
@@ -220,7 +235,8 @@ export class TestRuntime {
       runtime.databaseCreated = true;
 
       const buildArguments = ['build', '--bins'];
-      if (options.mail) buildArguments.push('--features', 'test-failpoints');
+      if (options.mail || options.push)
+        buildArguments.push('--features', 'test-failpoints');
       await runCommand('cargo', buildArguments, {
         logFile: path.join(directory, 'build.log'),
       });
@@ -285,7 +301,8 @@ export class TestRuntime {
         'worker',
         ...(pauseAfterPublish ||
         this.env.CHAT_TEST_SMTP_CAPTURE === 'true' ||
-        this.env.CHAT_TEST_SMTP_CA_FILE
+        this.env.CHAT_TEST_SMTP_CA_FILE ||
+        this.env.CHAT_TEST_PUSH_ADDRESS
           ? ['--features', 'test-failpoints']
           : []),
       ],
@@ -303,26 +320,79 @@ export class TestRuntime {
     );
   }
 
-  async startWeb() {
+  /** Production previews build inside this fixture; development remains the default. */
+  async startWeb(options: { mode?: 'dev' | 'preview'; version?: string } = {}) {
+    if (this.webProcess && !this.webProcess.done)
+      throw new Error('Stop the owned web server before replacing it');
+    const preview = options.mode === 'preview';
+    const version = options.version ?? 'one';
+    if (!/^[\w-]{1,32}$/.test(version))
+      throw new Error('Invalid fixture build version');
+    const previewDirectory = path.join(
+      this.directory,
+      `web-preview-${version}`,
+    );
+    const env = {
+      ...this.env,
+      CHAT_API_PROXY: this.apiUrl,
+      CHAT_CENTRIFUGO_PROXY: this.env.CENTRIFUGO_API_URL.replace('/api', ''),
+      CHAT_MEDIA_ORIGIN: new URL(this.env.MEDIA_S3_PUBLIC_ENDPOINT).origin,
+      ...(preview
+        ? {
+            CHAT_TEST_WEB_BUILD_DIR: previewDirectory,
+          }
+        : {}),
+    };
+    const vite = path.join(repositoryRoot, 'web/node_modules/vite/bin/vite.js');
+    if (preview) {
+      // SvelteKit executes production server output during prerendering. Output
+      // outside web/ still needs the pinned packages; the owned link copies no dependencies.
+      await mkdir(previewDirectory, { recursive: true });
+      const modules = path.join(repositoryRoot, 'web/node_modules');
+      const dependencyLink = path.join(previewDirectory, 'node_modules');
+      try {
+        await symlink(
+          modules,
+          dependencyLink,
+          process.platform === 'win32' ? 'junction' : 'dir',
+        );
+      } catch (error) {
+        if (
+          (error as NodeJS.ErrnoException).code !== 'EEXIST' ||
+          path.resolve(await readlink(dependencyLink)) !== modules
+        )
+          throw error;
+      }
+      await runCommand(process.execPath, [vite, 'build'], {
+        cwd: path.join(repositoryRoot, 'web'),
+        env,
+        logFile: path.join(this.directory, `web-build-${version}.log`),
+      });
+    }
     this.webProcess = launch(
       process.execPath,
       [
-        path.join(repositoryRoot, 'web/node_modules/vite/bin/vite.js'),
+        vite,
+        ...(preview ? ['preview'] : []),
         '--host',
         'localhost',
         '--port',
         '5174',
         '--strictPort',
       ],
-      {
-        ...this.env,
-        CHAT_API_PROXY: this.apiUrl,
-        CHAT_CENTRIFUGO_PROXY: this.env.CENTRIFUGO_API_URL.replace('/api', ''),
-      },
+      env,
       path.join(this.directory, 'web.log'),
       path.join(repositoryRoot, 'web'),
     );
     await ready(this.origin, this.webProcess);
+  }
+
+  /** Stop only this fixture's preview before serving another actual build version. */
+  async stopWeb() {
+    if (!this.webProcess) return;
+    if (!this.webProcess.done) this.webProcess.child.kill('SIGTERM');
+    await waitForExit(this.webProcess);
+    this.webProcess = undefined;
   }
 
   /** Deliberate SIGKILL models publish-before-ack crashes on both Windows and Unix. */

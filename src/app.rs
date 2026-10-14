@@ -23,11 +23,15 @@ pub struct AppState {
     pub object_storage: Option<crate::infrastructure::object_storage::ObjectStorage>,
     pub media_processors: Arc<tokio::sync::Semaphore>,
     pub mail: Option<crate::infrastructure::mail::MailDelivery>,
+    pub push: Option<crate::infrastructure::web_push::WebPushDelivery>,
 }
 
 impl AppState {
     /// Construct shared adapters and the dummy hash used to equalize login failures.
     pub async fn new(config: Config, pool: PgPool) -> Result<Self, AppError> {
+        if let Some(push) = &config.web_push {
+            push.validate()?;
+        }
         crate::infrastructure::observability::init();
         let passwords = PasswordService::default();
         let dummy_password_hash = Arc::new(passwords.hash("dummy password for timing").await?);
@@ -42,6 +46,11 @@ impl AppState {
             .as_ref()
             .map(crate::infrastructure::mail::MailDelivery::new)
             .transpose()?;
+        let push = config
+            .web_push
+            .as_ref()
+            .map(crate::infrastructure::web_push::WebPushDelivery::new)
+            .transpose()?;
         Ok(Self {
             pool,
             config: Arc::new(config),
@@ -52,6 +61,7 @@ impl AppState {
             object_storage,
             media_processors: Arc::new(tokio::sync::Semaphore::new(2)),
             mail,
+            push,
         })
     }
 }
@@ -62,6 +72,22 @@ pub fn build_router(state: AppState) -> Router {
     use crate::conversations::message_http as messages;
     use crate::media::http as media;
     let api = Router::new()
+        .route(
+            "/notifications/config",
+            get(crate::notifications::http::config),
+        )
+        .route(
+            "/notifications/subscriptions",
+            axum::routing::post(crate::notifications::http::register),
+        )
+        .route(
+            "/notifications/subscriptions/{id}",
+            axum::routing::delete(crate::notifications::http::remove),
+        )
+        .route(
+            "/notifications/subscriptions/{id}/activity",
+            axum::routing::post(crate::notifications::http::activity),
+        )
         .route("/auth/register", axum::routing::post(http::register))
         .route("/auth/login", axum::routing::post(http::login))
         .route("/auth/logout", axum::routing::post(http::logout))

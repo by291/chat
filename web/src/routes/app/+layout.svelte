@@ -15,9 +15,14 @@
   import { createRealtimeTransport } from '#lib/features/chat/realtime.ts';
   import { provideChat } from '#lib/features/chat/context.svelte.ts';
   import NotificationCenter from '#lib/features/chat/NotificationCenter.svelte';
+  import UpdateNotice from '#lib/features/pwa/UpdateNotice.svelte';
+  import { provideBackgroundPush } from '#lib/features/notifications/context.svelte.ts';
+  import { PushSubscriptions } from '#lib/features/notifications/subscriptions.svelte.ts';
+  import { createNotificationApi } from '#lib/features/notifications/api.ts';
 
   const queryClient = createQueryClient();
   const chat = provideChat();
+  const backgroundPush = provideBackgroundPush();
 
   let {
     children,
@@ -55,11 +60,45 @@
   $effect(() => {
     if (!auth.pending && !auth.user) {
       const pendingJoin =
-        page.url.pathname === '/app/groups/join'
+        page.url.pathname === '/app/groups/join' ||
+        /^\/app\/chats\/[0-9a-f-]{36}$/.test(page.url.pathname)
           ? `?next=${encodeURIComponent(page.url.pathname + page.url.search)}`
           : '';
       void goto(`/login${pendingJoin}`);
     }
+  });
+
+  $effect(() => {
+    const userId = authenticatedId;
+    if (!userId) return;
+    const owner = new PushSubscriptions(createNotificationApi());
+    backgroundPush.owner = owner;
+    const removeReset = auth.onReset(() => void owner.stop());
+    // Optional capability startup reads UI flags; identity alone owns this lifetime.
+    untrack(() => void owner.start());
+    return () => {
+      removeReset();
+      // Leaving /app can preserve authentication (for example /login redirects).
+      // Only identity replacement/reset revokes the shared browser capability.
+      if (auth.user?.id !== userId) void owner.stop();
+      else owner.dispose();
+      backgroundPush.owner = null;
+    };
+  });
+
+  $effect(() => {
+    const owner = backgroundPush.owner;
+    const conversation = page.url.pathname.startsWith('/app/chats/')
+      ? (chat.sync?.selectedId ?? null)
+      : null;
+    if (!owner) return;
+    untrack(() =>
+      owner.setActivity({
+        visible: document.visibilityState === 'visible',
+        focused: document.hasFocus(),
+        conversation_id: conversation,
+      }),
+    );
   });
 
   $effect(() => {
@@ -85,6 +124,7 @@
 
   async function logout() {
     try {
+      await backgroundPush.owner?.disable();
       await auth.logout();
       await goto('/login');
     } catch (reason) {
@@ -135,6 +175,17 @@
       {#if chat.sync}
         <NotificationCenter sync={chat.sync} />
       {/if}
+      <UpdateNotice
+        hasDraft={Object.values(chat.sync?.drafts ?? {}).some(
+          (text) => !!text,
+        ) || !!chat.sync?.actions.editingId}
+        hasUpload={!!chat.sync?.uploads.entries.length}
+        hasSubmission={chat.sync?.pending.some(
+          (message) => message.status === 'sending',
+        ) ||
+          chat.sync?.actions.busy ||
+          false}
+      />
     </div>
   </QueryClientProvider>
 {:else}

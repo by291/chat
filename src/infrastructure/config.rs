@@ -3,6 +3,7 @@
 use crate::error::AppError;
 
 use super::mail::MailConfig;
+use super::web_push::WebPushConfig;
 
 #[derive(Clone)]
 pub struct Config {
@@ -21,6 +22,7 @@ pub struct Config {
     pub media_storage: Option<MediaStorageConfig>,
     pub media_user_quota_bytes: u64,
     pub mail: Option<MailConfig>,
+    pub web_push: Option<WebPushConfig>,
 }
 
 /// Explicit storage configuration; Debug is deliberately absent because it owns secrets.
@@ -121,6 +123,7 @@ impl Config {
                 .filter(|bytes| *bytes > 0 && *bytes <= i64::MAX as u64)
                 .ok_or_else(|| AppError::invalid("媒体存储配额配置无效"))?,
             mail: MailConfig::from_env()?,
+            web_push: WebPushConfig::from_env()?,
         })
     }
 

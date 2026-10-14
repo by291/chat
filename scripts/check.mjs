@@ -100,6 +100,16 @@ const steps = [
   ],
   [
     "frontend",
+    "Service worker types",
+    () =>
+      tool("typescript", "tsc", [
+        "--noEmit",
+        "--project",
+        "src/service-worker/tsconfig.json",
+      ]),
+  ],
+  [
+    "frontend",
     "Formatting",
     () =>
       tool("prettier", "prettier", [
