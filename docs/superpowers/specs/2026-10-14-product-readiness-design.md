@@ -2,8 +2,10 @@
 
 **Status:** Written designs approved by the user on 2026-10-14. The user confirmed the
 [roadmap](../plans/2026-10-14-product-readiness-roadmap.md), selected verified email
-recovery and deferred iPhone/iPad real-device push acceptance. Product implementation
-has not started; these documents settle the new interfaces and consistency rules.
+recovery and deferred iPhone/iPad real-device push acceptance. Local implementation
+and integrated verification completed on 2026-10-15; see the
+[acceptance record](../../operations/product-readiness-acceptance.md) for the tested
+implementation revision and separately pending external checks.
 
 ## Intended result
 
@@ -63,5 +65,6 @@ acceptance checks remain separately listed until executed.
 - Reaction acknowledgements/replay must never resurrect stale counts or withdrawn
   content, leak actor-specific flags, or advance unread/read state as a new message.
 
-Next, produce focused implementation plans with exact tasks,
-file/interface mappings and verification commands, then select the execution method.
+The focused implementation plans now record completed local tasks. Execution stayed
+in the user's current checkout; grouped local commits were later authorized. Hosted CI,
+HTTPS staging and real mailbox/provider/OS observations remain separately pending.

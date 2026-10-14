@@ -1,7 +1,9 @@
 # Account security and email recovery design
 
-**Status:** Written design approved by the user on 2026-10-14. The roadmap and email
-recovery choice are confirmed; this document settles contracts before implementation.
+**Status:** Design approved on 2026-10-14; local implementation and integrated
+verification completed on 2026-10-15. See the
+[acceptance record](../../operations/product-readiness-acceptance.md).
+Staging mailbox arrival and hosted acceptance remain pending.
 
 **Goal:** Let existing username accounts change their password, verify a recovery
 email and reset a forgotten password without losing transaction/session guarantees.
@@ -15,7 +17,8 @@ become a login identifier. Recovery codes and a web administrator console are ou
 this batch.
 
 Authentication owns the policy in `src/auth/security.rs`, DTOs in `auth/model.rs`
-and SQL/locking in `auth/security_repository.rs`. Existing `auth/http.rs` remains a
+and SQL/locking in `auth/security_repository.rs`. Anonymous recovery and atomic
+token reset belong to the cohesive `auth/recovery.rs` workflow. Existing `auth/http.rs` remains a
 transport adapter. Durable mail uses cohesive `auth/mail_worker.rs` and
 `auth/mail_repository.rs`; SMTP and encrypted mail payloads belong to
 `infrastructure/mail.rs`. The existing worker composes an independent mail loop.
@@ -31,14 +34,14 @@ remain browser-only and do not require entering the chat tree.
 All paths below are under `/api/v1`. Errors retain `ApiErrorBody`, Origin protection
 and request correlation. Rust generates the OpenAPI/TypeScript contract.
 
-| Operation | Input | Result |
-| --- | --- | --- |
-| `POST /auth/password` | `PasswordChangeInput { current_password, new_password }` | `204`, clear current cookie after atomic revocation |
-| `GET /auth/email` | Authenticated actor | `EmailStatus { enabled, verified_email, pending_email, verification_expires_at }` |
-| `POST /auth/email` | `EmailEnrollmentInput { email, current_password }` | `202`, verification intent committed |
-| `POST /auth/email/verify` | Authenticated actor and `EmailVerificationInput { token }` | `200 EmailStatus` |
-| `POST /auth/password-recovery` | `PasswordRecoveryInput { email }` | `202` with an empty body for known/unknown/unverified addresses |
-| `POST /auth/password-reset` | `PasswordResetInput { token, new_password }` | `204`, no automatic login |
+| Operation                      | Input                                                      | Result                                                                            |
+| ------------------------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `POST /auth/password`          | `PasswordChangeInput { current_password, new_password }`   | `204`, atomic revocation without overwriting a newer browser cookie               |
+| `GET /auth/email`              | Authenticated actor                                        | `EmailStatus { enabled, verified_email, pending_email, verification_expires_at }` |
+| `POST /auth/email`             | `EmailEnrollmentInput { email, current_password }`         | `202`, verification intent committed                                              |
+| `POST /auth/email/verify`      | Authenticated actor and `EmailVerificationInput { token }` | `200 EmailStatus`                                                                 |
+| `POST /auth/password/recovery` | `PasswordRecoveryInput { email }`                          | `202` with an empty body for known/unknown/unverified addresses                   |
+| `POST /auth/password/reset`    | `PasswordResetInput { token, new_password }`               | `204`, no automatic login                                                         |
 
 Status emails/timestamps are nullable; timestamps use existing RFC3339 representation.
 Only the owner receives email status; peer/profile DTOs acquire no email fields.
@@ -95,7 +98,9 @@ transactions commit only in application operations; repositories never commit.
 
 The credential update, version increment, challenge invalidation, revocation of all
 existing sessions and existing realtime disconnect jobs commit together. Any failure
-rolls back the whole change. The HTTP adapter then clears the current cookie; the
+rolls back the whole change. The HTTP adapter does not emit a deletion cookie:
+a delayed response must not erase a newer login in the shared browser cookie jar.
+The old cookie remains inert because its session is revoked; a later login replaces it. The
 session owner resets cache/socket/upload/notification lifetimes and navigates to login.
 Other devices follow the existing immediate REST rejection and disconnect/refresh
 fallback, without inventing a zero-latency distributed revocation guarantee.

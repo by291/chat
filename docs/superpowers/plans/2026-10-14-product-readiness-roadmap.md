@@ -1,8 +1,10 @@
 # Product readiness roadmap
 
-**Status:** Roadmap confirmed by the user. Implementation has not started. The user
-selected verified email and email-based password recovery, and deferred iPhone/iPad
-real-device push acceptance because suitable devices are currently unavailable.
+**Status:** Roadmap confirmed; local implementation and integrated verification
+completed on 2026-10-15. See the
+[acceptance record](../../operations/product-readiness-acceptance.md) for the tested
+implementation revision. Hosted CI, HTTPS staging and real mailbox/provider/OS acceptance
+remain pending. iPhone/iPad acceptance remains explicitly deferred by the user.
 
 **Goal:** Complete background notifications, account self-service, release verification,
 and documentation consistency for the existing self-hosted small-team application.
@@ -57,15 +59,15 @@ does not establish hosted CI or staging acceptance for a new revision.
 
 ## Delivery sequence
 
-| Milestone | Assessment item | Deliverable | Dependency | Effort |
-| --- | --- | --- | --- | --- |
-| A | 3 and 5 | Consistent baseline docs, current-revision CI and HTTPS staging baseline | Operator access and a disposable staging target for external verification | Small code scope; external setup can dominate |
-| B | 2 | Self-service password change | Existing authentication/session revocation | Medium |
-| C | 2 | Verified email, durable mail and email-based recovery | B's credential/session workflow; operator SMTP configuration | Large; split enrollment/mail and recovery into two deliverables |
-| D | 1 | Installable PWA with safe asset/update behavior | Static build and HTTPS routing | Medium |
-| E | 1 | Durable background push and device controls | B/C revocation lifecycle, D service worker, HTTPS target | Large |
-| F | 1 | Message reactions with replay and multi-device convergence | Existing message revision/event model | Medium |
-| G | 3 and 5 | Current-revision CI/staging evidence and final operator/user documentation | B through F | Medium plus real-device verification |
+| Milestone | Assessment item | Deliverable                                                                | Dependency                                                                | Effort                                                          |
+| --------- | --------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| A         | 3 and 5         | Consistent baseline docs, current-revision CI and HTTPS staging baseline   | Operator access and a disposable staging target for external verification | Small code scope; external setup can dominate                   |
+| B         | 2               | Self-service password change                                               | Existing authentication/session revocation                                | Medium                                                          |
+| C         | 2               | Verified email, durable mail and email-based recovery                      | B's credential/session workflow; operator SMTP configuration              | Large; split enrollment/mail and recovery into two deliverables |
+| D         | 1               | Installable PWA with safe asset/update behavior                            | Static build and HTTPS routing                                            | Medium                                                          |
+| E         | 1               | Durable background push and device controls                                | B/C revocation lifecycle, D service worker, HTTPS target                  | Large                                                           |
+| F         | 1               | Message reactions with replay and multi-device convergence                 | Existing message revision/event model                                     | Medium                                                          |
+| G         | 3 and 5         | Current-revision CI/staging evidence and final operator/user documentation | B through F                                                               | Medium plus real-device verification                            |
 
 A establishes a baseline; G repeats release verification for the final changed
 revision. A pending staging address does not prevent local B through F development,
@@ -78,19 +80,19 @@ Documentation is updated with every milestone, rather than deferred to G.
 `tests/infrastructure.mts`, `web/e2e/deployment.spec.ts`,
 `docs/operations/{continuous-integration,deployment,groups-and-media}.md`, and `README.md`.
 
-- [ ] Reconcile current operating guides: remove the obsolete production Compose/setup
-  instructions in `groups-and-media.md`, and its claim that editing/search are future work.
-  Keep historical acceptance records clearly labeled as historical evidence.
-- [ ] Check that all three CI jobs retain isolated infrastructure, bounded diagnostics,
-  safe artifact selection and owned-resource cleanup. Do not weaken failing tests.
-- [ ] Prepare the exact candidate revision and local evidence. After an explicitly
-  requested push/PR, require Backend, Frontend, and Contracts and integration to pass
-  for that same SHA; do not substitute an older successful run.
+- [x] Reconcile current operating guides: remove the obsolete production Compose/setup
+      instructions in `groups-and-media.md`, and its claim that editing/search are future work.
+      Keep historical acceptance records clearly labeled as historical evidence.
+- [x] Check that all three CI jobs retain isolated infrastructure, bounded diagnostics,
+      safe artifact selection and owned-resource cleanup. Do not weaken failing tests.
+- [x] Record the candidate base and tested runtime source identity with local evidence.
+- [ ] After an explicitly requested push/PR, require Backend, Frontend, and Contracts
+      and integration to pass for that same SHA; do not substitute an older successful run.
 - [ ] Configure a disposable HTTPS staging application and a separate media origin
-  using the existing deployment guide. Supply fresh invitations through protected
-  environment configuration, without putting secrets in this plan or logs.
+      using the existing deployment guide. Supply fresh invitations through protected
+      environment configuration, without putting secrets in this plan or logs.
 - [ ] Run `pnpm -C web test:deployment` against that target and record the tested SHA,
-  build media origin, command, result and browser. The command does not provision services.
+      build media origin, command, result and browser. The command does not provision services.
 
 **Acceptance:** Current-version CI evidence is linked; HTTPS deep links, cookies,
 WebSocket routing, private endpoints, signed upload/download and CORS pass. Missing
@@ -110,17 +112,17 @@ After success, the current browser clears its authenticated lifetime and returns
 to login. Explain that all devices will need to sign in again before submission.
 Preserve the existing 6–128 Unicode-scalar password policy.
 
-- [ ] Design the additive `POST /api/v1/auth/password` request with
-  `current_password` and `new_password`; keep raw credentials out of public results.
-- [ ] Reuse bounded password work and the existing user/session lock discipline.
-  Revalidate the credential version and active session at the mutation boundary so
-  a concurrent reset cannot allow an old credential to change a newer password.
-- [ ] Keep password update, session revocation and durable disconnect jobs in one
-  transaction. A database/outbox failure must leave the old credential intact.
-- [ ] Add a settings form through the feature adapter and session owner. Retain
-  shadcn controls, password-manager semantics, labels and Chinese copy.
-- [ ] Cover incorrect credentials, Unicode bounds, concurrent login/reset,
-  transaction rollback, repeated form submission, and other-device REST/socket rejection.
+- [x] Design the additive `POST /api/v1/auth/password` request with
+      `current_password` and `new_password`; keep raw credentials out of public results.
+- [x] Reuse bounded password work and the existing user/session lock discipline.
+      Revalidate the credential version and active session at the mutation boundary so
+      a concurrent reset cannot allow an old credential to change a newer password.
+- [x] Keep password update, session revocation and durable disconnect jobs in one
+      transaction. A database/outbox failure must leave the old credential intact.
+- [x] Add a settings form through the feature adapter and session owner. Retain
+      shadcn controls, password-manager semantics, labels and Chinese copy.
+- [x] Cover incorrect credentials, Unicode bounds, concurrent login/reset,
+      transaction rollback, repeated form submission, and other-device REST/socket rejection.
 
 **Acceptance:** A real two-device browser test shows the old password failing,
 the new password working, and both prior sessions becoming unusable through the
@@ -148,36 +150,36 @@ verified address remains active until confirmation succeeds, then receives a cha
 notice. Replacing an address invalidates outstanding recovery challenges. Email does
 not become a second login identifier in this release.
 
-- [ ] Add immutable persistence for verified address, pending verification challenges,
-  credential/address generations and leased mail jobs. Enforce uniqueness of the
-  canonical verified address in the database; pending requests do not reserve it forever.
-- [ ] Parse addresses with a maintained library. Trim outer whitespace, lowercase the
-  domain, preserve the local part and delivery spelling, and avoid provider-specific
-  dot/plus rewriting. Apply the same documented comparison policy to enrollment,
-  uniqueness, change and recovery.
-- [ ] Issue 256-bit random, purpose-bound, single-use verification tokens with a
-  30-minute lifetime. Store token digests in challenge rows; confirmation rechecks
-  the initiating account, address generation, credential generation and current session.
-- [ ] Configure the existing worker with an independent SMTP delivery loop and a
-  reviewed pinned `lettre` Tokio/rustls adapter. Challenge and mail intent commit
-  together; network calls do not run inside the transaction or the realtime delivery lane.
-- [ ] Protect replayable mail payloads with authenticated encryption using a protected
-  mail-queue key: the worker needs the link token, although challenge rows retain only
-  its digest. Remove encrypted payload material after completion/expiry and document
-  key backup/rotation so queued work survives a controlled restart.
-- [ ] Use required STARTTLS or implicit TLS for production, bounded connection/send
-  deadlines, capped retries and challenge-expiry checks. SMTP acceptance is distinct
-  from arrival in a mailbox; report delivery failures without exposing tokens or credentials.
-- [ ] Keep missing mail configuration and provider outages from disabling existing
-  username authentication/text chat. Disable unavailable email controls with actionable
-  operator guidance; retain queued work/retry when a configured provider is temporarily down.
-- [ ] Construct links from a configured public application origin, never a request
-  Host header. Carry the token in the URL fragment, exchange it only in a POST body,
-  and use no-store/no-referrer behavior. Link visits and mail scanners do not consume tokens.
-- [ ] Add a settings email panel with pending/verified state, resend and change actions.
-  Define current-password verification, an explicit confirmation action and Chinese guidance.
-- [ ] Cover competing email claims, stale pending changes, address spelling/comparison,
-  mail timeouts/restart/retry, challenge rollback, token secrecy and scanner-style GETs.
+- [x] Add immutable persistence for verified address, pending verification challenges,
+      credential/address generations and leased mail jobs. Enforce uniqueness of the
+      canonical verified address in the database; pending requests do not reserve it forever.
+- [x] Parse addresses with a maintained library. Trim outer whitespace, lowercase the
+      domain, preserve the local part and delivery spelling, and avoid provider-specific
+      dot/plus rewriting. Apply the same documented comparison policy to enrollment,
+      uniqueness, change and recovery.
+- [x] Issue 256-bit random, purpose-bound, single-use verification tokens with a
+      30-minute lifetime. Store token digests in challenge rows; confirmation rechecks
+      the initiating account, address generation, credential generation and current session.
+- [x] Configure the existing worker with an independent SMTP delivery loop and a
+      reviewed pinned `lettre` Tokio/rustls adapter. Challenge and mail intent commit
+      together; network calls do not run inside the transaction or the realtime delivery lane.
+- [x] Protect replayable mail payloads with authenticated encryption using a protected
+      mail-queue key: the worker needs the link token, although challenge rows retain only
+      its digest. Remove encrypted payload material after completion/expiry and document
+      key backup/rotation so queued work survives a controlled restart.
+- [x] Use required STARTTLS or implicit TLS for production, bounded connection/send
+      deadlines, capped retries and challenge-expiry checks. SMTP acceptance is distinct
+      from arrival in a mailbox; report delivery failures without exposing tokens or credentials.
+- [x] Keep missing mail configuration and provider outages from disabling existing
+      username authentication/text chat. Disable unavailable email controls with actionable
+      operator guidance; retain queued work/retry when a configured provider is temporarily down.
+- [x] Construct links from a configured public application origin, never a request
+      Host header. Carry the token in the URL fragment, exchange it only in a POST body,
+      and use no-store/no-referrer behavior. Link visits and mail scanners do not consume tokens.
+- [x] Add a settings email panel with pending/verified state, resend and change actions.
+      Define current-password verification, an explicit confirmation action and Chinese guidance.
+- [x] Cover competing email claims, stale pending changes, address spelling/comparison,
+      mail timeouts/restart/retry, challenge rollback, token secrecy and scanner-style GETs.
 
 **Acceptance:** An owned SMTP fixture captures a real verification message; following
 its link and confirming promotes only the intended account's address. An expired,
@@ -193,24 +195,24 @@ addresses receive the same public acknowledgement. A 256-bit random reset token 
 updates the credential, invalidates all other pending security challenges, revokes all
 existing sessions and persists disconnect jobs. The user then signs in normally.
 
-- [ ] Add rate-limited request/complete operations to the auth feature adapter and
-  generated API. Use comparable request behavior for existing/nonexisting addresses;
-  never lock an account because someone requested recovery.
-- [ ] Tie reset challenges to the verified address and credential generations.
-  Resending must not let an anonymous caller invalidate a still-usable link; bound
-  issuance and queue growth without blocking normal authentication.
-- [ ] Prepare bounded password work, then lock/revalidate the user and challenge in
-  the existing user-first order. Invalid passwords and failed commits do not consume
-  the token or partially revoke devices.
-- [ ] Integrate challenge invalidation with milestone B, successful email changes
-  and CLI password reset. Links issued before a credential/address change cannot
-  reverse that change afterward.
-- [ ] Add forgot/reset pages and a login entry point. Opening a link displays a form;
-  only an explicit valid submission changes the password. Keep credentials/tokens
-  out of persistent browser storage and notification content.
-- [ ] Cover concurrent token use, expiry, older email ownership, reset/change races,
-  transaction rollback, lost successful responses, enumeration behavior and old-device
-  REST/socket rejection. Reuse C1's durable mail and provider-failure tests.
+- [x] Add rate-limited request/complete operations to the auth feature adapter and
+      generated API. Use comparable request behavior for existing/nonexisting addresses;
+      never lock an account because someone requested recovery.
+- [x] Tie reset challenges to the verified address and credential generations.
+      Resending must not let an anonymous caller invalidate a still-usable link; bound
+      issuance and queue growth without blocking normal authentication.
+- [x] Prepare bounded password work, then lock/revalidate the user and challenge in
+      the existing user-first order. Invalid passwords and failed commits do not consume
+      the token or partially revoke devices.
+- [x] Integrate challenge invalidation with milestone B, successful email changes
+      and CLI password reset. Links issued before a credential/address change cannot
+      reverse that change afterward.
+- [x] Add forgot/reset pages and a login entry point. Opening a link displays a form;
+      only an explicit valid submission changes the password. Keep credentials/tokens
+      out of persistent browser storage and notification content.
+- [x] Cover concurrent token use, expiry, older email ownership, reset/change races,
+      transaction rollback, lost successful responses, enumeration behavior and old-device
+      REST/socket rejection. Reuse C1's durable mail and provider-failure tests.
 
 **Acceptance:** Two competing submissions cannot both use one reset token. A completed
 reset makes old passwords, sessions and outstanding links unusable. The new password
@@ -224,20 +226,20 @@ works through normal login. The real mail/browser path passes on the staging bui
 Use SvelteKit 3's current `$app/service-worker`, `$app/env` and `$app/manifest`
 interfaces rather than copying legacy configuration.
 
-- [ ] Define stable application identity, start URL, scope, standalone display,
-  theme/background colors, standard icons, maskable icons and Apple touch icon.
-- [ ] Cache only an explicit allowlist of immutable build assets, public icons and
-  a generic offline page. API, media, WebSocket and mutation requests bypass this cache.
-- [ ] Keep service-worker asset network calls in shared transport under `api-client`;
-  preserve the frontend HTTP boundary instead of exempting all worker fetch calls.
-- [ ] Add `pnpm -C web exec tsc --project src/service-worker/tsconfig.json --noEmit`
-  to the frontend check scope so the separately typed worker cannot bypass type checks.
-- [ ] Keep navigation online-first; an offline fallback explains the unavailable
-  connection without displaying a previous account's message history.
-- [ ] Present an update notice that waits for an explicit user action. Avoid forced
-  activation/reload while a composer draft, upload or submission is in progress.
-- [ ] Test manifest routes, service-worker registration, asset allowlisting, old-cache
-  cleanup, deployment update behavior and account switching with existing caches.
+- [x] Define stable application identity, start URL, scope, standalone display,
+      theme/background colors, standard icons, maskable icons and Apple touch icon.
+- [x] Cache only an explicit allowlist of immutable build assets, public icons and
+      a generic offline page. API, media, WebSocket and mutation requests bypass this cache.
+- [x] Keep service-worker asset network calls in shared transport under `api-client`;
+      preserve the frontend HTTP boundary instead of exempting all worker fetch calls.
+- [x] Add `pnpm -C web exec tsc --project src/service-worker/tsconfig.json --noEmit`
+      to the frontend check scope so the separately typed worker cannot bypass type checks.
+- [x] Keep navigation online-first; an offline fallback explains the unavailable
+      connection without displaying a previous account's message history.
+- [x] Present an update notice that waits for an explicit user action. Avoid forced
+      activation/reload while a composer draft, upload or submission is in progress.
+- [x] Test manifest routes, service-worker registration, asset allowlisting, old-cache
+      cleanup, deployment update behavior and account switching with existing caches.
 
 **Acceptance:** The application installs and reopens in supported desktop/mobile
 environments. A deployment update preserves ongoing work until the user chooses
@@ -256,34 +258,34 @@ verify its Windows/Linux and Tokio compatibility before adopting it. Do not hand
 the cryptography or require a separate notification platform as an initial dependency.
 Browser-vendor push services remain external delivery dependencies.
 
-- [ ] Add authenticated subscription registration/removal and device controls.
-  Bind subscriptions to the actual session/user; handle endpoint replacement,
-  account switching, logout, password changes and expired/revoked sessions.
-- [ ] Validate submitted endpoints/keys, limit registrations and reject internal
-  destinations or unsafe redirects. Treat endpoints and auth keys as private capabilities.
-- [ ] Insert push intent in the committed message transaction, then deliver through
-  a separate leased queue/loop. Push timeouts or retries must not delay message
-  commits, realtime fanout, media work or session disconnects.
-- [ ] Recheck current session, membership episode, message state, mute preference
-  and read state before dispatch. Restrict this release to new incoming messages;
-  edits, withdrawals, reactions and replay backlog do not generate new-message push.
-- [ ] Define a short dispatch delay and expiring per-device foreground/focus lease
-  to suppress duplicate in-page/background alerts where possible. Lease expiry
-  restores eligibility; stale foreground state must not suppress delivery indefinitely.
-- [ ] Bound retries by an intent deadline; handle provider throttling/transient
-  failure separately from expired subscriptions. Remove invalid subscriptions on
-  definitive provider responses. Preserve message/event durability independently.
-- [ ] Use generic notification text without message bodies, sender names or group
-  titles. Use validated same-origin click routes; clicking authenticates and reads
-  current authorized state. No notification advances a replay or read cursor.
-- [ ] Display a user-visible notification for accepted push events; do not depend on
-  silent background pushes. Deduplicate with stable event tags and document the
-  race where already accepted provider messages can arrive after revocation.
-- [ ] Request permission only from an explicit user action. Give unsupported,
-  denied and installation-required environments usable in-page feedback.
-- [ ] Test actual payload encryption with test subscription keys, owned queue leases,
-  provider error handling, retries, logout/revocation, group removal/rejoining,
-  mute/read suppression and concurrent foreground transitions.
+- [x] Add authenticated subscription registration/removal and device controls.
+      Bind subscriptions to the actual session/user; handle endpoint replacement,
+      account switching, logout, password changes and expired/revoked sessions.
+- [x] Validate submitted endpoints/keys, limit registrations and reject internal
+      destinations or unsafe redirects. Treat endpoints and auth keys as private capabilities.
+- [x] Insert push intent in the committed message transaction, then deliver through
+      a separate leased queue/loop. Push timeouts or retries must not delay message
+      commits, realtime fanout, media work or session disconnects.
+- [x] Recheck current session, membership episode, message state, mute preference
+      and read state before dispatch. Restrict this release to new incoming messages;
+      edits, withdrawals, reactions and replay backlog do not generate new-message push.
+- [x] Define a short dispatch delay and expiring per-device foreground/focus lease
+      to suppress duplicate in-page/background alerts where possible. Lease expiry
+      restores eligibility; stale foreground state must not suppress delivery indefinitely.
+- [x] Bound retries by an intent deadline; handle provider throttling/transient
+      failure separately from expired subscriptions. Remove invalid subscriptions on
+      definitive provider responses. Preserve message/event durability independently.
+- [x] Use generic notification text without message bodies, sender names or group
+      titles. Use validated same-origin click routes; clicking authenticates and reads
+      current authorized state. No notification advances a replay or read cursor.
+- [x] Display a user-visible notification for accepted push events; do not depend on
+      silent background pushes. Deduplicate with stable event tags and document the
+      race where already accepted provider messages can arrive after revocation.
+- [x] Request permission only from an explicit user action. Give unsupported,
+      denied and installation-required environments usable in-page feedback.
+- [x] Test actual payload encryption with test subscription keys, owned queue leases,
+      provider error handling, retries, logout/revocation, group removal/rejoining,
+      mute/read suppression and concurrent foreground transitions.
 
 **Automated acceptance:** Verify subscription/session ownership, permission-state
 fallbacks, asset-cache privacy, push payload encryption, queue/retry/expiry behavior,
@@ -309,19 +311,19 @@ celebrate. Each user selects at most one reaction per message; they can switch o
 remove it. Show counts and the current user's selection. Reactions do not change
 message creation order, the original send identity or unread message counts.
 
-- [ ] Add immutable reaction persistence and additive set/remove operations scoped
-  to a message and current membership episode. Repeating a desired state is idempotent.
-- [ ] Commit a reaction mutation, revision, durable event and outbox together.
-  Keep event sequence separate from message creation order and read semantics.
-- [ ] Project reaction summaries from current authorized state across snapshots,
-  history, search/context and replay. Compute the current user's selection for
-  the REST reader rather than storing actor-specific flags in shared event payloads.
-- [ ] Reject reactions to withdrawn or inaccessible messages and hide withdrawn
-  reaction presentation. Fence old responses so they cannot resurrect stale counts.
-- [ ] Add keyboard/mobile-accessible controls and compact counts using existing UI
-  primitives. Keep the feature's network/state ownership outside components.
-- [ ] Cover concurrent set/switch/remove, unauthorized and rejoined members,
-  withdrawal races, offline replay, stale HTTP replies and two-device convergence.
+- [x] Add immutable reaction persistence and additive set/remove operations scoped
+      to a message and current membership episode. Repeating a desired state is idempotent.
+- [x] Commit a reaction mutation, revision, durable event and outbox together.
+      Keep event sequence separate from message creation order and read semantics.
+- [x] Project reaction summaries from current authorized state across snapshots,
+      history, search/context and replay. Compute the current user's selection for
+      the REST reader rather than storing actor-specific flags in shared event payloads.
+- [x] Reject reactions to withdrawn or inaccessible messages and hide withdrawn
+      reaction presentation. Fence old responses so they cannot resurrect stale counts.
+- [x] Add keyboard/mobile-accessible controls and compact counts using existing UI
+      primitives. Keep the feature's network/state ownership outside components.
+- [x] Cover concurrent set/switch/remove, unauthorized and rejoined members,
+      withdrawal races, offline replay, stale HTTP replies and two-device convergence.
 
 **Acceptance:** Multiple real browsers converge on reaction counts and their own
 selection after reconnect/reload. Reaction changes never generate new-message
@@ -329,21 +331,21 @@ notifications or inflate unread counts.
 
 ## Milestone G: integrated acceptance and final documentation
 
-- [ ] Regenerate the contract and review migration/old-payload compatibility.
-- [ ] Run `node scripts/check.mjs --integration` on the integrated revision, retaining
-  actual command output. Repeat targeted checks for subsequent fixes; repeat unrelated
-  stages only if the changed code invalidates their evidence.
-- [ ] Extend HTTPS staging scenarios for account security, PWA assets and reaction
-  convergence. Execute push acceptance on available real environments separately;
-  list iPhone/iPad real-device push acceptance as deferred rather than passed.
+- [x] Regenerate the contract and review migration/old-payload compatibility.
+- [x] Run `node scripts/check.mjs --integration` on the integrated revision, retaining
+      actual command output. Repeat targeted checks for subsequent fixes; repeat unrelated
+      stages only if the changed code invalidates their evidence.
+- [x] Extend HTTPS staging scenarios for account security, PWA assets and reaction convergence.
+- [ ] Execute push acceptance on an operator-configured HTTPS desktop/device environment.
+- [x] Record iPhone/iPad real-device push acceptance as deferred rather than passed.
 - [ ] After an explicitly requested publish action, verify all three hosted jobs
-  for the final SHA and record the staging build's matching version.
-- [ ] Update `README.md`, architecture, account/recovery, notification/PWA, deployment
-  configuration, migration/upgrade guidance and acceptance records in the same change.
-  Document SMTP host/port, required TLS mode, protected credentials, sender identity,
-  public application origin, mail-queue key and provider sender-domain verification.
-- [ ] Review old operations guides for conflicting claims and broken commands.
-  Retain historical records with clear dates/revisions instead of rewriting history.
+      for the final SHA and record the staging build's matching version.
+- [x] Update `README.md`, architecture, account/recovery, notification/PWA, deployment
+      configuration, migration/upgrade guidance and acceptance records in the same change.
+      Document SMTP host/port, required TLS mode, protected credentials, sender identity,
+      public application origin, mail-queue key and provider sender-domain verification.
+- [x] Review old operations guides for conflicting claims and broken commands.
+      Retain historical records with clear dates/revisions instead of rewriting history.
 
 **Completion evidence:** Exact source/build revision, local check results, hosted
 job links, staging results, real-device push observations, and any remaining
@@ -355,10 +357,10 @@ platform check and does not prevent completion of the other confirmed deliverabl
 
 The [detailed design package](../specs/2026-10-14-product-readiness-design.md) now
 contains written account security/recovery, PWA/background notification and reaction
-designs approved by the user on 2026-10-14. Each receives a focused implementation plan. Keep release
-verification and documentation attached to those deliverables. Designs must settle
-wire contracts, migration names, concurrency rules, device lifecycle and exact
-acceptance cases before their corresponding product code changes.
+designs approved by the user on 2026-10-14. Their focused implementation plans and
+local acceptance are now complete. Keep the separately pending hosted/staging and
+provider/device checks attached to the same tested source when publication and
+operator inputs become available.
 
 The recovery method is settled: verified email and email-based password recovery.
 Staging addresses/invitations, operator SMTP and sender configuration, mail-queue key,

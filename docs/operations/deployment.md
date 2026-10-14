@@ -6,16 +6,16 @@ Compose. The root `compose.yaml` is for development and isolated tests.
 
 ## Services and connections
 
-| Component | Responsibility | Required connections |
-| --- | --- | --- |
-| `api` | REST, sessions and migrations | PostgreSQL, Valkey, SeaweedFS |
-| `worker` | Durable realtime delivery and media jobs | PostgreSQL, Valkey, Centrifugo, SeaweedFS |
-| `web/build/` | Static SvelteKit SPA | Served by the reverse proxy; no resident Node server |
-| PostgreSQL | Durable users, messages, events and attachment state | Private application access |
-| Valkey | Temporary rates, presence and realtime history | Private API, worker and Centrifugo access |
-| Centrifugo | WebSocket notifications | Valkey and the API's private connect/refresh callbacks |
-| SeaweedFS | Private S3 objects | API/worker and signed transfers through the media proxy |
-| Reverse proxy | HTTPS, static files, REST, WebSocket and media ingress | API, Centrifugo and SeaweedFS |
+| Component     | Responsibility                                               | Required connections                                                       |
+| ------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `api`         | REST, sessions and migrations                                | PostgreSQL, Valkey, SeaweedFS                                              |
+| `worker`      | Durable realtime, media, optional security mail and Web Push | PostgreSQL, Valkey, Centrifugo, SeaweedFS; configured SMTP/HTTPS providers |
+| `web/build/`  | Static SvelteKit SPA                                         | Served by the reverse proxy; no resident Node server                       |
+| PostgreSQL    | Durable users, messages, events and attachment state         | Private application access                                                 |
+| Valkey        | Temporary rates, presence and realtime history               | Private API, worker and Centrifugo access                                  |
+| Centrifugo    | WebSocket notifications                                      | Valkey and the API's private connect/refresh callbacks                     |
+| SeaweedFS     | Private S3 objects                                           | API/worker and signed transfers through the media proxy                    |
+| Reverse proxy | HTTPS, static files, REST, WebSocket and media ingress       | API, Centrifugo and SeaweedFS                                              |
 
 For one host, application/private service listeners can use loopback. Only the
 reverse proxy needs public HTTP/HTTPS access. With separate hosts, use private
@@ -39,6 +39,23 @@ Install the three binaries and `web/build/` on the host. Configure API, worker a
 admin with the same protected environment; the Rust binaries also read `.env` in
 their working directory. Use independently generated credentials whose actual
 values match the PostgreSQL, Centrifugo and SeaweedFS services.
+
+Optional providers remain disabled without complete configuration. See
+[account security](account-security.md) for strict SMTP/TLS, verified mailboxes and
+the protected queue encryption key; see [PWA and push](pwa-notifications.md) for
+stable VAPID keys, exact HTTPS provider allowlisting, public DNS pinning and safe
+frontend updates. Preserve these keys alongside backups and never deploy
+`test-failpoints` binaries or fixture transport overrides.
+
+The staging suite also checks PWA assets, two-user reactions and password change.
+Optional mail verification/recovery runs only when both `CHAT_DEPLOYMENT_MAILBOX`
+and `CHAT_DEPLOYMENT_MAIL_CAPTURE_ORIGIN` are explicitly supplied. The mailbox must
+consent to this test and be unique to its disposable account. The exact HTTPS capture
+origin exposes a read-only `GET /messages` returning `[{ recipient, link }]`; an
+optional `CHAT_DEPLOYMENT_MAIL_CAPTURE_TOKEN` supplies its protected bearer access.
+Only fresh links with the staging app origin and expected fragment-token security
+route are followed. Keep capture access and test artifacts private. These variables
+do not provision a mail service or authorize running against production users.
 
 ```dotenv
 DATABASE_URL=postgres://chat:<database-password>@127.0.0.1:5432/chat

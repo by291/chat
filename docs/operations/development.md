@@ -41,8 +41,7 @@ pnpm -C web dev
 
 Open `http://localhost:5173`. Stop these foreground processes with Ctrl+C.
 The public API and private proxy use ports 8080 and 8081; worker metrics use 8082.
-PostgreSQL, Valkey, Centrifugo, and private SeaweedFS S3 use 55432, 56379, 8000, and
-8333. Signed file transfers use the separate `http://localhost:8336` media ingress.
+PostgreSQL, Valkey, Centrifugo, and private SeaweedFS S3 use 55432, 56379, 8000, and 8333. Signed file transfers use the separate `http://localhost:8336` media ingress.
 Vite proxies API/WebSocket requests through the browser's same origin. Development
 uses an HttpOnly, SameSite=Lax `chat_session` cookie.
 
@@ -64,8 +63,10 @@ cargo run --bin admin -- reset-password --username alice
 Enter an invitation token on the registration page, or use `/register?invite=<token>`.
 Invitations are single-use and expire after seven days. Password reset revokes all
 sessions for the account. The device settings page can revoke an individual session.
-The CLI requires database access; there is no separate web administration or email
-recovery service.
+The CLI requires database access; there is no separate web administration. Settings
+support authenticated password changes. Optional verified email enrollment and
+recovery require the [account mail configuration](account-security.md); mail and
+[background push](pwa-notifications.md) remain disabled by default.
 
 ## Checks and targeted tests
 

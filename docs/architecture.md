@@ -27,6 +27,11 @@ src/
     model.rs              request/response DTOs and authenticated session result
     validation.rs         username and display-name rules
     service.rs            invite, login, bootstrap, reset and revocation workflows
+    security.rs           password changes, verified mailbox enrollment and encrypted intents
+    recovery.rs           anonymous verified-mailbox recovery and atomic token resets
+    security_repository.rs credential/email version fences and challenge SQL
+    mail_repository.rs    encrypted queue persistence and leased completion
+    mail_worker.rs        independent bounded delivery and retry lifecycle
     repository.rs         users/invitations/sessions SQL and locking
     password.rs           bounded Argon2 work
   conversations/
@@ -41,10 +46,20 @@ src/
     preferences.rs        actor preferences and private durable refresh hints
     preferences_repository.rs preference persistence and targeted outbox SQL
     receipts.rs           monotonic read receipts and temporary typing
+    reactions.rs          authorized single-choice revision/event transaction
+    reactions_repository.rs reader-specific counts and single-choice persistence
     events.rs             transaction-composed event/outbox append
     repository.rs         conversation/member/message/event SQL
     groups.rs             roles, membership episodes and single-use invitations
     group_repository.rs   group/member/invitation SQL and locking
+  notifications/
+    http.rs               authenticated subscription/config/activity adapters
+    model.rs              public capability/config acknowledgement DTOs
+    service.rs            current session, endpoint capability and activity ownership
+    repository.rs         deterministic binding locks and leased activity SQL
+    job_repository.rs     transactional message intent, authorization and lease CAS
+    delivery.rs           current eligibility and generic provider payload
+    worker.rs             independent cancellation, expiry and retry lifecycle
   users/
     http.rs               profile/search/status REST adapters
     model.rs              user/profile/status DTOs
@@ -95,6 +110,8 @@ web/src/
     features/
       auth/                     auth API, session lifetime, identity form and styles
       settings/                 profile/device API, forms, theme and styles
+      pwa/                      install/update browser lifecycle and consent controls
+      notifications/            session-owned background capability and activity lifecycle
       media/                    scoped uploads, ephemeral transfer state and previews
       chat/
         api.ts                  typed feature HTTP adapter
@@ -111,6 +128,7 @@ web/src/
         context.svelte.ts       application-tree chat context
         *.svelte                readable, cohesive UI components
         chat.css                feature styling
+  service-worker/              static cache composition and generic push/click presentation
 ```
 
 Routes and components consume feature state/API adapters. Transport is reusable
@@ -134,6 +152,19 @@ The query cache owns authoritative server records. The coordinator owns selectio
 drafts and optimistic sends. The conversation store owns per-conversation request
 generations and continuous event cursors. Peer activity owns expiring information.
 There is no second mutable copy of authoritative messages.
+
+Background capabilities are private acknowledgements owned by one authenticated
+notification lifecycle. They never become message records or persistent browser
+storage. The root PWA owner tracks install/update state independently of identity;
+the worker uses `api-client/asset-cache.ts` with an explicit public asset allowlist.
+
+Account mail and Web Push use independent worker loops. Security mail stores only
+encrypted payloads and version-fenced challenge intent. Push intent shares the new
+message transaction, then rechecks session/generation/member/read/mute state outside
+that transaction. Provider calls run without SQL locks and have bounded deadlines.
+`infrastructure/mail{,_config}.rs` owns SMTP/TLS and queue encryption;
+`infrastructure/web_push.rs` owns pure-Rust encryption/signing and pinned public DNS
+transport, with startup validation under `web_push/config.rs`.
 
 Every message source uses the same `revision_seq` merge, including HTTP mutation
 acknowledgements, summaries, snapshots, search/context pages and durable replay.

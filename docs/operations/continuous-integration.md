@@ -7,7 +7,7 @@ have no `needs` dependencies and do not share a workspace or test containers.
 | Job                       | Shared local command                         | Responsibilities                                                                       | Required tools                     |
 | ------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------- |
 | Backend                   | `node scripts/check.mjs --scope backend`     | Rust fmt/clippy and all Rust tests, including real media/associations                  | Node, Rust, Docker                 |
-| Frontend                  | `node scripts/check.mjs --scope frontend`    | Architecture guards, Svelte types, formatting, units and static build                  | Node, pnpm                         |
+| Frontend                  | `node scripts/check.mjs --scope frontend`    | Architecture guards, Svelte/service-worker types, formatting, units and static build   | Node, pnpm                         |
 | Contracts and integration | `node scripts/check.mjs --scope integration` | Generated API consistency, SDK authentication/delivery/presence, recovery and browsers | Node, pnpm, Rust, Docker, Chromium |
 
 Contract generation belongs to the integration job because Rust owns the API and
@@ -22,6 +22,15 @@ protection; a fast frontend result alone does not establish application correctn
 Update existing protection rules if they required the former combined job name.
 
 ## Test ownership
+
+Optional account mail and background-push scenarios use owned capture providers;
+Rust and Node receivers verify actual TLS/signatures/encryption. The push browser
+scenario uses full Chromium's new headless mode rather than the limited headless
+shell. The existing `playwright install --with-deps chromium` step supplies it.
+Local Windows runs may set `CHAT_TEST_PUSH_BROWSER_CHANNEL=chrome` or `msedge` when
+the pinned full Chromium cannot run; that uses a fresh test profile and does not
+replace hosted acceptance of CI's pinned browser. Production builds omit
+`test-failpoints`, keeping fixture destination/certificate overrides unavailable.
 
 Local and CI checks share the root `compose.yaml`. Each infrastructure-dependent
 runner starts its own `chat-test` project with separate credentials, ports and

@@ -1,7 +1,10 @@
 # PWA and background notification design
 
-**Status:** Written design approved by the user on 2026-10-14. iPhone/iPad acceptance is
-deferred by the user and does not block the remaining confirmed scope.
+**Status:** Design approved on 2026-10-14; local implementation and integrated
+verification completed on 2026-10-15, including pinned full Chromium push tests.
+See the [acceptance record](../../operations/product-readiness-acceptance.md).
+External provider/OS acceptance remains pending; iPhone/iPad acceptance is deferred
+by the user.
 
 **Goal:** Install the existing static application and notify enrolled devices when
 its page is closed/backgrounded, preserving authenticated data and durable replay.
@@ -50,12 +53,12 @@ Do not force a new service-worker version to take over a live authenticated sess
 Authenticated paths below are under `/api/v1/notifications` and retain Origin/error
 contracts. `SubscriptionId` is a UUID and `generation` is an opaque binding UUID.
 
-| Operation | Input/result |
-| --- | --- |
-| `GET /config` | `{ enabled, vapid_public_key }`, nullable key when disabled |
-| `POST /subscriptions` | `{ endpoint, p256dh, auth }` -> `201 { id, generation }` |
-| `DELETE /subscriptions/{id}` | Owner's current-session binding -> idempotent `204` |
-| `POST /subscriptions/{id}/activity` | `{ visible, focused, conversation_id }` -> `204` |
+| Operation                           | Input/result                                                |
+| ----------------------------------- | ----------------------------------------------------------- |
+| `GET /config`                       | `{ enabled, vapid_public_key }`, nullable key when disabled |
+| `POST /subscriptions`               | `{ endpoint, p256dh, auth }` -> `201 { id, generation }`    |
+| `DELETE /subscriptions/{id}`        | Owner's current-session binding -> idempotent `204`         |
+| `POST /subscriptions/{id}/activity` | `{ visible, focused, conversation_id }` -> `204`            |
 
 Validate encoded keys/lengths and HTTPS endpoints. A session may own at most one
 active subscription; an account may own at most ten. A repeated identical request
@@ -124,10 +127,16 @@ retain in-page feedback. Show installation guidance when required by the platfor
 
 ## Adapter, bounds and configuration
 
-Use reviewed `web-push` 0.11.0 signing/encryption APIs and its request-builder support
+Use `web-push-native` 0.5.0 signing/encryption APIs and its request-builder support
 with a transport whose endpoint restrictions can be enforced. A scoped compatibility
 check must verify the existing Tokio/Rust/Windows/Linux stack before dependency changes.
 No handwritten VAPID/encryption implementation or unconstrained client HTTP redirects.
+
+Compatibility ruling: the original `web-push` candidate pulls Mozilla ECE's OpenSSL
+backend, adding native OpenSSL and Perl build prerequisites. The selected replacement
+uses RustCrypto and pure-Rust JWT signing. Its isolated Windows build, signed encrypted
+round trip and RFC 8291 Appendix A fixture passed without those native dependencies.
+Keep the bounded reqwest transport and all subscription/queue contracts unchanged.
 
 Configuration is `WEB_PUSH_ENABLED` (default false), `WEB_PUSH_PUBLIC_KEY`,
 `WEB_PUSH_PRIVATE_KEY`, `WEB_PUSH_CONTACT` and `WEB_PUSH_ALLOWED_HOSTS`. Enabled mode
@@ -165,5 +174,5 @@ does not establish that deferred platform result.
 
 References: [SvelteKit service workers](https://svelte.dev/docs/kit/service-workers),
 [Push API](https://developer.mozilla.org/en-US/docs/Web/API/Push_API),
-[Rust Web Push](https://docs.rs/web-push/latest/web_push/), and
+[Rust Web Push Native](https://docs.rs/web-push-native/0.5.0/web_push_native/), and
 [Apple enrollment](https://webkit.org/blog/13878/).

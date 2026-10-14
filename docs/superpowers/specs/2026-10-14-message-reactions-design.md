@@ -1,7 +1,10 @@
 # Message reactions design
 
-**Status:** Written design approved by the user on 2026-10-14, following the confirmed
-roadmap. This feature retains existing message creation, authorization and replay rules.
+**Status:** Design approved on 2026-10-14; local implementation and integrated
+verification completed on 2026-10-15. See the
+[acceptance record](../../operations/product-readiness-acceptance.md) for the tested
+source and pending staging/hosted checks. Existing message creation, authorization
+and replay rules are preserved.
 
 **Goal:** Add a small, durable reaction choice to messages with correct multi-device
 state, without changing unread message counts or generating new-message notifications.
@@ -27,10 +30,10 @@ owners integrate reactions rather than adding a parallel message store.
 
 Under `/api/v1/conversations/{id}/messages/{message_id}/reaction`:
 
-| Operation | Input | Result |
-| --- | --- | --- |
-| `PUT` | `SetReactionInput { kind, membership_id? }` | `200 MessageView` projected for the actor |
-| `DELETE` | Existing-style optional membership query | `200 MessageView` projected for the actor |
+| Operation | Input                                       | Result                                    |
+| --------- | ------------------------------------------- | ----------------------------------------- |
+| `PUT`     | `SetReactionInput { kind, membership_id? }` | `200 MessageView` projected for the actor |
+| `DELETE`  | Existing-style optional membership query    | `200 MessageView` projected for the actor |
 
 `MessageView.reactions` is an array of `ReactionSummary { kind, count: u32, mine: bool }`,
 ordered by the enum order above. Omit zero-count kinds. Add a serde default for legacy

@@ -7,8 +7,10 @@ The application provides invitation-based registration, device sessions, exact
 username lookup, direct and private group conversations, durable messages,
 idempotent retries, reconnect replay, read receipts, typing/presence, images/files,
 profile avatars, message replies/edits/withdrawal, Chinese substring search,
-personal pin/mute/archive preferences, open-page notifications, a responsive Chinese
-UI, and themes. Reactions, PWA installation and Web Push remain future work.
+personal pin/mute/archive preferences, six single-choice message reactions, open-page
+notifications, PWA installation and safe updates, optional generic Web Push, a
+responsive Chinese UI, and themes. Account security includes password change,
+optional verified email enrollment and email recovery with independently queued mail.
 
 The locked stack uses Rust 1.99, Axum, SQLx, PostgreSQL 18, Svelte 5, SvelteKit 3,
 TypeScript, Tailwind CSS 4, TanStack Query, Bits UI, Centrifugo 6, Valkey 9,
@@ -25,6 +27,9 @@ Comments and documentation are English; product localization remains Chinese.
 - [Continuous integration](docs/operations/continuous-integration.md)
 - [Private groups and media](docs/operations/groups-and-media.md)
 - [Messages, search, preferences and notifications](docs/operations/chat-experience.md)
+- [Account security and recovery](docs/operations/account-security.md)
+- [PWA and background notifications](docs/operations/pwa-notifications.md)
+- [Product readiness acceptance](docs/operations/product-readiness-acceptance.md)
 - [Backup and recovery](docs/operations/backup-restore.md)
 - [Phase-one acceptance](docs/operations/phase-1-acceptance.md)
 - [Groups and media acceptance](docs/operations/phase-2-acceptance.md)

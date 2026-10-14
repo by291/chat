@@ -54,7 +54,8 @@ Notifications operate while the application page is open. In-app alerts are the
 fallback; sound and permission-based system notifications are optional. Request
 permission through the notification control, never automatically during login.
 System alerts omit message bodies. Unsupported or denied system notifications do
-not prevent in-app alerts. This release does not include Web Push.
+not prevent in-app alerts. Optional background delivery is separately configured;
+see [PWA and background notifications](pwa-notifications.md).
 
 Only fresh incoming messages applied through continuous synchronization can alert.
 Initial history, missed replay backlog, the author's own messages, muted chats and
@@ -64,6 +65,27 @@ its own realtime hint arrives; that exact hint can still announce the cached mes
 if it remains unread. Both acknowledged read cursors and refetched summaries suppress
 already-read messages. Notification activity never advances the read cursor and its
 session-owned timers/listeners are torn down on logout.
+
+## Message reactions
+
+Each account chooses one of `like`, `love`, `laugh`, `surprise`, `sad` or `celebrate`
+per message; setting another switches, and removal clears it. Counts use that stable
+order and expose only the current reader's `mine`, with no reactor directory.
+Withdrawn messages show no reactions and reject changes. Former members' aggregate
+counts remain, while rejoining never restores old message access.
+
+Changed choices atomically advance the message projection revision and append
+`message.reactions_updated` with its outbox. Creation sequence/time, original retry
+metadata, conversation ordering timestamp and unread/read cursors remain unchanged.
+Repeated desired state produces no new event. Shared reaction payloads contain only
+the message ID; authorized replay hydrates a current reader-specific message or an
+unavailable placeholder. Shared edit/withdraw payloads also omit reader selections.
+
+All HTTP, history, summary, search/context and replay projections share revision-aware
+merging. A delayed acknowledgement cannot replace newer counts, and mutation actions
+do not establish rendered read progress. Reactions do not create open-page alerts or
+background push intent. Install migration 15 and deploy API, worker and frontend
+together for the new event; preserve the safe waiting-worker update policy.
 
 ## Deployment compatibility
 
