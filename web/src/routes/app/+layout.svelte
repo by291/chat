@@ -184,6 +184,7 @@
           (message) => message.status === 'sending',
         ) ||
           chat.sync?.actions.busy ||
+          !!chat.sync?.actions.reacting.length ||
           false}
       />
     </div>

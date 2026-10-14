@@ -30,7 +30,7 @@ export function mergeMessageRecords(
     records.set(
       record.id,
       current.withdrawn
-        ? current
+        ? { ...current, reactions: [] }
         : {
             ...current,
             reply: latestReply(previous?.reply, record.reply),
@@ -80,6 +80,7 @@ export function mergeMessageRecords(
           body: '',
           attachments: [],
           reply: undefined,
+          reactions: [],
         };
       }
       if (record.withdrawn || !record.reply) return record;

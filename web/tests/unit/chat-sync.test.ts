@@ -20,6 +20,7 @@ function message(id: string, seq: string, conversation = 'a'): Message {
     created_seq: seq,
     revision_seq: seq,
     withdrawn: false,
+    reactions: [],
     conversation_id: conversation,
     client_message_id: id,
     sender_id: 'alice',
@@ -78,6 +79,12 @@ function fixture(overrides: Partial<ChatApi> = {}) {
       throw new Error('not needed');
     },
     withdraw: async () => {
+      throw new Error('not needed');
+    },
+    setReaction: async () => {
+      throw new Error('not needed');
+    },
+    removeReaction: async () => {
       throw new Error('not needed');
     },
     search: async () => ({ items: [], next_before: null, snapshot_seq: '1' }),

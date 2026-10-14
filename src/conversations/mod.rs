@@ -12,6 +12,8 @@ pub mod messages;
 pub mod model;
 pub mod preferences;
 pub(crate) mod preferences_repository;
+pub mod reactions;
+pub(crate) mod reactions_repository;
 pub mod receipts;
 pub(crate) mod repository;
 pub mod service;

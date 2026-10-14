@@ -32,6 +32,7 @@ export function membershipId(
 }
 
 export type Message = components['schemas']['MessageView'];
+export type ReactionKind = components['schemas']['ReactionKind'];
 
 export type Reply = components['schemas']['MessageReplyView'];
 
@@ -81,6 +82,17 @@ export interface ChatApi {
     membershipId?: string,
   ): Promise<Message>;
   withdraw(
+    id: string,
+    messageId: string,
+    membershipId?: string,
+  ): Promise<Message>;
+  setReaction(
+    id: string,
+    messageId: string,
+    kind: ReactionKind,
+    membershipId?: string,
+  ): Promise<Message>;
+  removeReaction(
     id: string,
     messageId: string,
     membershipId?: string,

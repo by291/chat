@@ -50,6 +50,7 @@ function message(id: string, sequence = '1'): Message {
     created_seq: sequence,
     revision_seq: sequence,
     withdrawn: false,
+    reactions: [],
     created_at: '2026-10-13T00:00:00Z',
   };
 }
@@ -95,6 +96,12 @@ function fixture(overrides: Partial<ChatApi> = {}) {
       throw new Error('not needed');
     },
     withdraw: async () => {
+      throw new Error('not needed');
+    },
+    setReaction: async () => {
+      throw new Error('not needed');
+    },
+    removeReaction: async () => {
       throw new Error('not needed');
     },
     search: async () => ({ items: [], next_before: null, snapshot_seq: '1' }),

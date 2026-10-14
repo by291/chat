@@ -135,8 +135,7 @@ pub async fn get_conversation(
     actor: Actor,
     id: ConversationId,
 ) -> Result<ConversationSummary, AppError> {
-    let mut transaction = state.pool.begin().await?;
-    repository::repeatable_read(&mut transaction).await?;
+    let mut transaction = repository::begin_snapshot(&state.pool).await?;
     let row = repository::summary(&mut transaction, actor.user_id, id)
         .await?
         .ok_or_else(AppError::not_found)?;
@@ -157,8 +156,7 @@ pub async fn list_conversations(
     }
 
     let cursor = page.cursor.map(decode_cursor).transpose()?;
-    let mut transaction = state.pool.begin().await?;
-    repository::repeatable_read(&mut transaction).await?;
+    let mut transaction = repository::begin_snapshot(&state.pool).await?;
     let mut rows =
         repository::summaries(&mut transaction, actor.user_id, cursor, page.limit).await?;
     let has_more = rows.len() > usize::from(page.limit);
@@ -215,7 +213,7 @@ async fn enrich(
     let mut last_message =
         message_repository::last_message(transaction, row.id, row.joined_seq).await?;
     if let Some(message) = &mut last_message {
-        enrich_message(transaction, message, row.joined_seq).await?;
+        enrich_message(transaction, message, actor, row.joined_seq).await?;
     }
 
     let unread = repository::unread_count(

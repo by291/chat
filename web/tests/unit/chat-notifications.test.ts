@@ -20,6 +20,7 @@ const incoming: Message = {
   created_seq: '2',
   revision_seq: '2',
   withdrawn: false,
+  reactions: [],
 };
 const conversation: Conversation = {
   id: 'chat',

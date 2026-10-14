@@ -51,6 +51,10 @@ pub struct MessageView {
     #[sqlx(skip)]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<AttachmentView>,
+    #[sqlx(skip)]
+    #[serde(default)]
+    #[schema(required = true)]
+    pub reactions: Vec<ReactionSummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sender_name: Option<String>,
     #[serde(with = "time::serde::rfc3339")]
@@ -67,6 +71,62 @@ pub struct MessageReplyView {
     pub revision_seq: Seq,
     pub body: String,
     pub withdrawn: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReactionKind {
+    Like,
+    Love,
+    Laugh,
+    Surprise,
+    Sad,
+    Celebrate,
+}
+
+impl ReactionKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Like => "like",
+            Self::Love => "love",
+            Self::Laugh => "laugh",
+            Self::Surprise => "surprise",
+            Self::Sad => "sad",
+            Self::Celebrate => "celebrate",
+        }
+    }
+
+    pub(crate) fn from_record(kind: &str) -> Result<Self, crate::error::AppError> {
+        match kind {
+            "like" => Ok(Self::Like),
+            "love" => Ok(Self::Love),
+            "laugh" => Ok(Self::Laugh),
+            "surprise" => Ok(Self::Surprise),
+            "sad" => Ok(Self::Sad),
+            "celebrate" => Ok(Self::Celebrate),
+            _ => Err(crate::error::AppError::unavailable()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ReactionSummary {
+    pub kind: ReactionKind,
+    pub count: u32,
+    pub mine: bool,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct SetReactionInput {
+    pub kind: ReactionKind,
+    pub membership_id: Option<MembershipId>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ReactionUpdateData {
+    pub message_id: MessageId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<MessageView>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -255,6 +315,8 @@ pub enum ConversationEventKind {
     MessageEdited,
     #[serde(rename = "message.withdrawn")]
     MessageWithdrawn,
+    #[serde(rename = "message.reactions_updated")]
+    MessageReactionsUpdated,
     #[serde(rename = "receipt.updated")]
     ReceiptUpdated,
     #[serde(rename = "group.updated")]
@@ -291,6 +353,8 @@ pub enum ConversationEventPayload {
     MessageEdited(MessageView),
     #[serde(rename = "message.withdrawn")]
     MessageWithdrawn(MessageView),
+    #[serde(rename = "message.reactions_updated")]
+    MessageReactionsUpdated(ReactionUpdateData),
     #[serde(rename = "message.unavailable")]
     MessageUnavailable { message_id: MessageId },
     #[serde(rename = "receipt.updated")]

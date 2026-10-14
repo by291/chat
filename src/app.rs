@@ -174,6 +174,10 @@ pub fn build_router(state: AppState) -> Router {
             get(messages::context),
         )
         .route(
+            "/conversations/{id}/messages/{message_id}/reaction",
+            axum::routing::put(messages::set_reaction).delete(messages::remove_reaction),
+        )
+        .route(
             "/conversations/{id}/messages",
             get(conversations::messages).post(conversations::send),
         )

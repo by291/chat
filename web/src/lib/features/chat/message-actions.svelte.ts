@@ -1,4 +1,4 @@
-import type { ChatApi, Message, Preferences } from './models';
+import type { ChatApi, Message, Preferences, ReactionKind } from './models';
 import type { ConversationStore } from './conversation-store';
 
 /** Owns reply selection and edit drafts; durable records stay in ConversationStore. */
@@ -8,6 +8,7 @@ export class MessageActions {
   withdrawingId = $state<string | null>(null);
   editBody = $state('');
   busy = $state(false);
+  reacting = $state<string[]>([]);
   private generation = 0;
 
   constructor(
@@ -145,6 +146,55 @@ export class MessageActions {
     }
   }
 
+  reactionPending(messageId: string): boolean {
+    return this.reacting.includes(messageId);
+  }
+
+  /** Serialize one choice per message and merge only within its selected authenticated episode. */
+  async reaction(messageId: string, kind: ReactionKind | null): Promise<void> {
+    const id = this.options.selectedId();
+    if (!id || !this.options.active() || this.reactionPending(messageId))
+      return;
+    const target = this.options.store
+      .messages(id)
+      .find((message) => message.id === messageId);
+    if (!target || target.withdrawn) return;
+    const membership = this.options.store.membership(id);
+    const generation = this.generation;
+    this.reacting = [...this.reacting, messageId];
+
+    try {
+      const record = kind
+        ? await this.options.api.setReaction(id, messageId, kind, membership)
+        : await this.options.api.removeReaction(id, messageId, membership);
+      if (
+        !this.options.active() ||
+        generation !== this.generation ||
+        id !== this.options.selectedId() ||
+        membership !== this.options.store.membership(id)
+      )
+        return;
+
+      this.options.store.merge(id, [record]);
+      this.options.store.raiseTarget(id, record.revision_seq);
+      void this.options.store.drain(id);
+      void this.options.store.refreshSummaries();
+    } catch (reason) {
+      if (
+        this.options.active() &&
+        generation === this.generation &&
+        id === this.options.selectedId()
+      ) {
+        this.options.failed(
+          reason instanceof Error ? reason.message : '表情回应失败，请稍后重试',
+        );
+      }
+    } finally {
+      if (generation === this.generation)
+        this.reacting = this.reacting.filter((id) => id !== messageId);
+    }
+  }
+
   async preferences(patch: Partial<Preferences>) {
     const id = this.options.selectedId();
     if (!id || !this.options.active() || this.busy) return;
@@ -178,5 +228,6 @@ export class MessageActions {
     this.withdrawingId = null;
     this.cancelEdit();
     this.busy = false;
+    this.reacting = [];
   }
 }

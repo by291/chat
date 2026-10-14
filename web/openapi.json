@@ -181,6 +181,7 @@
           "message.created",
           "message.edited",
           "message.withdrawn",
+          "message.reactions_updated",
           "receipt.updated",
           "group.updated",
           "membership.updated"
@@ -259,6 +260,24 @@
               "type": {
                 "enum": [
                   "message.withdrawn"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "data",
+              "type"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/ReactionUpdateData"
+              },
+              "type": {
+                "enum": [
+                  "message.reactions_updated"
                 ],
                 "type": "string"
               }
@@ -1188,6 +1207,12 @@
           "id": {
             "$ref": "#/components/schemas/MessageId"
           },
+          "reactions": {
+            "items": {
+              "$ref": "#/components/schemas/ReactionSummary"
+            },
+            "type": "array"
+          },
           "reply": {
             "oneOf": [
               {
@@ -1233,6 +1258,7 @@
           "revision_seq",
           "withdrawn",
           "body",
+          "reactions",
           "created_at"
         ],
         "type": "object"
@@ -1326,6 +1352,59 @@
       "PushSubscriptionId": {
         "format": "uuid",
         "type": "string"
+      },
+      "ReactionKind": {
+        "enum": [
+          "like",
+          "love",
+          "laugh",
+          "surprise",
+          "sad",
+          "celebrate"
+        ],
+        "type": "string"
+      },
+      "ReactionSummary": {
+        "properties": {
+          "count": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ReactionKind"
+          },
+          "mine": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "count",
+          "mine"
+        ],
+        "type": "object"
+      },
+      "ReactionUpdateData": {
+        "properties": {
+          "message": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MessageView"
+              }
+            ]
+          },
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId"
+          }
+        },
+        "required": [
+          "message_id"
+        ],
+        "type": "object"
       },
       "ReadInput": {
         "properties": {
@@ -1508,6 +1587,27 @@
           "created_at",
           "expires_at",
           "is_current"
+        ],
+        "type": "object"
+      },
+      "SetReactionInput": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/ReactionKind"
+          },
+          "membership_id": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MembershipId"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind"
         ],
         "type": "object"
       },
@@ -3073,6 +3173,130 @@
           }
         },
         "summary": "Return an authorized window around a target, with independent history edges.",
+        "tags": [
+          "chat"
+        ]
+      }
+    },
+    "/api/v1/conversations/{id}/messages/{message_id}/reaction": {
+      "delete": {
+        "operationId": "remove_reaction",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          },
+          {
+            "in": "query",
+            "name": "membership_id",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MembershipId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageView"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Remove only the authenticated actor's choice, with authorization before idempotent success.",
+        "tags": [
+          "chat"
+        ]
+      },
+      "put": {
+        "operationId": "set_reaction",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "in": "path",
+            "name": "message_id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetReactionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageView"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Set one current-episode reaction; malformed choices retain the public invalid-input contract.",
         "tags": [
           "chat"
         ]

@@ -432,6 +432,8 @@ export class ConversationStore {
           fresh,
         );
       }
+    } else if (payload.type === 'message.reactions_updated') {
+      if (payload.data.message) this.merge(id, [payload.data.message]);
     } else if (payload.type === 'receipt.updated') {
       const receipt = payload.data;
       if (receipt.membership_id)

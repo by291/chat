@@ -77,6 +77,22 @@ export function createChatApi(api: ApiClient): ChatApi {
           signal,
         }),
       ),
+    setReaction: (id, message_id, kind, membership_id) =>
+      unwrap(
+        api.PUT('/api/v1/conversations/{id}/messages/{message_id}/reaction', {
+          params: { path: { id, message_id } },
+          body: { kind, membership_id },
+        }),
+      ),
+    removeReaction: (id, message_id, membership_id) =>
+      unwrap(
+        api.DELETE(
+          '/api/v1/conversations/{id}/messages/{message_id}/reaction',
+          {
+            params: { path: { id, message_id }, query: { membership_id } },
+          },
+        ),
+      ),
     preferences: (id, patch, membership_id) =>
       unwrap(
         api.PATCH('/api/v1/conversations/{id}/preferences', {

@@ -32,10 +32,7 @@ pub async fn message_snapshot(
 ) -> Result<MessageSnapshot, AppError> {
     validate_limit(page.limit)?;
 
-    let mut transaction = state.pool.begin().await?;
-    // Isolation must be set before any query, otherwise rows and cursor could
-    // describe different commits and cause the client to skip a durable event.
-    repository::repeatable_read(&mut transaction).await?;
+    let mut transaction = repository::begin_snapshot(&state.pool).await?;
     let member = require_member(&mut transaction, actor, id).await?;
     check_membership(&member, page.membership_id, false)?;
     let snapshot = repository::version(&mut transaction, id).await?;
@@ -52,7 +49,7 @@ pub async fn message_snapshot(
     items.truncate(usize::from(page.limit));
     items.reverse();
     for message in &mut items {
-        enrich_message(&mut transaction, message, member.joined_seq).await?;
+        enrich_message(&mut transaction, message, actor, member.joined_seq).await?;
     }
 
     let next_before = if has_more {
@@ -94,8 +91,7 @@ pub async fn events_with_membership(
         return Err(AppError::invalid("分页大小需要 1–200"));
     }
 
-    let mut transaction = state.pool.begin().await?;
-    repository::repeatable_read(&mut transaction).await?;
+    let mut transaction = repository::begin_snapshot(&state.pool).await?;
     let member = require_member(&mut transaction, actor, id).await?;
     check_membership(&member, expected, false)?;
     if after.0 < member.joined_seq - 1 {
@@ -114,7 +110,7 @@ pub async fn events_with_membership(
     let mut events = Vec::with_capacity(rows.len());
     for row in rows {
         let mut event = decode_event(id, row)?;
-        project_message_event(&mut transaction, &mut event, member.joined_seq).await?;
+        project_message_event(&mut transaction, &mut event, actor, member.joined_seq).await?;
         events.push(event);
     }
     transaction.commit().await?;
@@ -131,12 +127,14 @@ pub async fn events_with_membership(
 async fn project_message_event(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     event: &mut ConversationEvent,
+    actor: Actor,
     joined_seq: i64,
 ) -> Result<(), AppError> {
     let message_id = match &event.payload {
         ConversationEventPayload::MessageCreated(message)
         | ConversationEventPayload::MessageEdited(message)
         | ConversationEventPayload::MessageWithdrawn(message) => message.id,
+        ConversationEventPayload::MessageReactionsUpdated(update) => update.message_id,
         _ => return Ok(()),
     };
 
@@ -151,7 +149,7 @@ async fn project_message_event(
     )
     .await?
     {
-        enrich_message(transaction, &mut current, joined_seq).await?;
+        enrich_message(transaction, &mut current, actor, joined_seq).await?;
         match &event.payload {
             ConversationEventPayload::MessageCreated(_) => {
                 ConversationEventPayload::MessageCreated(current)
@@ -161,6 +159,14 @@ async fn project_message_event(
             }
             ConversationEventPayload::MessageWithdrawn(_) => {
                 ConversationEventPayload::MessageWithdrawn(current)
+            }
+            ConversationEventPayload::MessageReactionsUpdated(_) => {
+                ConversationEventPayload::MessageReactionsUpdated(
+                    super::model::ReactionUpdateData {
+                        message_id,
+                        message: Some(current),
+                    },
+                )
             }
             _ => return Err(AppError::unavailable()),
         }
@@ -183,8 +189,7 @@ pub async fn search_messages(
     }
     validate_limit(query.limit)?;
 
-    let mut transaction = state.pool.begin().await?;
-    repository::repeatable_read(&mut transaction).await?;
+    let mut transaction = repository::begin_snapshot(&state.pool).await?;
     let member = require_member(&mut transaction, actor, id).await?;
     check_membership(&member, query.membership_id, false)?;
     let snapshot_seq = Seq(repository::version(&mut transaction, id).await?);
@@ -200,7 +205,7 @@ pub async fn search_messages(
     let has_more = items.len() > usize::from(query.limit);
     items.truncate(usize::from(query.limit));
     for message in &mut items {
-        enrich_message(&mut transaction, message, member.joined_seq).await?;
+        enrich_message(&mut transaction, message, actor, member.joined_seq).await?;
     }
     let next_before = if has_more {
         items.last().map(|message| message.created_seq)
@@ -227,8 +232,7 @@ pub async fn message_context(
 ) -> Result<MessageContext, AppError> {
     validate_limit(query.limit)?;
 
-    let mut transaction = state.pool.begin().await?;
-    repository::repeatable_read(&mut transaction).await?;
+    let mut transaction = repository::begin_snapshot(&state.pool).await?;
     let member = require_member(&mut transaction, actor, id).await?;
     check_membership(&member, query.membership_id, false)?;
     let target = message_repository::message(&mut transaction, id, message_id, member.joined_seq)
@@ -244,7 +248,7 @@ pub async fn message_context(
     )
     .await?;
     for message in &mut items {
-        enrich_message(&mut transaction, message, member.joined_seq).await?;
+        enrich_message(&mut transaction, message, actor, member.joined_seq).await?;
     }
     let first = items.first().ok_or_else(AppError::unavailable)?.created_seq;
     let last = items.last().ok_or_else(AppError::unavailable)?.created_seq;

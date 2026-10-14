@@ -38,6 +38,7 @@ function message(
     created_seq: '2',
     revision_seq: revision,
     withdrawn: false,
+    reactions: [],
   };
 }
 
@@ -106,6 +107,8 @@ function fixture(overrides: Partial<ChatApi> = {}) {
     send: async () => message(),
     edit: async () => message(),
     withdraw: async () => message(),
+    setReaction: async () => message(),
+    removeReaction: async () => message(),
     search: async () => ({ items: [], next_before: null, snapshot_seq: '2' }),
     context: async () => ({
       items: [],

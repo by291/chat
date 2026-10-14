@@ -6,6 +6,7 @@
   import { isGroup } from './models';
   import type { ChatSync } from './sync.svelte';
   import AttachmentList from '../media/AttachmentList.svelte';
+  import MessageReactions from './MessageReactions.svelte';
 
   let {
     sync,
@@ -15,7 +16,8 @@
 
   const own = $derived(message.sender_id === sync.userId);
   const edited = $derived(
-    !message.withdrawn && message.revision_seq !== message.created_seq,
+    // Reactions advance the projection revision without editing the message body.
+    !message.withdrawn && !!message.edited_at,
   );
   const replyName = $derived(
     message.reply?.sender_name ??
@@ -108,6 +110,7 @@
         </Button>
       {/if}
     </div>
+    <MessageReactions {message} actions={sync.actions} />
   {/if}
   <div class="message-meta">
     {#if edited}

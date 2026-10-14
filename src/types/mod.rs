@@ -17,7 +17,8 @@ pub use crate::conversations::model::{
     ConversationPreferencesInput, ConversationView, DirectInput, EditMessageInput, EventEnvelope,
     EventPage, EventQuery, MessageContext, MessagePage, MessageReplyView, MessageSearchQuery,
     MessageSearchResult, MessageSnapshot, MessageTargetQuery, MessageView, Page, PageCursor,
-    ReadInput, ReadResult, ReceiptData, SendMessageInput, TypingInput,
+    ReactionKind, ReactionSummary, ReactionUpdateData, ReadInput, ReadResult, ReceiptData,
+    SendMessageInput, SetReactionInput, TypingInput,
 };
 
 pub use crate::users::model::{UpdateProfile, UserStatus, UserView};

@@ -399,6 +399,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/conversations/{id}/messages/{message_id}/reaction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set one current-episode reaction; malformed choices retain the public invalid-input contract. */
+        put: operations["set_reaction"];
+        post?: never;
+        /** Remove only the authenticated actor's choice, with authorization before idempotent success. */
+        delete: operations["remove_reaction"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/conversations/{id}/owner": {
         parameters: {
             query?: never;
@@ -824,7 +842,7 @@ export interface components {
             payload: components["schemas"]["ConversationEventPayload"];
         };
         /** @enum {string} */
-        ConversationEventKind: "conversation.created" | "message.created" | "message.edited" | "message.withdrawn" | "receipt.updated" | "group.updated" | "membership.updated";
+        ConversationEventKind: "conversation.created" | "message.created" | "message.edited" | "message.withdrawn" | "message.reactions_updated" | "receipt.updated" | "group.updated" | "membership.updated";
         ConversationEventPayload: {
             data: {
                 initiator_id: components["schemas"]["UserId"];
@@ -843,6 +861,10 @@ export interface components {
             data: components["schemas"]["MessageView"];
             /** @enum {string} */
             type: "message.withdrawn";
+        } | {
+            data: components["schemas"]["ReactionUpdateData"];
+            /** @enum {string} */
+            type: "message.reactions_updated";
         } | {
             data: {
                 message_id: components["schemas"]["MessageId"];
@@ -1064,6 +1086,7 @@ export interface components {
             /** Format: date-time */
             edited_at?: string | null;
             id: components["schemas"]["MessageId"];
+            reactions: components["schemas"]["ReactionSummary"][];
             reply?: null | components["schemas"]["MessageReplyView"];
             reply_to_message_id?: null | components["schemas"]["MessageId"];
             revision_seq: components["schemas"]["Seq"];
@@ -1092,6 +1115,18 @@ export interface components {
         };
         /** Format: uuid */
         PushSubscriptionId: string;
+        /** @enum {string} */
+        ReactionKind: "like" | "love" | "laugh" | "surprise" | "sad" | "celebrate";
+        ReactionSummary: {
+            /** Format: int32 */
+            count: number;
+            kind: components["schemas"]["ReactionKind"];
+            mine: boolean;
+        };
+        ReactionUpdateData: {
+            message?: null | components["schemas"]["MessageView"];
+            message_id: components["schemas"]["MessageId"];
+        };
         ReadInput: {
             membership_id?: null | components["schemas"]["MembershipId"];
             message_seq: components["schemas"]["Seq"];
@@ -1134,6 +1169,10 @@ export interface components {
             expires_at: string;
             id: components["schemas"]["SessionId"];
             is_current: boolean;
+        };
+        SetReactionInput: {
+            kind: components["schemas"]["ReactionKind"];
+            membership_id?: null | components["schemas"]["MembershipId"];
         };
         SubscriptionBinding: {
             /** Format: uuid */
@@ -2114,6 +2153,80 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    set_reaction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+                message_id: components["schemas"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetReactionInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
+            };
+        };
+    };
+    remove_reaction: {
+        parameters: {
+            query?: {
+                membership_id?: components["schemas"]["MembershipId"];
+            };
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+                message_id: components["schemas"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageView"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -43,6 +43,7 @@ function isEvent(data: unknown): data is RealtimeEvent {
       'message.created',
       'message.edited',
       'message.withdrawn',
+      'message.reactions_updated',
       'receipt.updated',
       'group.updated',
       'membership.updated',

@@ -69,7 +69,7 @@ pub async fn send_message(
         if !original.matches(&input) {
             return Err(AppError::conflict("此消息 ID 已用于不同内容"));
         }
-        enrich_message(&mut transaction, &mut message, member.joined_seq).await?;
+        enrich_message(&mut transaction, &mut message, actor, member.joined_seq).await?;
         transaction.commit().await?;
         return Ok(Created {
             value: message,
@@ -108,7 +108,7 @@ pub async fn send_message(
         .await?;
     }
 
-    enrich_message(&mut transaction, &mut message, member.joined_seq).await?;
+    enrich_message(&mut transaction, &mut message, actor, member.joined_seq).await?;
 
     let envelope = events::append(
         &mut transaction,
@@ -202,7 +202,7 @@ async fn mutate_message(
 
     let revision = Seq(latest.checked_add(1).ok_or_else(AppError::unavailable)?);
     message = message_repository::mutate(&mut transaction, message_id, revision, body).await?;
-    enrich_message(&mut transaction, &mut message, member.joined_seq).await?;
+    enrich_message(&mut transaction, &mut message, actor, member.joined_seq).await?;
     let (kind, payload) = if body.is_some() {
         (
             ConversationEventKind::MessageEdited,
@@ -224,16 +224,20 @@ async fn mutate_message(
 pub(crate) async fn enrich_message(
     transaction: &mut Transaction<'_, Postgres>,
     message: &mut MessageView,
+    actor: Actor,
     joined_seq: i64,
 ) -> Result<(), AppError> {
     if message.withdrawn {
         message.body.clear();
         message.attachments.clear();
         message.reply = None;
+        message.reactions.clear();
         return Ok(());
     }
 
     message.attachments = media::repository::message_views(transaction, message.id).await?;
+    message.reactions =
+        super::reactions_repository::summaries(transaction, message.id, actor.user_id).await?;
     message.reply = if let Some(reply_id) = message.reply_to_message_id {
         message_repository::message(transaction, message.conversation_id, reply_id, joined_seq)
             .await?

@@ -30,6 +30,23 @@ test('HTTPS serves SPA deep links and keeps internal endpoints private', async (
   expect(response.headers()['x-request-id']).toBe(
     (await response.json()).request_id,
   );
+  const manifest = await request.get('/manifest.webmanifest');
+  expect(manifest.status()).toBe(200);
+  expect(await manifest.json()).toMatchObject({
+    id: '/',
+    scope: '/',
+    start_url: '/app',
+    display: 'standalone',
+  });
+  for (const path of [
+    '/service-worker.js',
+    '/icons/icon-192.png',
+    '/icons/icon-512.png',
+    '/apple-touch-icon.png',
+    '/offline.html',
+  ]) {
+    expect((await request.get(path)).status()).toBe(200);
+  }
 
   for (const path of [
     '/',
@@ -67,7 +84,9 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
   page,
   browser,
 }) => {
-  test.setTimeout(60000);
+  test.setTimeout(
+    process.env.CHAT_DEPLOYMENT_MAIL_CAPTURE_ORIGIN ? 180000 : 90000,
+  );
   const invitations = [
     process.env.CHAT_DEPLOYMENT_INVITE_1,
     process.env.CHAT_DEPLOYMENT_INVITE_2,
@@ -95,7 +114,7 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
   }
 
   try {
-    await signup(page, invitations[0]!);
+    const ownerUsername = await signup(page, invitations[0]!);
     const username = await signup(peer, invitations[1]!);
     await expect(page.getByText('已连接', { exact: true })).toBeVisible();
     await expect(peer.getByText('已连接', { exact: true })).toBeVisible();
@@ -126,6 +145,17 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
     await expect(
       peer.getByRole('log').getByText('经过 HTTPS 的真实消息', { exact: true }),
     ).toBeVisible();
+    const messageBubble = page
+      .getByRole('log')
+      .locator('article')
+      .filter({ hasText: '经过 HTTPS 的真实消息' });
+    await messageBubble.getByRole('button', { name: '添加表情回应' }).click();
+    await messageBubble
+      .getByRole('button', { name: '点赞', exact: true })
+      .click();
+    await expect(
+      peer.getByRole('log').getByRole('button', { name: '点赞，1 个回应' }),
+    ).toHaveAttribute('aria-pressed', 'false');
     await page.reload();
     await expect(
       page.getByRole('log').getByText('经过 HTTPS 的真实消息', { exact: true }),
@@ -197,6 +227,117 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
     await expect(
       page.getByRole('img', { name: 'HTTPS 用户的头像', exact: true }),
     ).toBeVisible();
+    let currentPassword = 'abc123';
+    const mailbox = process.env.CHAT_DEPLOYMENT_MAILBOX;
+    const captureOrigin = process.env.CHAT_DEPLOYMENT_MAIL_CAPTURE_ORIGIN;
+    if (!!mailbox !== !!captureOrigin)
+      throw new Error(
+        'Configure both consenting mailbox and HTTPS mail capture origin, or neither',
+      );
+    if (mailbox && captureOrigin) {
+      const capture = new URL(captureOrigin);
+      if (
+        capture.protocol !== 'https:' ||
+        capture.origin !== captureOrigin ||
+        capture.username ||
+        capture.password
+      )
+        throw new Error(
+          'Mail capture must be an exact operator-controlled HTTPS origin',
+        );
+      const captureHeaders = process.env.CHAT_DEPLOYMENT_MAIL_CAPTURE_TOKEN
+        ? {
+            Authorization: `Bearer ${process.env.CHAT_DEPLOYMENT_MAIL_CAPTURE_TOKEN}`,
+          }
+        : undefined;
+      async function links(): Promise<string[]> {
+        const response = await page.request.get(`${captureOrigin}/messages`, {
+          headers: captureHeaders,
+        });
+        expect(response.status()).toBe(200);
+        const messages = (await response.json()) as Array<{
+          recipient: string;
+          link?: string;
+        }>;
+        return messages
+          .filter(
+            (message) =>
+              message.recipient === mailbox && typeof message.link === 'string',
+          )
+          .map((message) => message.link!);
+      }
+      async function freshLink(
+        purpose: string,
+        before: Set<string>,
+      ): Promise<string> {
+        let selected: string | undefined;
+        await expect
+          .poll(
+            async () => {
+              selected = (await links()).find((link) => {
+                if (before.has(link)) return false;
+                const url = new URL(link);
+                return (
+                  url.origin === appOrigin &&
+                  url.pathname === `/${purpose}` &&
+                  !url.search &&
+                  new URLSearchParams(url.hash.slice(1)).has('token')
+                );
+              });
+              return !!selected;
+            },
+            { timeout: 60000 },
+          )
+          .toBe(true);
+        return selected!;
+      }
+      const beforeVerification = new Set(await links());
+      const enrollment = await page.request.post('/api/v1/auth/email', {
+        headers: { Origin: appOrigin },
+        data: { email: mailbox, current_password: currentPassword },
+      });
+      expect(enrollment.status()).toBe(202);
+      await page.goto(await freshLink('verify-email', beforeVerification));
+      await page
+        .getByRole('button', { name: '确认验证邮箱', exact: true })
+        .click();
+      await expect(
+        page.getByRole('heading', { name: '邮箱已验证', exact: true }),
+      ).toBeVisible();
+      const beforeReset = new Set(await links());
+      const recovery = await page.request.post(
+        '/api/v1/auth/password/recovery',
+        { headers: { Origin: appOrigin }, data: { email: mailbox } },
+      );
+      expect(recovery.status()).toBe(202);
+      await page.goto(await freshLink('reset-password', beforeReset));
+      currentPassword = 'recovered-https-password';
+      await page.getByLabel('新密码', { exact: true }).fill(currentPassword);
+      await page
+        .getByLabel('确认新密码', { exact: true })
+        .fill(currentPassword);
+      await page.getByRole('button', { name: '重置密码', exact: true }).click();
+      await expect(
+        page.getByRole('heading', { name: '密码已重置', exact: true }),
+      ).toBeVisible();
+      expect((await page.request.get('/api/v1/auth/me')).status()).toBe(401);
+      await page.goto('/login');
+      await page.getByLabel('用户名', { exact: true }).fill(ownerUsername);
+      await page.getByLabel('密码', { exact: true }).fill(currentPassword);
+      await page.getByRole('button', { name: '登录', exact: true }).click();
+      await expect(page).toHaveURL(/\/app/);
+      await page.goto('/app/settings');
+    }
+    await page.getByLabel('当前密码', { exact: true }).fill(currentPassword);
+    await page
+      .getByLabel('新密码', { exact: true })
+      .fill('changed-https-password');
+    await page
+      .getByLabel('确认新密码', { exact: true })
+      .fill('changed-https-password');
+    await page.getByRole('button', { name: '修改密码', exact: true }).click();
+    await expect(page).toHaveURL('/login');
+    expect((await page.request.get('/api/v1/auth/me')).status()).toBe(401);
   } finally {
     await other.close();
   }

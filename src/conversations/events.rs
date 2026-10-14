@@ -29,7 +29,10 @@ pub async fn append_with_invalidations(
     payload: ConversationEventPayload,
     invalidations: Vec<super::model::MembershipInvalidation>,
 ) -> Result<EventEnvelope, AppError> {
-    let sequence = repository::advance_version(transaction, id).await?;
+    // Reactions refresh projections without pretending a new message/activity
+    // changed the conversation ordering. Existing event kinds retain their behavior.
+    let update_activity = !matches!(kind, ConversationEventKind::MessageReactionsUpdated);
+    let sequence = repository::advance_version(transaction, id, update_activity).await?;
     let envelope = EventEnvelope {
         schema_version: 1,
         event_id: EventId::new(),
@@ -40,6 +43,15 @@ pub async fn append_with_invalidations(
     let serialized_kind =
         serde_json::to_value(&envelope.kind).map_err(|_| AppError::unavailable())?;
     let kind = serialized_kind.as_str().ok_or_else(AppError::unavailable)?;
+    let mut payload = payload;
+    if let ConversationEventPayload::MessageCreated(message)
+    | ConversationEventPayload::MessageEdited(message)
+    | ConversationEventPayload::MessageWithdrawn(message) = &mut payload
+    {
+        // Shared historical payloads cannot retain a particular reader's selection.
+        // REST replay always projects current reactions for its authenticated actor.
+        message.reactions.clear();
+    }
     let payload = serde_json::to_value(payload).map_err(|_| AppError::unavailable())?;
 
     // An event without its job would never reach connected clients. Both records

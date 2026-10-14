@@ -1,6 +1,6 @@
 //! PostgreSQL operations for conversations. Callers own transaction boundaries.
 
-use sqlx::{Postgres, Transaction};
+use sqlx::{PgPool, Postgres, Transaction};
 use time::OffsetDateTime;
 
 use super::model::MembershipContext;
@@ -255,11 +255,11 @@ pub async fn lock_version(
         .await
 }
 
-pub async fn repeatable_read(tx: &mut Transaction<'_, Postgres>) -> Result<(), sqlx::Error> {
-    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
-        .execute(&mut **tx)
-        .await?;
-    Ok(())
+pub async fn begin_snapshot(pool: &PgPool) -> Result<Transaction<'static, Postgres>, sqlx::Error> {
+    // Choose isolation in BEGIN itself, before prepared-statement metadata or
+    // any application query can acquire a snapshot. The caller still owns commit.
+    pool.begin_with("BEGIN ISOLATION LEVEL REPEATABLE READ")
+        .await
 }
 
 pub async fn version(
@@ -351,14 +351,19 @@ pub async fn members(
 pub async fn advance_version(
     tx: &mut Transaction<'_, Postgres>,
     id: ConversationId,
+    update_activity: bool,
 ) -> Result<i64, sqlx::Error> {
     sqlx::query_scalar(
         r#"
-        UPDATE conversations SET latest_event_seq = latest_event_seq + 1, updated_at = now()
-        WHERE id = $1 RETURNING latest_event_seq
+        UPDATE conversations
+        SET latest_event_seq = latest_event_seq + 1,
+            updated_at = CASE WHEN $2 THEN now() ELSE updated_at END
+        WHERE id = $1
+        RETURNING latest_event_seq
     "#,
     )
     .bind(id)
+    .bind(update_activity)
     .fetch_one(&mut **tx)
     .await
 }
