@@ -131,10 +131,12 @@ impl MailDelivery {
         if payload.purpose != purpose {
             return Err(invalid_payload());
         }
+
         let plaintext = serde_json::to_vec(payload).map_err(|_| invalid_payload())?;
         if plaintext.len() > MAX_PAYLOAD_BYTES {
             return Err(invalid_payload());
         }
+
         let mut nonce_bytes = [0u8; NONCE_BYTES];
         rand::rngs::OsRng.fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from(nonce_bytes);
@@ -170,6 +172,7 @@ impl MailDelivery {
         {
             return Err(invalid_payload());
         }
+
         let nonce_bytes: [u8; NONCE_BYTES] = encrypted[1..1 + NONCE_BYTES]
             .try_into()
             .map_err(|_| invalid_payload())?;
@@ -209,6 +212,7 @@ impl MailDelivery {
         {
             return Err(invalid_payload());
         }
+
         let (subject, explanation) = match payload.purpose {
             MailPurpose::EmailVerification => (
                 "验证你的邮箱 · Chat",
@@ -228,6 +232,7 @@ impl MailDelivery {
         } else {
             "\n\n如果没有申请此操作，可以忽略本邮件。"
         };
+
         let message = Message::builder()
             .from(self.from.clone())
             .to(Mailbox::new(

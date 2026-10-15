@@ -76,7 +76,8 @@ pub struct SecurityChallenge {
 }
 
 pub async fn email_details(pool: &PgPool, user_id: UserId) -> Result<EmailDetails, sqlx::Error> {
-    sqlx::query_as(r#"
+    sqlx::query_as(
+        r#"
         SELECT verified.email_address AS verified_email, pending.email_address AS pending_email,
                pending.expires_at AS verification_expires_at
         FROM users account
@@ -86,14 +87,17 @@ pub async fn email_details(pool: &PgPool, user_id: UserId) -> Result<EmailDetail
             FROM account_security_challenges
             WHERE user_id = account.id AND purpose = 'email_verification'
               AND consumed_at IS NULL AND invalidated_at IS NULL AND expires_at > clock_timestamp()
-              AND credential_version = account.credential_version AND email_version = account.email_version
+                  AND credential_version = account.credential_version
+                  AND email_version = account.email_version
             ORDER BY created_at DESC
             LIMIT 1
         ) pending ON true
         WHERE account.id = $1
-    "#)
+        "#,
+    )
     .bind(user_id)
-    .fetch_one(pool).await
+    .fetch_one(pool)
+    .await
 }
 
 pub async fn verified_email(
@@ -105,7 +109,7 @@ pub async fn verified_email(
         SELECT email_address, canonical_address
         FROM account_emails
         WHERE user_id = $1
-    "#,
+        "#,
     )
     .bind(user_id)
     .fetch_optional(&mut **transaction)
@@ -122,7 +126,7 @@ pub async fn invalidate_verification(
         SET invalidated_at = clock_timestamp()
         WHERE user_id = $1 AND purpose = 'email_verification'
           AND consumed_at IS NULL AND invalidated_at IS NULL
-    "#,
+        "#,
     )
     .bind(user_id)
     .execute(&mut **transaction)
@@ -140,7 +144,7 @@ pub async fn verified_email_owner(
         SELECT user_id
         FROM account_emails
         WHERE canonical_address = $1
-    "#,
+        "#,
     )
     .bind(address)
     .fetch_optional(pool)
@@ -158,7 +162,7 @@ pub async fn live_reset_count(
         WHERE user_id = $1 AND purpose = 'password_reset'
           AND consumed_at IS NULL AND invalidated_at IS NULL AND expires_at > clock_timestamp()
           AND credential_version = $2 AND email_version = $3
-    "#,
+        "#,
     )
     .bind(identity.user_id)
     .bind(identity.credential_version)
@@ -178,7 +182,7 @@ pub async fn invalidate_challenges(
         SET invalidated_at = clock_timestamp()
         WHERE user_id = $1 AND ($2::uuid IS NULL OR id <> $2)
           AND consumed_at IS NULL AND invalidated_at IS NULL
-    "#,
+        "#,
     )
     .bind(user_id)
     .bind(except)
@@ -204,7 +208,7 @@ pub async fn insert_challenge(
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, clock_timestamp()+make_interval(secs => $9))
         RETURNING id, user_id, purpose, email_address, canonical_address, credential_version,
                   email_version, expires_at, consumed_at, invalidated_at
-    "#,
+        "#,
     )
     .bind(Uuid::now_v7())
     .bind(identity.user_id)
@@ -229,7 +233,7 @@ pub async fn challenge_by_hash(
                email_version, expires_at, consumed_at, invalidated_at
         FROM account_security_challenges
         WHERE token_hash = $1
-    "#,
+        "#,
     )
     .bind(token_hash)
     .fetch_optional(pool)
@@ -247,7 +251,7 @@ pub async fn lock_challenge(
         FROM account_security_challenges
         WHERE id = $1
         FOR UPDATE
-    "#,
+        "#,
     )
     .bind(id)
     .fetch_optional(&mut **transaction)
@@ -263,7 +267,7 @@ pub async fn consume_challenge(
         UPDATE account_security_challenges
         SET consumed_at = clock_timestamp()
         WHERE id = $1
-    "#,
+        "#,
     )
     .bind(id)
     .execute(&mut **transaction)
@@ -277,23 +281,27 @@ pub async fn replace_email(
     user_id: UserId,
     email: &EmailRecord,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(r#"
+    sqlx::query(
+        r#"
         INSERT INTO account_emails (user_id, email_address, canonical_address)
         VALUES ($1, $2, $3)
         ON CONFLICT (user_id)
-        DO UPDATE SET email_address = EXCLUDED.email_address,
+        DO UPDATE
+        SET email_address = EXCLUDED.email_address,
                       canonical_address = EXCLUDED.canonical_address, verified_at = clock_timestamp()
-    "#)
+        "#,
+    )
     .bind(user_id)
     .bind(&email.email_address)
     .bind(&email.canonical_address)
-    .execute(&mut **transaction).await?;
+    .execute(&mut **transaction)
+    .await?;
     sqlx::query(
         r#"
         UPDATE users
         SET email_version = email_version + 1
         WHERE id = $1
-    "#,
+        "#,
     )
     .bind(user_id)
     .execute(&mut **transaction)

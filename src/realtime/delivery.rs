@@ -1,7 +1,7 @@
 //! Durable job delivery. Duplicate publications are safe because clients replay by sequence.
 
 use super::{
-    client::{EphemeralEvent, RealtimeEvent},
+    model::{EphemeralEvent, RealtimeEvent},
     repository::{self, LeasedJob},
 };
 use crate::{
@@ -16,6 +16,7 @@ pub async fn deliver(state: &AppState, job: &LeasedJob) -> Result<(), AppError> 
         Some("conversation.event") => {
             let envelope: EventEnvelope = serde_json::from_value(job.payload["envelope"].clone())
                 .map_err(|_| AppError::unavailable())?;
+
             // Old jobs have no control recipients. Episode IDs keep delayed retries
             // from purging a later rejoin, and no conversation content is published.
             let invalidations: Vec<crate::conversations::model::MembershipInvalidation> =
@@ -38,6 +39,7 @@ pub async fn deliver(state: &AppState, job: &LeasedJob) -> Result<(), AppError> 
                     )
                     .await?;
             }
+
             let members =
                 repository::conversation_members(&state.pool, envelope.conversation_id).await?;
             for member in members {
@@ -80,5 +82,6 @@ pub async fn deliver(state: &AppState, job: &LeasedJob) -> Result<(), AppError> 
         }
         _ => return Err(AppError::invalid("未知投递任务")),
     }
+
     Ok(())
 }

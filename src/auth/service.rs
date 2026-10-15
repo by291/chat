@@ -54,6 +54,7 @@ pub async fn bootstrap(
 /// Returns not-found for an unknown username. Revocation jobs cannot be lost after commit.
 pub async fn reset_password(state: &AppState, name: &str, password: &str) -> Result<(), AppError> {
     let password_hash = state.passwords.hash(password).await?;
+
     let mut transaction = state.pool.begin().await?;
 
     // UPDATE locks the user exclusively; login holds its shared lock through session creation.
@@ -68,6 +69,7 @@ pub async fn reset_password(state: &AppState, name: &str, password: &str) -> Res
     }
 
     transaction.commit().await?;
+
     Ok(())
 }
 
@@ -136,6 +138,7 @@ pub async fn register(
     }
 
     let password_hash = state.passwords.hash(&input.password).await?;
+
     let mut transaction = state.pool.begin().await?;
     let invitation_id =
         repository::lock_invitation(&mut transaction, &token_hash(&input.invitation))
@@ -230,6 +233,7 @@ pub async fn enqueue_revocation(
     session_id: SessionId,
 ) -> Result<(), AppError> {
     repository::enqueue_revocation(transaction, user_id, session_id).await?;
+
     Ok(())
 }
 

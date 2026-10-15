@@ -7,7 +7,6 @@ use axum::{
 };
 
 use super::model::{ConversationPreferences, ConversationPreferencesInput, ConversationSummary};
-
 use crate::{
     AppState,
     error::AppError,
@@ -36,6 +35,7 @@ pub async fn direct(
     Json(input): Json<DirectInput>,
 ) -> Result<(StatusCode, Json<ConversationView>), AppError> {
     let created = super::service::ensure_direct(&state, actor, input.peer_id).await?;
+
     Ok((
         if created.is_new {
             StatusCode::CREATED
@@ -114,7 +114,8 @@ pub async fn send(
     Path(id): Path<ConversationId>,
     Json(input): Json<SendMessageInput>,
 ) -> Result<(StatusCode, Json<MessageView>), AppError> {
-    let created = super::service::send_message(&state, actor, id, input).await?;
+    let created = super::messages::send_message(&state, actor, id, input).await?;
+
     Ok((
         if created.is_new {
             StatusCode::CREATED
@@ -148,7 +149,7 @@ pub async fn messages(
     Query(page): Query<MessagePage>,
 ) -> Result<Json<MessageSnapshot>, AppError> {
     Ok(Json(
-        super::service::message_snapshot(&state, actor, id, page).await?,
+        super::message_queries::message_snapshot(&state, actor, id, page).await?,
     ))
 }
 
@@ -267,5 +268,6 @@ pub async fn typing(
         input.membership_id,
     )
     .await?;
+
     Ok(StatusCode::NO_CONTENT)
 }

@@ -213,19 +213,30 @@ pub async fn context_window(
     sqlx::query_as(
         r#"
         WITH preceding AS (
-            SELECT * FROM messages
+            SELECT *
+            FROM messages
             WHERE conversation_id = $1 AND created_seq >= $2 AND created_seq < $3
             ORDER BY created_seq DESC
             LIMIT $4
         ), following AS (
-            SELECT * FROM messages
+            SELECT *
+            FROM messages
             WHERE conversation_id = $1 AND created_seq >= $2 AND created_seq >= $3
             ORDER BY created_seq
-            LIMIT ($5 - (SELECT count(*) FROM preceding))
+            LIMIT ($5 - (
+                SELECT count(*)
+                FROM preceding
+            ))
         )
         SELECT id, conversation_id, sender_id, client_message_id, created_seq, body,
                created_at, sender_name, revision_seq, withdrawn, edited_at, reply_to_message_id
-        FROM (SELECT * FROM preceding UNION ALL SELECT * FROM following) message_window
+        FROM (
+            SELECT *
+            FROM preceding
+            UNION ALL
+            SELECT *
+            FROM following
+        ) message_window
         ORDER BY created_seq
         "#,
     )
@@ -247,9 +258,18 @@ pub async fn context_edges(
 ) -> Result<(bool, bool), sqlx::Error> {
     sqlx::query_as(
         r#"
-        SELECT EXISTS(SELECT 1 FROM messages WHERE conversation_id = $1
-                      AND created_seq >= $2 AND created_seq < $3),
-               EXISTS(SELECT 1 FROM messages WHERE conversation_id = $1 AND created_seq > $4)
+        SELECT
+            EXISTS(
+                SELECT 1
+                FROM messages
+                WHERE conversation_id = $1
+                    AND created_seq >= $2 AND created_seq < $3
+            ),
+            EXISTS(
+                SELECT 1
+                FROM messages
+                WHERE conversation_id = $1 AND created_seq > $4
+            )
         "#,
     )
     .bind(conversation_id)

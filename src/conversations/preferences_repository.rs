@@ -73,7 +73,11 @@ pub async fn append_hint(
     .bind(uuid::Uuid::now_v7())
     .bind(format!("preferences:{user_id}:{conversation_id}"))
     .bind(revision)
-    .bind(serde_json::json!({"type":"conversation.preferences", "user_id":user_id, "conversation_id":conversation_id}))
+    .bind(serde_json::json!({
+        "type": "conversation.preferences",
+        "user_id": user_id,
+        "conversation_id": conversation_id,
+    }))
     .execute(&mut **transaction)
     .await?;
 

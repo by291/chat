@@ -1,9 +1,7 @@
 //! Environment configuration and explicit trusted-proxy handling.
 
+use super::{mail::MailConfig, web_push::WebPushConfig};
 use crate::error::AppError;
-
-use super::mail::MailConfig;
-use super::web_push::WebPushConfig;
 
 #[derive(Clone)]
 pub struct Config {
@@ -78,6 +76,8 @@ impl MediaStorageConfig {
 impl Config {
     /// Load required secrets without including their values in configuration errors.
     pub fn from_env() -> Result<Self, AppError> {
+        // A local .env is optional. Process-provided settings remain authoritative,
+        // and missing required configuration is reported by the checks below.
         dotenvy::dotenv().ok();
         let required =
             |name| std::env::var(name).map_err(|_| AppError::invalid("缺少必需的服务配置"));

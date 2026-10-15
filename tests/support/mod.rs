@@ -1,6 +1,10 @@
 #![allow(dead_code)]
-use chat_server::{AppState, build_router, infrastructure::config::Config};
+
+//! Per-test databases and application listeners, with cleanup owned by the fixture.
+
 use sqlx::{PgPool, postgres::PgPoolOptions};
+
+use chat_server::{AppState, build_router, infrastructure::config::Config};
 
 pub mod mail;
 pub mod media;
@@ -22,8 +26,10 @@ impl Drop for TestApp {
         for server in &self.servers {
             server.abort();
         }
+
         let url = self.admin_url.clone();
         let database = self.database.clone();
+
         // The name is generated here, not supplied by a caller; cleanup survives a test runtime shutdown.
         std::thread::spawn(move || {
             tokio::runtime::Runtime::new()
@@ -68,14 +74,17 @@ pub async fn spawn_test_app_with_migrator(
         admin_url.contains("@127.0.0.1:55433/"),
         "Rust integration tests require the isolated test PostgreSQL; run node scripts/check.mjs"
     );
+
     let admin = PgPool::connect(&config.database_url).await.unwrap();
     let database = format!("test_{}", uuid::Uuid::new_v4().simple());
+
     // Identifier contains only test_ and a generated hexadecimal UUID, never user input.
     let create_sql = format!("CREATE DATABASE {database}");
     sqlx::query(sqlx::AssertSqlSafe(create_sql.as_str()))
         .execute(&admin)
         .await
         .unwrap();
+
     config.database_url = format!(
         "{}/{database}",
         config.database_url.rsplit_once('/').unwrap().0
@@ -87,14 +96,17 @@ pub async fn spawn_test_app_with_migrator(
         .unwrap();
     migrator.run(&pool).await.unwrap();
     admin.close().await;
+
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base_url = format!("http://{}", listener.local_addr().unwrap());
     config.allowed_origins = vec![base_url.clone()];
     let state = AppState::new(config, pool.clone()).await.unwrap();
     let router = build_router(state.clone());
+
     let internal = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let internal_url = format!("http://{}", internal.local_addr().unwrap());
     let internal_router = chat_server::realtime::http::build_internal_router(state.clone());
+
     let internal_task = tokio::spawn(async move {
         axum::serve(internal, internal_router).await.unwrap();
     });
@@ -106,6 +118,7 @@ pub async fn spawn_test_app_with_migrator(
         .await
         .unwrap();
     });
+
     TestApp {
         origin: base_url.clone(),
         base_url,
@@ -125,14 +138,19 @@ pub async fn register_user(
     use sha2::{Digest, Sha256};
 
     let token = uuid::Uuid::new_v4().to_string();
+
     sqlx::query(
-        "INSERT INTO invitations(id,token_hash,expires_at) VALUES($1,$2,now()+interval '7 days')",
+        r#"
+        INSERT INTO invitations(id, token_hash, expires_at)
+        VALUES ($1, $2, now() + interval '7 days')
+        "#,
     )
     .bind(uuid::Uuid::now_v7())
     .bind(hex::encode(Sha256::digest(token.as_bytes())))
     .execute(&app.pool)
     .await
     .unwrap();
+
     let client = app.client();
     let response = client
         .post(format!("{}/api/v1/auth/register", app.base_url))
@@ -149,5 +167,6 @@ pub async fn register_user(
 
     assert_eq!(response.status(), 201);
     let user = response.json().await.unwrap();
+
     (client, user)
 }

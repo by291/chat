@@ -1,13 +1,15 @@
 //! Restricted Web Push encryption, signing and bounded HTTPS provider transport.
 
 use std::{
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     time::Duration,
 };
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 
 use crate::error::AppError;
+
+const PROVIDER_DEADLINE: Duration = Duration::from_secs(10);
 
 mod config;
 #[cfg(feature = "test-failpoints")]
@@ -47,7 +49,7 @@ impl WebPushDelivery {
         ttl: u32,
     ) -> ProviderOutcome {
         tokio::time::timeout(
-            Duration::from_secs(10),
+            PROVIDER_DEADLINE,
             self.send_request(endpoint, p256dh, auth, payload, ttl),
         )
         .await
@@ -83,10 +85,11 @@ impl WebPushDelivery {
         {
             return ProviderOutcome::Definitive("invalid_endpoint");
         }
+
         let client = reqwest::Client::builder()
             .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
-            .timeout(Duration::from_secs(10));
+            .timeout(PROVIDER_DEADLINE);
         #[cfg(feature = "test-failpoints")]
         let (client, fixture_addresses) = if let Some(fixture) = self
             .config
@@ -118,11 +121,13 @@ impl WebPushDelivery {
             }
             addresses
         };
+
         // Pin the validated DNS snapshot, retaining the original hostname for TLS
         // verification. A second DNS resolution must not enable rebinding to private services.
         let Ok(client) = client.resolve_to_addrs(host, &addresses).build() else {
             return ProviderOutcome::Definitive("provider_configuration");
         };
+
         let prepared = (|| {
             let public = web_push_native::p256::PublicKey::from_sec1_bytes(
                 &URL_SAFE_NO_PAD.decode(p256dh).ok()?,
@@ -148,6 +153,7 @@ impl WebPushDelivery {
         let Some(request) = prepared else {
             return ProviderOutcome::Definitive("invalid_subscription");
         };
+
         let (parts, body) = request.into_parts();
         let Ok(response) = client
             .post(url)
@@ -158,6 +164,7 @@ impl WebPushDelivery {
         else {
             return ProviderOutcome::Retryable("provider_connection", None);
         };
+
         match response.status().as_u16() {
             200..=299 => ProviderOutcome::Accepted,
             404 | 410 => ProviderOutcome::BindingExpired,
@@ -183,29 +190,44 @@ impl WebPushDelivery {
 }
 
 fn public_destinations(addresses: &[SocketAddr]) -> bool {
+    // Validate the entire DNS snapshot, not only the address a connection happens
+    // to choose. The provider client pins this same snapshot for TLS transport.
     !addresses.is_empty()
         && addresses.iter().all(|address| match address.ip() {
-            IpAddr::V4(ip) => {
-                let [a, b, c, _] = ip.octets();
-                !(a == 0
-                    || a == 10
-                    || a == 127
-                    || a >= 224
-                    || a == 100 && (64..=127).contains(&b)
-                    || a == 169 && b == 254
-                    || a == 172 && (16..=31).contains(&b)
-                    || a == 192 && (b == 168 || b == 0 || b == 88 && c == 99)
-                    || a == 198 && (b == 18 || b == 19 || b == 51 && c == 100)
-                    || a == 203 && b == 0 && c == 113)
-            }
-            IpAddr::V6(ip) => {
-                let parts = ip.segments();
-                parts[0] & 0xe000 == 0x2000
-                    && !(parts[0] == 0x2001 && (parts[1] < 0x200 || parts[1] == 0xdb8)
-                        || parts[0] == 0x2002
-                        || parts[0] == 0x3fff && parts[1] & 0xf000 == 0)
-            }
+            IpAddr::V4(ip) => public_ipv4(ip),
+            IpAddr::V6(ip) => public_ipv6(ip),
         })
+}
+
+fn public_ipv4(ip: Ipv4Addr) -> bool {
+    let [first_octet, second_octet, third_octet, _] = ip.octets();
+    let private_network = first_octet == 10
+        || first_octet == 172 && (16..=31).contains(&second_octet)
+        || first_octet == 192 && second_octet == 168;
+    let local_or_shared_network = first_octet == 127
+        || first_octet == 100 && (64..=127).contains(&second_octet)
+        || first_octet == 169 && second_octet == 254;
+    let special_use_network = first_octet == 0
+        || first_octet >= 224
+        || first_octet == 192 && (second_octet == 0 || second_octet == 88 && third_octet == 99)
+        || first_octet == 198
+            && (second_octet == 18
+                || second_octet == 19
+                || second_octet == 51 && third_octet == 100)
+        || first_octet == 203 && second_octet == 0 && third_octet == 113;
+
+    !(private_network || local_or_shared_network || special_use_network)
+}
+
+fn public_ipv6(ip: Ipv6Addr) -> bool {
+    let [first_segment, second_segment, ..] = ip.segments();
+    let global_unicast = first_segment & 0xe000 == 0x2000;
+    let special_use_network = first_segment == 0x2001
+        && (second_segment < 0x200 || second_segment == 0xdb8)
+        || first_segment == 0x2002
+        || first_segment == 0x3fff && second_segment & 0xf000 == 0;
+
+    global_unicast && !special_use_network
 }
 
 #[cfg(test)]

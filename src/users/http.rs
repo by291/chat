@@ -7,14 +7,13 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
+use super::model::AvatarInput;
 use crate::{
     AppState,
     error::AppError,
     media::model::DownloadGrant,
     types::{Actor, UpdateProfile, UserId, UserStatus, UserView},
 };
-
-use super::model::AvatarInput;
 
 /// Atomically select a ready avatar belonging to the authenticated actor.
 #[utoipa::path(
@@ -34,6 +33,7 @@ pub async fn set_avatar(
     Json(input): Json<AvatarInput>,
 ) -> Result<StatusCode, AppError> {
     super::service::set_avatar(&state, actor, input).await?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -50,6 +50,7 @@ pub async fn clear_avatar(
     actor: Actor,
 ) -> Result<StatusCode, AppError> {
     super::service::clear_avatar(&state, actor).await?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -74,6 +75,7 @@ pub async fn avatar(
     response
         .headers_mut()
         .insert(CACHE_CONTROL, HeaderValue::from_static("private, no-store"));
+
     Ok(response)
 }
 
@@ -139,5 +141,5 @@ pub async fn status(
     actor: Actor,
     Path(id): Path<UserId>,
 ) -> Result<Json<UserStatus>, AppError> {
-    Ok(Json(super::service::get_status(&state, actor, id).await?))
+    Ok(Json(super::presence::get_status(&state, actor, id).await?))
 }

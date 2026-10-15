@@ -2,6 +2,7 @@
 
 use crate::error::AppError;
 
+/// Trim and lowercase an ASCII username; invalid length or characters return invalid-input.
 pub fn username(value: &str) -> Result<String, AppError> {
     let normalized = value.trim().to_ascii_lowercase();
     let bytes = normalized.as_bytes();
@@ -20,6 +21,7 @@ pub fn username(value: &str) -> Result<String, AppError> {
     Ok(normalized)
 }
 
+/// Trim a display name and require 1–64 Unicode scalar values; invalid input is rejected.
 pub fn display_name(value: &str) -> Result<String, AppError> {
     let trimmed = value.trim();
 

@@ -29,6 +29,7 @@ pub async fn request_password_recovery(
             Duration::from_secs(RESET_SECONDS.into()),
         )
         .await?;
+
     let address = security::normalize_email(email)?;
     match state
         .limiter
@@ -44,11 +45,13 @@ pub async fn request_password_recovery(
         Err(error) if error.code == "rate_limited" => return Ok(()),
         Err(error) => return Err(error),
     }
+
     let Some(user_id) =
         security_repository::verified_email_owner(&state.pool, &address.canonical_address).await?
     else {
         return Ok(());
     };
+
     let token = service::token();
 
     let mut transaction = state.pool.begin().await?;
@@ -61,12 +64,14 @@ pub async fn request_password_recovery(
     else {
         return Ok(());
     };
+
     // User locking serializes resends with resets and email changes. Refusing a
     // fourth live link preserves the first three even after rate-window rollover.
     if security_repository::live_reset_count(&mut transaction, &identity).await? >= LIVE_RESET_LIMIT
     {
         return Ok(());
     }
+
     let challenge = security_repository::insert_challenge(
         &mut transaction,
         &identity,
@@ -119,12 +124,14 @@ pub async fn reset_password_from_token(
         .await?
         .ok_or_else(security::invalid_token)?;
     security::validate_challenge(&challenge, &identity, MailPurpose::PasswordReset)?;
+
     let email = security_repository::verified_email(&mut transaction, identity.user_id)
         .await?
         .ok_or_else(security::invalid_token)?;
     if email.canonical_address != challenge.canonical_address {
         return Err(security::invalid_token());
     }
+
     security_repository::invalidate_challenges(
         &mut transaction,
         identity.user_id,
@@ -132,12 +139,15 @@ pub async fn reset_password_from_token(
     )
     .await?;
     security_repository::consume_challenge(&mut transaction, challenge.id).await?;
+
     security_repository::replace_password(&mut transaction, identity.user_id, &password_hash)
         .await?;
     let sessions = repository::revoke_all_sessions(&mut transaction, identity.user_id).await?;
+
     for session_id in sessions {
         repository::enqueue_revocation(&mut transaction, identity.user_id, session_id).await?;
     }
+
     transaction.commit().await?;
 
     Ok(())

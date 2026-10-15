@@ -21,6 +21,7 @@ pub async fn claim_next(pool: &PgPool, duration: Duration) -> Result<Option<Leas
     if job.as_ref().is_some_and(|j| j.reclaimed) {
         metrics::counter!("chat_outbox_lease_reclaims_total").increment(1);
     }
+
     Ok(job)
 }
 
@@ -30,6 +31,7 @@ pub async fn finish(pool: &PgPool, job: &LeasedJob) -> Result<(), AppError> {
     if changed != 1 {
         return Err(AppError::conflict("任务租约已变更"));
     }
+
     Ok(())
 }
 
@@ -44,6 +46,7 @@ pub async fn retry(pool: &PgPool, job: &LeasedJob, _error: &str) -> Result<(), A
         return Err(AppError::conflict("任务租约已变更"));
     }
     metrics::counter!("chat_outbox_retries_total").increment(1);
+
     Ok(())
 }
 
@@ -64,7 +67,7 @@ pub async fn run_worker(
             // Ephemeral maintenance cannot hold durable delivery or shutdown behind a dependency.
             tokio::select! {
                 _ = cancel.cancelled() => return Ok(()),
-                _ = tokio::time::timeout(Duration::from_secs(2), crate::users::service::refresh_presence(&state)) => {}
+                _ = tokio::time::timeout(Duration::from_secs(2), crate::users::presence::refresh_presence(&state)) => {}
             }
             next_presence = tokio::time::Instant::now() + Duration::from_secs(5);
         }
@@ -88,6 +91,8 @@ pub async fn run_worker(
                 }
                 match result {
                     Ok(()) => {
+                        // Delivery may succeed before SQL confirmation fails. Keep
+                        // the row recoverable by lease expiry; replay tolerates repeats.
                         if finish(&state.pool, &job).await.is_ok() {
                             metrics::counter!("chat_outbox_delivered_total").increment(1);
                         }

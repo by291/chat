@@ -74,6 +74,7 @@ pub async fn origin_guard(
             ));
         }
     }
+
     Ok(next.run(request).await)
 }
 
@@ -96,6 +97,7 @@ fn session_response(
         axum::http::header::SET_COOKIE,
         HeaderValue::from_str(&cookie.to_string()).map_err(|_| AppError::unavailable())?,
     );
+
     Ok(response)
 }
 
@@ -212,6 +214,7 @@ fn clear_session_response(state: &AppState) -> Result<Response, AppError> {
         axum::http::header::SET_COOKIE,
         HeaderValue::from_str(&cookie.to_string()).map_err(|_| AppError::unavailable())?,
     );
+
     Ok(response)
 }
 
@@ -251,6 +254,7 @@ pub async fn change_password(
         axum::http::header::CACHE_CONTROL,
         HeaderValue::from_static("no-store"),
     );
+
     Ok(response)
 }
 
@@ -262,6 +266,7 @@ pub async fn email_status(
     actor: Actor,
 ) -> Result<Response, AppError> {
     let status = security::email_status(&state, actor).await?;
+
     Ok(no_store(Json(status).into_response()))
 }
 
@@ -275,6 +280,7 @@ pub async fn enroll_email(
     Json(input): Json<EmailEnrollmentInput>,
 ) -> Result<Response, AppError> {
     security::enroll_email(&state, actor, input).await?;
+
     Ok(no_store(StatusCode::ACCEPTED.into_response()))
 }
 
@@ -288,6 +294,7 @@ pub async fn verify_email(
     Json(input): Json<EmailVerificationInput>,
 ) -> Result<Response, AppError> {
     let status = security::verify_email(&state, actor, &input.token).await?;
+
     Ok(no_store(Json(status).into_response()))
 }
 
@@ -315,6 +322,7 @@ pub async fn request_password_recovery(
         state.config.client_ip(peer.ip(), &headers),
     )
     .await?;
+
     Ok(no_store(StatusCode::ACCEPTED.into_response()))
 }
 
@@ -327,6 +335,7 @@ pub async fn reset_password_from_token(
     Json(input): Json<super::model::PasswordResetInput>,
 ) -> Result<Response, AppError> {
     recovery::reset_password_from_token(&state, input).await?;
+
     Ok(no_store(StatusCode::NO_CONTENT.into_response()))
 }
 
@@ -380,5 +389,6 @@ pub async fn revoke(
     Path(id): Path<SessionId>,
 ) -> Result<StatusCode, AppError> {
     service::revoke_session(&state, actor, id).await?;
+
     Ok(StatusCode::NO_CONTENT)
 }

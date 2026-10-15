@@ -40,6 +40,7 @@ pub async fn append_with_invalidations(
         conversation_id: id,
         event_seq: Seq(sequence),
     };
+
     let serialized_kind =
         serde_json::to_value(&envelope.kind).map_err(|_| AppError::unavailable())?;
     let kind = serialized_kind.as_str().ok_or_else(AppError::unavailable)?;
@@ -52,6 +53,7 @@ pub async fn append_with_invalidations(
         // REST replay always projects current reactions for its authenticated actor.
         message.reactions.clear();
     }
+
     let payload = serde_json::to_value(payload).map_err(|_| AppError::unavailable())?;
 
     // An event without its job would never reach connected clients. Both records
@@ -69,8 +71,13 @@ pub async fn append_with_invalidations(
         transaction,
         id,
         envelope.event_seq,
-        serde_json::json!({"type":"conversation.event","envelope":envelope,"invalidations":invalidations}),
+        serde_json::json!({
+            "type": "conversation.event",
+            "envelope": envelope,
+            "invalidations": invalidations,
+        }),
     )
     .await?;
+
     Ok(envelope)
 }

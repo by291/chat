@@ -7,10 +7,11 @@ use sqlx::PgPool;
 
 use crate::{
     auth::{http, password::PasswordService},
-    infrastructure::rate_limit::RateLimiter,
+    conversations::http as conversations,
+    error::AppError,
+    infrastructure::{config::Config, presence::PresenceTracker, rate_limit::RateLimiter},
+    users::http as users,
 };
-use crate::{conversations::http as conversations, users::http as users};
-use crate::{error::AppError, infrastructure::config::Config};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -18,6 +19,7 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub passwords: PasswordService,
     pub limiter: RateLimiter,
+    pub presence: PresenceTracker,
     pub dummy_password_hash: Arc<String>,
     pub centrifugo: crate::realtime::client::CentrifugoClient,
     pub object_storage: Option<crate::infrastructure::object_storage::ObjectStorage>,
@@ -32,10 +34,13 @@ impl AppState {
         if let Some(push) = &config.web_push {
             push.validate()?;
         }
+
         crate::infrastructure::observability::init();
         let passwords = PasswordService::default();
         let dummy_password_hash = Arc::new(passwords.hash("dummy password for timing").await?);
         let limiter = RateLimiter::new(&config.valkey_url, &config.database_url)?;
+        let presence = PresenceTracker::new(&config.valkey_url, &config.database_url)?;
+
         let centrifugo = crate::realtime::client::CentrifugoClient::new(&config)?;
         let object_storage = config
             .media_storage
@@ -51,11 +56,13 @@ impl AppState {
             .as_ref()
             .map(crate::infrastructure::web_push::WebPushDelivery::new)
             .transpose()?;
+
         Ok(Self {
             pool,
             config: Arc::new(config),
             passwords,
             limiter,
+            presence,
             dummy_password_hash,
             centrifugo,
             object_storage,
@@ -71,6 +78,7 @@ pub fn build_router(state: AppState) -> Router {
     use crate::conversations::group_http as groups;
     use crate::conversations::message_http as messages;
     use crate::media::http as media;
+
     let api = Router::new()
         .route(
             "/notifications/config",
@@ -194,6 +202,7 @@ pub fn build_router(state: AppState) -> Router {
             state.clone(),
             http::origin_guard,
         ));
+
     Router::new()
         .route("/health/live", get(|| async { StatusCode::OK }))
         .route("/health/ready", get(ready))
@@ -207,5 +216,6 @@ pub fn build_router(state: AppState) -> Router {
 
 async fn ready(State(state): State<AppState>) -> Result<StatusCode, AppError> {
     crate::infrastructure::db::check_ready(&state.pool).await?;
+
     Ok(StatusCode::OK)
 }

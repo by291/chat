@@ -51,6 +51,7 @@ pub async fn register_subscription(
     repository::lock_endpoint(&mut transaction, &endpoint_hash).await?;
     let bindings =
         repository::lock_registration_bindings(&mut transaction, actor, &endpoint_hash).await?;
+
     if let Some(target) = bindings
         .iter()
         .find(|binding| binding.endpoint_hash == endpoint_hash)
@@ -71,6 +72,7 @@ pub async fn register_subscription(
             return Ok(result);
         }
     }
+
     for binding in &bindings {
         if binding.revoked_at.is_none() {
             repository::revoke_binding(&mut transaction, binding.id).await?;
@@ -79,6 +81,7 @@ pub async fn register_subscription(
     if repository::active_device_count(&mut transaction, actor.user_id).await? >= 10 {
         return Err(AppError::conflict("最多可为十个登录设备开启后台提醒"));
     }
+
     let binding =
         repository::insert_binding(&mut transaction, actor, &input, &endpoint_hash).await?;
     transaction.commit().await?;
@@ -100,8 +103,10 @@ pub async fn remove_subscription(
     repository::lock_owned_binding(&mut transaction, actor, id)
         .await?
         .ok_or_else(AppError::not_found)?;
+
     repository::revoke_binding(&mut transaction, id).await?;
     transaction.commit().await?;
+
     Ok(())
 }
 
@@ -119,10 +124,12 @@ pub async fn record_activity(
         .await?
         .filter(|binding| binding.revoked_at.is_none())
         .ok_or_else(AppError::not_found)?;
+
     if let Some(conversation) = input.conversation_id {
         crate::conversations::service::require_member(&mut transaction, actor, conversation)
             .await?;
     }
+
     repository::update_activity(
         &mut transaction,
         binding.id,
@@ -131,6 +138,7 @@ pub async fn record_activity(
     )
     .await?;
     transaction.commit().await?;
+
     Ok(())
 }
 
@@ -142,6 +150,7 @@ async fn lock_actor(
     if !crate::auth::security_repository::require_active_session(transaction, actor).await? {
         return Err(AppError::unauthorized());
     }
+
     Ok(())
 }
 
@@ -152,6 +161,7 @@ fn validate_subscription(
     if input.endpoint.len() > 2048 || input.p256dh.len() != 87 || input.auth.len() != 22 {
         return Err(AppError::invalid("推送订阅格式无效"));
     }
+
     let endpoint =
         reqwest::Url::parse(&input.endpoint).map_err(|_| AppError::invalid("推送订阅格式无效"))?;
     if endpoint.scheme() != "https"
@@ -165,6 +175,7 @@ fn validate_subscription(
     {
         return Err(AppError::invalid("推送服务地址无效"));
     }
+
     let public = URL_SAFE_NO_PAD
         .decode(&input.p256dh)
         .map_err(|_| AppError::invalid("推送订阅格式无效"))?;
@@ -176,5 +187,6 @@ fn validate_subscription(
     }
     web_push_native::p256::PublicKey::from_sec1_bytes(&public)
         .map_err(|_| AppError::invalid("推送订阅格式无效"))?;
+
     Ok(endpoint)
 }

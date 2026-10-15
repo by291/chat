@@ -1,8 +1,9 @@
 //! Optional VAPID startup configuration and redacted validation.
 
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 #[cfg(feature = "test-failpoints")]
 use std::net::SocketAddr;
+
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use web_push_native::p256::{SecretKey, elliptic_curve::sec1::ToEncodedPoint};
 
 use crate::error::AppError;

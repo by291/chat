@@ -23,12 +23,13 @@ pub async fn set_choice(
     let affected = if let Some(kind) = kind {
         sqlx::query(
             r#"
-            INSERT INTO message_reactions(message_id,user_id,kind)
-            VALUES ($1,$2,$3)
-            ON CONFLICT (message_id,user_id)
-            DO UPDATE SET kind=EXCLUDED.kind,updated_at=clock_timestamp()
+            INSERT INTO message_reactions(message_id, user_id, kind)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (message_id, user_id)
+            DO UPDATE
+            SET kind = EXCLUDED.kind, updated_at = clock_timestamp()
             WHERE message_reactions.kind IS DISTINCT FROM EXCLUDED.kind
-        "#,
+            "#,
         )
         .bind(message)
         .bind(user)
@@ -37,13 +38,19 @@ pub async fn set_choice(
         .await?
         .rows_affected()
     } else {
-        sqlx::query("DELETE FROM message_reactions WHERE message_id=$1 AND user_id=$2")
-            .bind(message)
-            .bind(user)
-            .execute(&mut **transaction)
-            .await?
-            .rows_affected()
+        sqlx::query(
+            r#"
+            DELETE FROM message_reactions
+            WHERE message_id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(message)
+        .bind(user)
+        .execute(&mut **transaction)
+        .await?
+        .rows_affected()
     };
+
     Ok(if affected == 0 {
         ChoiceChange::Unchanged
     } else {
@@ -56,11 +63,18 @@ pub async fn update_revision(
     message: MessageId,
     revision: Seq,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE messages SET revision_seq=$2 WHERE id=$1")
-        .bind(message)
-        .bind(revision)
-        .execute(&mut **transaction)
-        .await?;
+    sqlx::query(
+        r#"
+        UPDATE messages
+        SET revision_seq = $2
+        WHERE id = $1
+        "#,
+    )
+    .bind(message)
+    .bind(revision)
+    .execute(&mut **transaction)
+    .await?;
+
     Ok(())
 }
 
@@ -79,12 +93,12 @@ pub async fn summaries(
 ) -> Result<Vec<ReactionSummary>, AppError> {
     let rows: Vec<Aggregate> = sqlx::query_as(
         r#"
-        SELECT kind,count(*) AS count,bool_or(user_id=$2) AS mine
+        SELECT kind, count(*) AS count, bool_or(user_id = $2) AS mine
         FROM message_reactions
-        WHERE message_id=$1
+        WHERE message_id = $1
         GROUP BY kind
-        ORDER BY array_position(ARRAY['like','love','laugh','surprise','sad','celebrate'],kind)
-    "#,
+        ORDER BY array_position(ARRAY['like','love','laugh','surprise','sad','celebrate'], kind)
+        "#,
     )
     .bind(message)
     .bind(reader)

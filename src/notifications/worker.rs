@@ -12,20 +12,26 @@ use super::{
 };
 use crate::{AppState, error::AppError, infrastructure::web_push::ProviderOutcome};
 
+const DATABASE_DEADLINE: Duration = Duration::from_secs(5);
+const DELIVERY_DEADLINE: Duration = Duration::from_secs(15);
+const IDLE_INTERVAL: Duration = Duration::from_secs(1);
+
 /// Keep optional provider failures local so realtime, media and account mail keep running.
 pub async fn run_worker(state: AppState, cancel: CancellationToken) -> Result<(), AppError> {
     loop {
         if cancel.is_cancelled() {
             return Ok(());
         }
+
         match process_next(&state, &cancel).await {
             Ok(true) => continue,
             Ok(false) => {}
             Err(error) => tracing::error!(code = error.code, "push delivery deferred"),
         }
+
         tokio::select! {
             _ = cancel.cancelled() => return Ok(()),
-            _ = tokio::time::sleep(Duration::from_secs(1)) => {},
+            _ = tokio::time::sleep(IDLE_INTERVAL) => {},
         }
     }
 }
@@ -43,12 +49,17 @@ async fn process_claim(state: &AppState) -> Result<bool, AppError> {
     if state.push.is_none() {
         return Ok(false);
     }
+
     let Some(job) = database(job_repository::claim(&state.pool)).await? else {
         return Ok(false);
     };
-    let outcome = tokio::time::timeout(Duration::from_secs(15), delivery::deliver(state, &job))
+
+    let outcome = tokio::time::timeout(DELIVERY_DEADLINE, delivery::deliver(state, &job))
         .await
         .map_err(|_| AppError::unavailable())??;
+
+    // A false completion/defer CAS means a newer lease owns the row. Its result
+    // stands; database errors still propagate so durable failures are never hidden.
     match outcome {
         PushOutcome::Accepted | PushOutcome::Provider(ProviderOutcome::Accepted) => {
             database(job_repository::complete(
@@ -101,13 +112,14 @@ async fn process_claim(state: &AppState) -> Result<bool, AppError> {
             }
         }
     }
+
     Ok(true)
 }
 
 async fn database<T>(
     operation: impl std::future::Future<Output = Result<T, sqlx::Error>>,
 ) -> Result<T, AppError> {
-    tokio::time::timeout(Duration::from_secs(5), operation)
+    tokio::time::timeout(DATABASE_DEADLINE, operation)
         .await
         .map_err(|_| AppError::unavailable())?
         .map_err(AppError::from)

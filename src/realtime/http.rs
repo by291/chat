@@ -48,6 +48,7 @@ async fn connect(
             input.headers.insert(key.into(), value.into());
         }
     }
+
     Ok(Json(connect_proxy(&state, input).await?))
 }
 
@@ -76,6 +77,7 @@ pub fn build_internal_router(state: AppState) -> Router {
 
 async fn metrics(State(state): State<AppState>) -> Result<axum::response::Response, AppError> {
     let backlog = super::service::outbox_stats(&state).await?;
+
     Ok(crate::infrastructure::observability::render_metrics(
         backlog.pending,
         backlog.oldest_age_seconds,

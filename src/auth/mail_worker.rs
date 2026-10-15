@@ -17,11 +17,13 @@ pub async fn run_worker(state: AppState, cancel: CancellationToken) -> Result<()
         if cancel.is_cancelled() {
             return Ok(());
         }
+
         match process_next(&state, &cancel).await {
             Ok(true) => continue,
             Ok(false) => {}
             Err(error) => tracing::error!(code = error.code, "mail delivery deferred"),
         }
+
         tokio::select! {
             _ = cancel.cancelled() => return Ok(()),
             _ = tokio::time::sleep(IDLE_INTERVAL) => {},
@@ -49,6 +51,7 @@ async fn process_claim(state: &AppState) -> Result<bool, AppError> {
     if !database(mail_repository::eligible(&state.pool, &job)).await? {
         return Ok(true);
     }
+
     let payload = match delivery.open(job.id, job.purpose, &job.encrypted_payload) {
         Ok(payload) => payload,
         Err(_) => {
@@ -88,6 +91,7 @@ async fn process_claim(state: &AppState) -> Result<bool, AppError> {
             database(mail_repository::retry(&state.pool, &job, delay, category)).await?
         }
     };
+
     if !confirmed {
         // A newer lease or challenge retirement owns this row now. Never overwrite
         // its result after SMTP acceptance; a duplicate link remains single-use.

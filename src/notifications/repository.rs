@@ -23,10 +23,18 @@ pub async fn lock_owner(
     transaction: &mut Transaction<'_, Postgres>,
     user: UserId,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
-        .bind(user)
-        .execute(&mut **transaction)
-        .await?;
+    sqlx::query(
+        r#"
+        SELECT id
+        FROM users
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(user)
+    .execute(&mut **transaction)
+    .await?;
+
     Ok(())
 }
 
@@ -40,6 +48,7 @@ pub async fn lock_endpoint(
         .bind(endpoint_hash)
         .execute(&mut **transaction)
         .await?;
+
     Ok(())
 }
 
@@ -55,12 +64,15 @@ pub async fn lock_registration_bindings(
         SELECT id, user_id, session_id, generation, p256dh, auth, revoked_at, endpoint_hash
         FROM push_subscriptions
         WHERE id = (
-            SELECT id FROM push_subscriptions WHERE endpoint_hash=$1
-            ORDER BY enrolled_at DESC, id DESC LIMIT 1
-        ) OR (session_id=$2 AND revoked_at IS NULL)
+            SELECT id
+            FROM push_subscriptions
+            WHERE endpoint_hash = $1
+            ORDER BY enrolled_at DESC, id DESC
+            LIMIT 1
+        ) OR (session_id = $2 AND revoked_at IS NULL)
         ORDER BY id
         FOR UPDATE
-    "#,
+        "#,
     )
     .bind(endpoint_hash)
     .bind(actor.session_id)
@@ -76,10 +88,10 @@ pub async fn active_device_count(
         r#"
         SELECT count(*)
         FROM push_subscriptions binding
-        JOIN sessions session ON session.id=binding.session_id
-        WHERE binding.user_id=$1 AND binding.revoked_at IS NULL
+        JOIN sessions session ON session.id = binding.session_id
+        WHERE binding.user_id = $1 AND binding.revoked_at IS NULL
           AND session.revoked_at IS NULL AND session.expires_at > clock_timestamp()
-    "#,
+        "#,
     )
     .bind(user_id)
     .fetch_one(&mut **transaction)
@@ -90,12 +102,27 @@ pub async fn revoke_binding(
     transaction: &mut Transaction<'_, Postgres>,
     id: PushSubscriptionId,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE push_subscriptions SET revoked_at=coalesce(revoked_at, clock_timestamp()) WHERE id=$1")
-        .bind(id).execute(&mut **transaction).await?;
-    sqlx::query("DELETE FROM push_activity WHERE subscription_id=$1")
-        .bind(id)
-        .execute(&mut **transaction)
-        .await?;
+    sqlx::query(
+        r#"
+        UPDATE push_subscriptions
+        SET revoked_at = coalesce(revoked_at, clock_timestamp())
+        WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .execute(&mut **transaction)
+    .await?;
+
+    sqlx::query(
+        r#"
+        DELETE FROM push_activity
+        WHERE subscription_id = $1
+        "#,
+    )
+    .bind(id)
+    .execute(&mut **transaction)
+    .await?;
+
     Ok(())
 }
 
@@ -105,11 +132,13 @@ pub async fn insert_binding(
     input: &SubscriptionInput,
     endpoint_hash: &str,
 ) -> Result<StoredBinding, sqlx::Error> {
-    sqlx::query_as(r#"
-        INSERT INTO push_subscriptions(id,user_id,session_id,generation,endpoint,endpoint_hash,p256dh,auth)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-        RETURNING id,user_id,session_id,generation,p256dh,auth,revoked_at,endpoint_hash
-    "#)
+    sqlx::query_as(
+        r#"
+        INSERT INTO push_subscriptions(id, user_id, session_id, generation, endpoint, endpoint_hash, p256dh, auth)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        RETURNING id, user_id, session_id, generation, p256dh, auth, revoked_at, endpoint_hash
+        "#,
+    )
     .bind(PushSubscriptionId::new())
     .bind(actor.user_id)
     .bind(actor.session_id)
@@ -118,7 +147,8 @@ pub async fn insert_binding(
     .bind(endpoint_hash)
     .bind(&input.p256dh)
     .bind(&input.auth)
-    .fetch_one(&mut **transaction).await
+    .fetch_one(&mut **transaction)
+    .await
 }
 
 pub async fn lock_owned_binding(
@@ -128,11 +158,11 @@ pub async fn lock_owned_binding(
 ) -> Result<Option<StoredBinding>, sqlx::Error> {
     sqlx::query_as(
         r#"
-        SELECT id,user_id,session_id,generation,p256dh,auth,revoked_at,endpoint_hash
+        SELECT id, user_id, session_id, generation, p256dh, auth, revoked_at, endpoint_hash
         FROM push_subscriptions
-        WHERE id=$1 AND user_id=$2 AND session_id=$3
+        WHERE id = $1 AND user_id = $2 AND session_id = $3
         FOR UPDATE
-    "#,
+        "#,
     )
     .bind(id)
     .bind(actor.user_id)
@@ -148,23 +178,30 @@ pub async fn update_activity(
     active: bool,
 ) -> Result<(), sqlx::Error> {
     if !active {
-        sqlx::query("DELETE FROM push_activity WHERE subscription_id=$1")
-            .bind(id)
-            .execute(&mut **transaction)
-            .await?;
+        sqlx::query(
+            r#"
+            DELETE FROM push_activity
+            WHERE subscription_id = $1
+            "#,
+        )
+        .bind(id)
+        .execute(&mut **transaction)
+        .await?;
         return Ok(());
     }
     sqlx::query(
         r#"
-        INSERT INTO push_activity(subscription_id,conversation_id,expires_at)
-        VALUES ($1,$2,clock_timestamp()+interval '30 seconds')
+        INSERT INTO push_activity(subscription_id, conversation_id, expires_at)
+        VALUES ($1, $2, clock_timestamp()+interval '30 seconds')
         ON CONFLICT (subscription_id)
-        DO UPDATE SET conversation_id=EXCLUDED.conversation_id, expires_at=EXCLUDED.expires_at
-    "#,
+        DO UPDATE
+        SET conversation_id = EXCLUDED.conversation_id, expires_at = EXCLUDED.expires_at
+        "#,
     )
     .bind(id)
     .bind(conversation)
     .execute(&mut **transaction)
     .await?;
+
     Ok(())
 }

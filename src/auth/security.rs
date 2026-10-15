@@ -37,6 +37,7 @@ pub async fn enqueue_mail(
             "邮件服务暂未启用",
         )
     })?;
+
     let id = Uuid::now_v7();
     let encrypted_payload = delivery.seal(id, payload.purpose, payload)?;
     let job = super::mail_repository::NewMailJob {
@@ -55,6 +56,7 @@ pub async fn enqueue_mail(
 /// Return mailbox state only for the authenticated owner; absent mail remains a supported mode.
 pub async fn email_status(state: &AppState, actor: Actor) -> Result<EmailStatus, AppError> {
     let details = security_repository::email_details(&state.pool, actor.user_id).await?;
+
     Ok(EmailStatus {
         enabled: state.mail.is_some(),
         verified_email: details.verified_email,
@@ -72,6 +74,7 @@ pub async fn enroll_email(
 ) -> Result<(), AppError> {
     let config = require_mail(state)?;
     let email = normalize_email(&input.email)?;
+
     state
         .limiter
         .check(
@@ -99,15 +102,18 @@ pub async fn enroll_email(
             Duration::from_secs(15 * 60),
         )
         .await?;
+
     let prepared = prepare_password(state, actor, &input.current_password).await?;
     let token = super::service::token();
 
     let mut transaction = state.pool.begin().await?;
     let identity = lock_prepared(&mut transaction, &prepared).await?;
+
     // Take challenge locks before the initiating session lock. A failed recheck
     // rolls back invalidation and leaves the previous pending attempt available.
     security_repository::invalidate_verification(&mut transaction, actor.user_id).await?;
     require_session(&mut transaction, actor).await?;
+
     let challenge = security_repository::insert_challenge(
         &mut transaction,
         &identity,
@@ -163,11 +169,13 @@ pub async fn verify_email(
     security_repository::invalidate_challenges(&mut transaction, actor.user_id, Some(challenge.id))
         .await?;
     require_session(&mut transaction, actor).await?;
+
     let previous = security_repository::verified_email(&mut transaction, actor.user_id).await?;
     let email = EmailRecord {
         email_address: challenge.email_address,
         canonical_address: challenge.canonical_address,
     };
+
     if let Err(error) =
         security_repository::replace_email(&mut transaction, actor.user_id, &email).await
     {
@@ -202,6 +210,7 @@ pub async fn verify_email(
         )
         .await?;
     }
+
     transaction.commit().await?;
 
     email_status(state, actor).await
@@ -212,6 +221,7 @@ pub(super) fn normalize_email(input: &str) -> Result<EmailRecord, AppError> {
     if email.len() > 320 {
         return Err(AppError::invalid("邮箱格式无效"));
     }
+
     let parsed: lettre::Address = email
         .parse()
         .map_err(|_| AppError::invalid("邮箱格式无效"))?;
@@ -230,6 +240,7 @@ async fn prepare_password(
     let identity = security_repository::load_identity(&state.pool, actor.user_id)
         .await?
         .ok_or_else(AppError::unauthorized)?;
+
     if !state
         .passwords
         .verify(password, &identity.password_hash)
@@ -252,6 +263,7 @@ async fn lock_prepared(
     let identity = security_repository::lock_identity(transaction, prepared.user_id)
         .await?
         .ok_or_else(AppError::unauthorized)?;
+
     if identity.credential_version != prepared.credential_version
         || identity.password_hash != prepared.password_hash
     {
@@ -268,6 +280,7 @@ async fn require_session(
     if !security_repository::require_active_session(transaction, actor).await? {
         return Err(AppError::unauthorized());
     }
+
     Ok(())
 }
 
@@ -296,6 +309,7 @@ pub(super) async fn load_token(
     if challenge.purpose != purpose {
         return Err(invalid_token());
     }
+
     Ok(challenge)
 }
 
@@ -314,6 +328,7 @@ pub(super) fn validate_challenge(
     {
         return Err(invalid_token());
     }
+
     Ok(())
 }
 
@@ -337,6 +352,7 @@ pub async fn change_password(
     let prepared = security_repository::load_identity(&state.pool, actor.user_id)
         .await?
         .ok_or_else(AppError::unauthorized)?;
+
     if !state
         .passwords
         .verify(&input.current_password, &prepared.password_hash)
@@ -349,6 +365,7 @@ pub async fn change_password(
             "当前密码不正确",
         ));
     }
+
     let password_hash = state.passwords.hash(&input.new_password).await?;
 
     // Login holds a shared user lock through session insertion. Take the exclusive
@@ -357,6 +374,7 @@ pub async fn change_password(
     let locked = security_repository::lock_identity(&mut transaction, prepared.user_id)
         .await?
         .ok_or_else(AppError::unauthorized)?;
+
     if locked.credential_version != prepared.credential_version
         || locked.password_hash != prepared.password_hash
     {
@@ -369,9 +387,11 @@ pub async fn change_password(
     require_session(&mut transaction, actor).await?;
     security_repository::replace_password(&mut transaction, actor.user_id, &password_hash).await?;
     let revoked_sessions = repository::revoke_all_sessions(&mut transaction, actor.user_id).await?;
+
     for session_id in revoked_sessions {
         repository::enqueue_revocation(&mut transaction, actor.user_id, session_id).await?;
     }
+
     transaction.commit().await?;
 
     Ok(())
@@ -384,5 +404,6 @@ pub async fn invalidate_security_challenges(
     user_id: UserId,
 ) -> Result<(), AppError> {
     security_repository::invalidate_challenges(transaction, user_id, None).await?;
+
     Ok(())
 }

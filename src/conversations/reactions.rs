@@ -40,6 +40,7 @@ pub async fn set_reaction(
     )
     .await?
     .ok_or_else(AppError::not_found)?;
+
     if message.withdrawn {
         return Err(AppError::conflict("已撤回的消息不能回应"));
     }
@@ -63,7 +64,9 @@ pub async fn set_reaction(
         )
         .await?;
     }
+
     enrich_message(&mut transaction, &mut message, actor, member.joined_seq).await?;
     transaction.commit().await?;
+
     Ok(message)
 }

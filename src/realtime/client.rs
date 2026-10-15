@@ -1,47 +1,17 @@
-//! Bounded Centrifugo HTTP transport and durable/ephemeral publication contracts.
+//! Bounded Centrifugo HTTP transport for typed publications and session disconnects.
 
 use serde_json::{Value, json};
 
-use crate::{
-    error::AppError,
-    infrastructure::config::Config,
-    types::{ConversationId, EventEnvelope, MembershipId, UserId},
-};
+use crate::{error::AppError, infrastructure::config::Config, types::UserId};
+
+// Preserve established client imports while the model owns publication contracts.
+pub use super::model::{EphemeralEvent, RealtimeEvent};
 
 #[derive(Clone)]
 pub struct CentrifugoClient {
     http: reqwest::Client,
     url: String,
     key: String,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
-#[serde(untagged)]
-pub enum RealtimeEvent {
-    Durable(EventEnvelope),
-    Ephemeral(EphemeralEvent),
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, utoipa::ToSchema)]
-#[serde(tag = "kind")]
-pub enum EphemeralEvent {
-    #[serde(rename = "conversation.preferences.updated")]
-    ConversationPreferencesUpdated { conversation_id: ConversationId },
-    #[serde(rename = "membership.invalidated")]
-    MembershipInvalidated {
-        conversation_id: ConversationId,
-        membership_id: MembershipId,
-    },
-    #[serde(rename = "typing.changed")]
-    TypingChanged {
-        conversation_id: ConversationId,
-        user_id: UserId,
-        is_typing: bool,
-        #[serde(with = "time::serde::rfc3339")]
-        expires_at: time::OffsetDateTime,
-    },
-    #[serde(rename = "presence.changed")]
-    PresenceChanged { user_id: UserId },
 }
 
 impl CentrifugoClient {
@@ -69,10 +39,12 @@ impl CentrifugoClient {
         if !response.status().is_success() {
             return Err(AppError::unavailable());
         }
+
         let body: Value = response.json().await.map_err(|_| AppError::unavailable())?;
         if body.get("error").is_some() {
             return Err(AppError::unavailable());
         }
+
         body.get("result")
             .cloned()
             .ok_or_else(AppError::unavailable)
@@ -80,8 +52,14 @@ impl CentrifugoClient {
 
     /// Publish a typed hint or durable envelope to a private channel.
     pub async fn publish(&self, channel: &str, event: &RealtimeEvent) -> Result<(), AppError> {
-        self.call("publish", json!({"channel":channel,"data":event}))
-            .await?;
+        self.call(
+            "publish",
+            json!({
+                "channel": channel,
+                "data": event,
+            }),
+        )
+        .await?;
         Ok(())
     }
 

@@ -33,7 +33,7 @@ pub async fn insert_job(
         INSERT INTO account_mail_jobs
             (id, user_id, purpose, challenge_id, encrypted_payload, expires_at)
         VALUES ($1, $2, $3, $4, $5, $6)
-    "#,
+        "#,
     )
     .bind(job.id)
     .bind(job.user_id)
@@ -50,23 +50,29 @@ pub async fn insert_job(
 pub async fn retire_unusable(pool: &PgPool) -> Result<(), sqlx::Error> {
     // Versions/challenge consumption invalidate queued links even after a restore
     // or configuration pause. Terminal jobs retain metadata but purge ciphertext.
-    sqlx::query(r#"
+    sqlx::query(
+        r#"
         WITH retired AS (
             SELECT job.id
             FROM account_mail_jobs job
             WHERE job.status = 'pending'
-              AND (job.expires_at <= clock_timestamp() OR (
-                job.challenge_id IS NOT NULL AND NOT EXISTS (
-                    SELECT 1 FROM account_security_challenges challenge
-                    JOIN users account ON account.id = challenge.user_id
-                    WHERE challenge.id = job.challenge_id
-                      AND challenge.purpose = job.purpose
-                      AND challenge.consumed_at IS NULL AND challenge.invalidated_at IS NULL
-                      AND challenge.expires_at > clock_timestamp()
-                      AND challenge.credential_version = account.credential_version
-                      AND challenge.email_version = account.email_version
+                AND (
+                    job.expires_at <= clock_timestamp()
+                    OR (
+                        job.challenge_id IS NOT NULL
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM account_security_challenges challenge
+                            JOIN users account ON account.id = challenge.user_id
+                            WHERE challenge.id = job.challenge_id
+                                AND challenge.purpose = job.purpose
+                                AND challenge.consumed_at IS NULL AND challenge.invalidated_at IS NULL
+                                AND challenge.expires_at > clock_timestamp()
+                                AND challenge.credential_version = account.credential_version
+                                AND challenge.email_version = account.email_version
+                        )
+                    )
                 )
-              ))
             ORDER BY job.created_at
             LIMIT 100
             FOR UPDATE OF job SKIP LOCKED
@@ -77,7 +83,10 @@ pub async fn retire_unusable(pool: &PgPool) -> Result<(), sqlx::Error> {
             finished_at = clock_timestamp()
         FROM retired
         WHERE job.id = retired.id
-    "#).execute(pool).await?;
+        "#,
+    )
+    .execute(pool)
+    .await?;
 
     Ok(())
 }
@@ -101,7 +110,7 @@ pub async fn claim(pool: &PgPool) -> Result<Option<LeasedMailJob>, sqlx::Error> 
         FROM next_job
         WHERE job.id = next_job.id
         RETURNING job.id, job.purpose, job.encrypted_payload, job.attempts, job.lease_token
-    "#,
+        "#,
     )
     .bind(Uuid::now_v7())
     .fetch_optional(pool)
@@ -109,27 +118,35 @@ pub async fn claim(pool: &PgPool) -> Result<Option<LeasedMailJob>, sqlx::Error> 
 }
 
 pub async fn eligible(pool: &PgPool, job: &LeasedMailJob) -> Result<bool, sqlx::Error> {
-    sqlx::query_scalar(r#"
+    sqlx::query_scalar(
+        r#"
         SELECT EXISTS(
-            SELECT 1 FROM account_mail_jobs current_job
+            SELECT 1
+            FROM account_mail_jobs current_job
             WHERE current_job.id = $1 AND current_job.lease_token = $2
               AND current_job.status = 'pending'
               AND current_job.lease_until > clock_timestamp()
               AND current_job.expires_at > clock_timestamp()
-              AND (current_job.challenge_id IS NULL OR EXISTS (
-                SELECT 1 FROM account_security_challenges challenge
-                JOIN users account ON account.id = challenge.user_id
-                WHERE challenge.id = current_job.challenge_id AND challenge.purpose = current_job.purpose
-                  AND challenge.consumed_at IS NULL AND challenge.invalidated_at IS NULL
-                  AND challenge.expires_at > clock_timestamp()
-                  AND challenge.credential_version = account.credential_version
-                  AND challenge.email_version = account.email_version
-              ))
+                AND (
+                    current_job.challenge_id IS NULL
+                    OR EXISTS (
+                        SELECT 1
+                        FROM account_security_challenges challenge
+                        JOIN users account ON account.id = challenge.user_id
+                        WHERE challenge.id = current_job.challenge_id AND challenge.purpose = current_job.purpose
+                            AND challenge.consumed_at IS NULL AND challenge.invalidated_at IS NULL
+                            AND challenge.expires_at > clock_timestamp()
+                            AND challenge.credential_version = account.credential_version
+                            AND challenge.email_version = account.email_version
+                    )
+                )
         )
-    "#)
+        "#,
+    )
     .bind(job.id)
     .bind(job.lease_token)
-    .fetch_one(pool).await
+    .fetch_one(pool)
+    .await
 }
 
 pub async fn complete(
@@ -145,7 +162,7 @@ pub async fn complete(
             finished_at = clock_timestamp(), lease_token = NULL, lease_until = NULL
         WHERE id = $1 AND lease_token = $2 AND status = 'pending'
           AND lease_until > clock_timestamp()
-    "#,
+        "#,
     )
     .bind(job.id)
     .bind(job.lease_token)
@@ -170,7 +187,7 @@ pub async fn retry(
             failure_category = $4, lease_token = NULL, lease_until = NULL
         WHERE id = $1 AND lease_token = $2 AND status = 'pending'
           AND lease_until > clock_timestamp()
-    "#,
+        "#,
     )
     .bind(job.id)
     .bind(job.lease_token)

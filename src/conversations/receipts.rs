@@ -6,7 +6,7 @@ use super::{events, repository, service::require_membership};
 use crate::{
     AppState,
     error::AppError,
-    realtime::client::{EphemeralEvent, RealtimeEvent},
+    realtime::model::{EphemeralEvent, RealtimeEvent},
     types::{
         Actor, ConversationEventKind, ConversationEventPayload, ConversationId, MembershipId,
         ReceiptData, Seq,
@@ -81,6 +81,7 @@ pub async fn set_typing_with_membership(
 ) -> Result<(), AppError> {
     let mut transaction = state.pool.begin().await?;
     require_membership(&mut transaction, actor, id, expected).await?;
+
     let members = repository::members(&mut transaction, id).await?;
     // Do not retain a database transaction while waiting on the rate limiter or network.
     transaction.commit().await?;
@@ -94,6 +95,7 @@ pub async fn set_typing_with_membership(
             std::time::Duration::from_secs(3),
         )
         .await?;
+
     let event = RealtimeEvent::Ephemeral(EphemeralEvent::TypingChanged {
         conversation_id: id,
         user_id: actor.user_id,
@@ -106,5 +108,6 @@ pub async fn set_typing_with_membership(
             .publish(&format!("personal:#{member}"), &event)
             .await?;
     }
+
     Ok(())
 }

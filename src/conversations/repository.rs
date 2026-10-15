@@ -54,6 +54,14 @@ pub struct StoredEvent {
     pub payload: serde_json::Value,
 }
 
+/// Complete seek position, including the pinned tier, for stable summary pagination.
+#[derive(Clone, Copy)]
+pub struct SummaryCursor {
+    pub pinned: bool,
+    pub updated_at: OffsetDateTime,
+    pub id: uuid::Uuid,
+}
+
 pub async fn member(
     tx: &mut Transaction<'_, Postgres>,
     user_id: UserId,
@@ -65,7 +73,7 @@ pub async fn member(
         FROM conversation_members m
         JOIN conversations c ON c.id = m.conversation_id
         WHERE m.conversation_id = $1 AND m.user_id = $2 AND m.left_at IS NULL
-    "#,
+        "#,
     )
     .bind(id)
     .bind(user_id)
@@ -77,10 +85,18 @@ pub async fn user_exists(
     tx: &mut Transaction<'_, Postgres>,
     user_id: UserId,
 ) -> Result<bool, sqlx::Error> {
-    sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
-        .bind(user_id)
-        .fetch_one(&mut **tx)
-        .await
+    sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM users
+            WHERE id = $1
+        )
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(&mut **tx)
+    .await
 }
 
 pub async fn insert_direct(
@@ -94,7 +110,7 @@ pub async fn insert_direct(
         VALUES ($1, $2, $3)
         ON CONFLICT(min_user_id, max_user_id) DO NOTHING
         RETURNING id
-    "#,
+        "#,
     )
     .bind(ConversationId::new())
     .bind(low)
@@ -113,7 +129,7 @@ pub async fn insert_direct_members(
         r#"
         INSERT INTO conversation_members(conversation_id, user_id, membership_id)
         VALUES ($1, $2, $4), ($1, $3, $5)
-    "#,
+        "#,
     )
     .bind(id)
     .bind(low)
@@ -122,6 +138,7 @@ pub async fn insert_direct_members(
     .bind(MembershipId::new())
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
@@ -132,9 +149,10 @@ pub async fn direct_id(
 ) -> Result<ConversationId, sqlx::Error> {
     sqlx::query_scalar(
         r#"
-        SELECT id FROM conversations
+        SELECT id
+        FROM conversations
         WHERE min_user_id = $1 AND max_user_id = $2
-    "#,
+        "#,
     )
     .bind(low)
     .bind(high)
@@ -156,8 +174,11 @@ pub async fn summary(
                peer.peer_id, peer.username, peer.display_name, peer.peer_read_seq,
                m.membership_id, m.joined_seq, m.role,
                m.last_read_message_seq AS my_read_seq,
-               (SELECT count(*) FROM conversation_members active
-                WHERE active.conversation_id = c.id AND active.left_at IS NULL) AS member_count
+               (
+                   SELECT count(*)
+                   FROM conversation_members active
+                   WHERE active.conversation_id = c.id AND active.left_at IS NULL
+               ) AS member_count
         FROM conversations c
         JOIN conversation_members m ON m.conversation_id = c.id
              AND m.user_id = $1 AND m.left_at IS NULL
@@ -172,7 +193,7 @@ pub async fn summary(
             LIMIT 1
         ) peer ON TRUE
         WHERE c.id = $2
-    "#,
+        "#,
     )
     .bind(user_id)
     .bind(id)
@@ -183,7 +204,7 @@ pub async fn summary(
 pub async fn summaries(
     tx: &mut Transaction<'_, Postgres>,
     user_id: UserId,
-    cursor: Option<(bool, OffsetDateTime, uuid::Uuid)>,
+    cursor: Option<SummaryCursor>,
     limit: u16,
 ) -> Result<Vec<SummaryRow>, sqlx::Error> {
     sqlx::query_as(
@@ -195,8 +216,11 @@ pub async fn summaries(
                peer.peer_id, peer.username, peer.display_name, peer.peer_read_seq,
                m.membership_id, m.joined_seq, m.role,
                m.last_read_message_seq AS my_read_seq,
-               (SELECT count(*) FROM conversation_members active
-                WHERE active.conversation_id = c.id AND active.left_at IS NULL) AS member_count
+               (
+                   SELECT count(*)
+                   FROM conversation_members active
+                   WHERE active.conversation_id = c.id AND active.left_at IS NULL
+               ) AS member_count
         FROM conversations c
         JOIN conversation_members m ON m.conversation_id = c.id
              AND m.user_id = $1 AND m.left_at IS NULL
@@ -213,12 +237,12 @@ pub async fn summaries(
         WHERE ($2::boolean IS NULL OR (coalesce(preferences.pinned, false), c.updated_at, c.id) < ($2, $3, $4))
         ORDER BY coalesce(preferences.pinned, false) DESC, c.updated_at DESC, c.id DESC
         LIMIT $5
-    "#,
+        "#,
     )
     .bind(user_id)
-    .bind(cursor.map(|position| position.0))
-    .bind(cursor.map(|position| position.1))
-    .bind(cursor.map(|position| position.2))
+    .bind(cursor.map(|position| position.pinned))
+    .bind(cursor.map(|position| position.updated_at))
+    .bind(cursor.map(|position| position.id))
     .bind(i64::from(limit) + 1)
     .fetch_all(&mut **tx)
     .await
@@ -233,9 +257,14 @@ pub async fn unread_count(
 ) -> Result<i64, sqlx::Error> {
     sqlx::query_scalar(
         r#"
-        SELECT count(*) FROM messages
-        WHERE conversation_id = $1 AND sender_id != $2 AND created_seq > $3 AND created_seq >= $4 AND NOT withdrawn
-    "#,
+        SELECT count(*)
+        FROM messages
+        WHERE conversation_id = $1
+            AND sender_id != $2
+            AND created_seq > $3
+            AND created_seq >= $4
+            AND NOT withdrawn
+        "#,
     )
     .bind(id)
     .bind(user_id)
@@ -249,10 +278,17 @@ pub async fn lock_version(
     tx: &mut Transaction<'_, Postgres>,
     id: ConversationId,
 ) -> Result<Option<i64>, sqlx::Error> {
-    sqlx::query_scalar("SELECT latest_event_seq FROM conversations WHERE id = $1 FOR UPDATE")
-        .bind(id)
-        .fetch_optional(&mut **tx)
-        .await
+    sqlx::query_scalar(
+        r#"
+        SELECT latest_event_seq
+        FROM conversations
+        WHERE id = $1
+        FOR UPDATE
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(&mut **tx)
+    .await
 }
 
 pub async fn begin_snapshot(pool: &PgPool) -> Result<Transaction<'static, Postgres>, sqlx::Error> {
@@ -266,10 +302,16 @@ pub async fn version(
     tx: &mut Transaction<'_, Postgres>,
     id: ConversationId,
 ) -> Result<i64, sqlx::Error> {
-    sqlx::query_scalar("SELECT latest_event_seq FROM conversations WHERE id = $1")
-        .bind(id)
-        .fetch_one(&mut **tx)
-        .await
+    sqlx::query_scalar(
+        r#"
+        SELECT latest_event_seq
+        FROM conversations
+        WHERE id = $1
+        "#,
+    )
+    .bind(id)
+    .fetch_one(&mut **tx)
+    .await
 }
 
 pub async fn events(
@@ -281,10 +323,12 @@ pub async fn events(
 ) -> Result<Vec<StoredEvent>, sqlx::Error> {
     sqlx::query_as(
         r#"
-        SELECT event_id, event_seq, kind, payload FROM conversation_events
+        SELECT event_id, event_seq, kind, payload
+        FROM conversation_events
         WHERE conversation_id = $1 AND event_seq > $2 AND event_seq >= $3
-        ORDER BY event_seq LIMIT $4
-    "#,
+        ORDER BY event_seq
+        LIMIT $4
+        "#,
     )
     .bind(id)
     .bind(after)
@@ -302,9 +346,12 @@ pub async fn visible_message(
 ) -> Result<bool, sqlx::Error> {
     sqlx::query_scalar(
         r#"
-        SELECT EXISTS(SELECT 1 FROM messages
-            WHERE conversation_id = $1 AND created_seq = $2 AND created_seq >= $3)
-    "#,
+        SELECT EXISTS(
+            SELECT 1
+            FROM messages
+            WHERE conversation_id = $1 AND created_seq = $2 AND created_seq >= $3
+        )
+        "#,
     )
     .bind(id)
     .bind(seq)
@@ -321,15 +368,17 @@ pub async fn update_receipt(
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
-        UPDATE conversation_members SET last_read_message_seq = $3
+        UPDATE conversation_members
+        SET last_read_message_seq = $3
         WHERE conversation_id = $1 AND user_id = $2 AND left_at IS NULL
-    "#,
+        "#,
     )
     .bind(id)
     .bind(user_id)
     .bind(seq)
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
@@ -339,9 +388,10 @@ pub async fn members(
 ) -> Result<Vec<UserId>, sqlx::Error> {
     sqlx::query_scalar(
         r#"
-        SELECT user_id FROM conversation_members
+        SELECT user_id
+        FROM conversation_members
         WHERE conversation_id = $1 AND left_at IS NULL
-    "#,
+        "#,
     )
     .bind(id)
     .fetch_all(&mut **tx)
@@ -360,7 +410,7 @@ pub async fn advance_version(
             updated_at = CASE WHEN $2 THEN now() ELSE updated_at END
         WHERE id = $1
         RETURNING latest_event_seq
-    "#,
+        "#,
     )
     .bind(id)
     .bind(update_activity)
@@ -380,7 +430,7 @@ pub async fn insert_event(
         r#"
         INSERT INTO conversation_events(event_id, conversation_id, event_seq, kind, payload)
         VALUES ($1, $2, $3, $4, $5)
-    "#,
+        "#,
     )
     .bind(event_id)
     .bind(id)
@@ -389,6 +439,7 @@ pub async fn insert_event(
     .bind(payload)
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
@@ -402,7 +453,7 @@ pub async fn insert_event_job(
         r#"
         INSERT INTO outbox(job_id, aggregate_key, ordinal, payload)
         VALUES ($1, $2, $3, $4)
-    "#,
+        "#,
     )
     .bind(uuid::Uuid::now_v7())
     .bind(format!("conversation:{id}"))
@@ -410,5 +461,6 @@ pub async fn insert_event_job(
     .bind(payload)
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }

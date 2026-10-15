@@ -94,9 +94,11 @@ pub async fn events_with_membership(
     let mut transaction = repository::begin_snapshot(&state.pool).await?;
     let member = require_member(&mut transaction, actor, id).await?;
     check_membership(&member, expected, false)?;
+
     if after.0 < member.joined_seq - 1 {
         return Err(AppError::conflict("成员历史边界已变化，请重新加载快照"));
     }
+
     let snapshot = repository::version(&mut transaction, id).await?;
     if after.0 > snapshot {
         return Err(AppError::invalid("事件游标超过当前版本"));
@@ -107,6 +109,7 @@ pub async fn events_with_membership(
     let has_more = rows.len() > usize::from(limit);
     rows.truncate(usize::from(limit));
     let last_seq = rows.last().map(|row| Seq(row.event_seq)).unwrap_or(after);
+
     let mut events = Vec::with_capacity(rows.len());
     for row in rows {
         let mut event = decode_event(id, row)?;
@@ -173,6 +176,7 @@ async fn project_message_event(
     } else {
         ConversationEventPayload::MessageUnavailable { message_id }
     };
+
     Ok(())
 }
 
@@ -202,11 +206,13 @@ pub async fn search_messages(
         query.limit,
     )
     .await?;
+
     let has_more = items.len() > usize::from(query.limit);
     items.truncate(usize::from(query.limit));
     for message in &mut items {
         enrich_message(&mut transaction, message, actor, member.joined_seq).await?;
     }
+
     let next_before = if has_more {
         items.last().map(|message| message.created_seq)
     } else {
@@ -250,6 +256,7 @@ pub async fn message_context(
     for message in &mut items {
         enrich_message(&mut transaction, message, actor, member.joined_seq).await?;
     }
+
     let first = items.first().ok_or_else(AppError::unavailable)?.created_seq;
     let last = items.last().ok_or_else(AppError::unavailable)?.created_seq;
     let (has_before, has_after) =
@@ -271,6 +278,7 @@ fn validate_limit(limit: u16) -> Result<(), AppError> {
     if limit == 0 || limit > MAX_HISTORY_PAGE {
         return Err(AppError::invalid("分页大小需要 1–100"));
     }
+
     Ok(())
 }
 

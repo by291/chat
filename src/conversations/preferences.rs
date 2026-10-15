@@ -19,6 +19,7 @@ pub async fn update_preferences(
     input: ConversationPreferencesInput,
 ) -> Result<ConversationPreferences, AppError> {
     let mut transaction = state.pool.begin().await?;
+
     // Use the aggregate-first discipline shared with membership mutations. This
     // also serializes partial updates so one device cannot lose another's fields.
     lock_membership(
@@ -28,6 +29,7 @@ pub async fn update_preferences(
         input.membership_id,
     )
     .await?;
+
     let current =
         preferences_repository::get(&mut transaction, conversation_id, actor.user_id).await?;
     let updated = ConversationPreferences {
@@ -35,6 +37,7 @@ pub async fn update_preferences(
         muted: input.muted.unwrap_or(current.muted),
         archived: input.archived.unwrap_or(current.archived),
     };
+
     if updated != current {
         let revision =
             preferences_repository::save(&mut transaction, conversation_id, actor.user_id, updated)
@@ -47,6 +50,7 @@ pub async fn update_preferences(
         )
         .await?;
     }
+
     transaction.commit().await?;
 
     Ok(updated)

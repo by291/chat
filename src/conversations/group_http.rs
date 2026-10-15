@@ -141,6 +141,7 @@ pub async fn remove(
     Json(input): Json<GroupActionInput>,
 ) -> Result<StatusCode, AppError> {
     groups::remove(&state, actor, id, input.membership_id, user).await?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -166,6 +167,7 @@ pub async fn leave(
     Json(input): Json<GroupActionInput>,
 ) -> Result<StatusCode, AppError> {
     groups::remove(&state, actor, id, input.membership_id, actor.user_id).await?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -245,6 +247,7 @@ pub async fn revoke(
     Json(input): Json<GroupActionInput>,
 ) -> Result<StatusCode, AppError> {
     groups::revoke_invite(&state, actor, id, input.membership_id, invitation).await?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 

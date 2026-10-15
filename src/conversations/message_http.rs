@@ -109,6 +109,7 @@ pub async fn set_reaction(
     input: Result<Json<SetReactionInput>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<MessageView>, AppError> {
     let Json(input) = input.map_err(|_| AppError::invalid("表情回应格式无效"))?;
+
     Ok(Json(
         super::reactions::set_reaction(
             &state,

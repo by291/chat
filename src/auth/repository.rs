@@ -30,9 +30,16 @@ pub async fn lock_bootstrap(
 }
 
 pub async fn users_exist(transaction: &mut Transaction<'_, Postgres>) -> Result<bool, sqlx::Error> {
-    sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users)")
-        .fetch_one(&mut **transaction)
-        .await
+    sqlx::query_scalar(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM users
+        )
+        "#,
+    )
+    .fetch_one(&mut **transaction)
+    .await
 }
 
 pub async fn insert_user(
@@ -81,7 +88,8 @@ pub async fn revoke_all_sessions(
 ) -> Result<Vec<SessionId>, sqlx::Error> {
     sqlx::query_scalar(
         r#"
-        UPDATE sessions SET revoked_at = COALESCE(revoked_at, now())
+        UPDATE sessions
+        SET revoked_at = COALESCE(revoked_at, now())
         WHERE user_id = $1
         RETURNING id
         "#,
@@ -122,7 +130,8 @@ pub async fn lock_invitation(
 ) -> Result<Option<Uuid>, sqlx::Error> {
     sqlx::query_scalar(
         r#"
-        SELECT id FROM invitations
+        SELECT id
+        FROM invitations
         WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > now()
         FOR UPDATE
         "#,
@@ -139,7 +148,8 @@ pub async fn consume_invitation(
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
-        UPDATE invitations SET consumed_at = now(), consumed_by = $2
+        UPDATE invitations
+        SET consumed_at = now(), consumed_by = $2
         WHERE id = $1
         "#,
     )
@@ -157,7 +167,8 @@ pub async fn lock_credentials(
 ) -> Result<Option<Credentials>, sqlx::Error> {
     sqlx::query_as(
         r#"
-        SELECT id, username, display_name, password_hash FROM users
+        SELECT id, username, display_name, password_hash
+        FROM users
         WHERE username = $1
         FOR SHARE
         "#,
@@ -170,7 +181,8 @@ pub async fn lock_credentials(
 pub async fn active_session(pool: &PgPool, token_hash: &str) -> Result<Option<Actor>, sqlx::Error> {
     let row: Option<(UserId, SessionId)> = sqlx::query_as(
         r#"
-        SELECT user_id, id FROM sessions
+        SELECT user_id, id
+        FROM sessions
         WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > now()
         "#,
     )
@@ -218,7 +230,8 @@ pub async fn revoke_owned_session(
 ) -> Result<Option<UserId>, sqlx::Error> {
     sqlx::query_scalar(
         r#"
-        UPDATE sessions SET revoked_at = COALESCE(revoked_at, now())
+        UPDATE sessions
+        SET revoked_at = COALESCE(revoked_at, now())
         WHERE id = $1 AND user_id = $2
         RETURNING user_id
         "#,
@@ -230,10 +243,16 @@ pub async fn revoke_owned_session(
 }
 
 pub async fn user(pool: &PgPool, user_id: UserId) -> Result<UserView, sqlx::Error> {
-    sqlx::query_as("SELECT id, username, display_name FROM users WHERE id = $1")
-        .bind(user_id)
-        .fetch_one(pool)
-        .await
+    sqlx::query_as(
+        r#"
+        SELECT id, username, display_name
+        FROM users
+        WHERE id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
 }
 
 pub async fn list_sessions(pool: &PgPool, actor: Actor) -> Result<Vec<SessionView>, sqlx::Error> {

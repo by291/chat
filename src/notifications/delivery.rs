@@ -24,9 +24,12 @@ pub async fn deliver(state: &AppState, job: &LeasedPushJob) -> Result<PushOutcom
     if let Some(until) = binding.foreground_until {
         return Ok(PushOutcome::Deferred(until));
     }
+
     let payload = serde_json::to_vec(&serde_json::json!({
-        "schema_version":1,"tag":format!("chat:{}",job.event_id),
-        "generation":job.binding_generation,"path":format!("/app/chats/{}",job.conversation_id)
+        "schema_version": 1,
+        "tag": format!("chat:{}", job.event_id),
+        "generation": job.binding_generation,
+        "path": format!("/app/chats/{}", job.conversation_id),
     }))
     .map_err(|_| AppError::unavailable())?;
     let ttl = (job.deadline - OffsetDateTime::now_utc())
@@ -35,6 +38,7 @@ pub async fn deliver(state: &AppState, job: &LeasedPushJob) -> Result<PushOutcom
     if ttl == 0 {
         return Ok(PushOutcome::Skipped);
     }
+
     let result = transport
         .send(
             &binding.endpoint,
@@ -44,6 +48,7 @@ pub async fn deliver(state: &AppState, job: &LeasedPushJob) -> Result<PushOutcom
             ttl,
         )
         .await;
+
     Ok(match result {
         ProviderOutcome::Accepted => PushOutcome::Accepted,
         other => PushOutcome::Provider(other),

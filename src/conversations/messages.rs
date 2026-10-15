@@ -48,6 +48,7 @@ pub async fn send_message(
         .await?
         .ok_or_else(AppError::not_found)?;
     let member = require_membership(&mut transaction, actor, id, input.membership_id).await?;
+
     if let Some(original) = message_repository::original_submission(
         &mut transaction,
         id,
@@ -64,13 +65,16 @@ pub async fn send_message(
         )
         .await?
         .ok_or_else(|| AppError::conflict("此消息 ID 已用于较早的成员历史"))?;
+
         // Compare immutable submission fields, including ordered IDs. Never rebind
         // on retry: display state and attachment lifecycle may have changed since send.
         if !original.matches(&input) {
             return Err(AppError::conflict("此消息 ID 已用于不同内容"));
         }
+
         enrich_message(&mut transaction, &mut message, actor, member.joined_seq).await?;
         transaction.commit().await?;
+
         return Ok(Created {
             value: message,
             is_new: false,
@@ -97,7 +101,7 @@ pub async fn send_message(
     // Binding follows conversation -> owner quota -> sorted attachment locks;
     // any failed validation rolls back the message and every reference together.
     if !input.attachment_ids.is_empty() {
-        message.attachments = media::service::bind_message(
+        message.attachments = media::references::bind_message(
             &mut transaction,
             actor,
             &member,
@@ -181,9 +185,11 @@ async fn mutate_message(
         message_repository::message(&mut transaction, id, message_id, member.joined_seq)
             .await?
             .ok_or_else(AppError::not_found)?;
+
     if message.sender_id != actor.user_id {
         return Err(AppError::forbidden());
     }
+
     if message.withdrawn {
         if body.is_some() {
             return Err(AppError::conflict("已撤回的消息不能编辑"));
@@ -191,9 +197,11 @@ async fn mutate_message(
         transaction.commit().await?;
         return Ok(message);
     }
+
     if let Some(body) = body {
-        let attachment_ids = media::repository::message_views(&mut transaction, message.id).await?;
-        if (body.trim().is_empty() && attachment_ids.is_empty())
+        let attachments =
+            media::reference_repository::message_views(&mut transaction, message.id).await?;
+        if (body.trim().is_empty() && attachments.is_empty())
             || body.chars().count() > MAX_MESSAGE_LENGTH
         {
             return Err(AppError::invalid("消息不能为空，且最多 4096 个字符"));
@@ -203,6 +211,7 @@ async fn mutate_message(
     let revision = Seq(latest.checked_add(1).ok_or_else(AppError::unavailable)?);
     message = message_repository::mutate(&mut transaction, message_id, revision, body).await?;
     enrich_message(&mut transaction, &mut message, actor, member.joined_seq).await?;
+
     let (kind, payload) = if body.is_some() {
         (
             ConversationEventKind::MessageEdited,
@@ -214,6 +223,7 @@ async fn mutate_message(
             ConversationEventPayload::MessageWithdrawn(message.clone()),
         )
     };
+
     events::append(&mut transaction, id, kind, payload).await?;
     transaction.commit().await?;
 
@@ -235,9 +245,11 @@ pub(crate) async fn enrich_message(
         return Ok(());
     }
 
-    message.attachments = media::repository::message_views(transaction, message.id).await?;
+    message.attachments =
+        media::reference_repository::message_views(transaction, message.id).await?;
     message.reactions =
         super::reactions_repository::summaries(transaction, message.id, actor.user_id).await?;
+
     message.reply = if let Some(reply_id) = message.reply_to_message_id {
         message_repository::message(transaction, message.conversation_id, reply_id, joined_seq)
             .await?
@@ -257,5 +269,6 @@ pub(crate) async fn enrich_message(
     } else {
         None
     };
+
     Ok(())
 }

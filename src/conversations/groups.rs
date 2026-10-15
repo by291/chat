@@ -31,6 +31,7 @@ fn title(input: &str) -> Result<&str, AppError> {
     if !(1..=100).contains(&title.chars().count()) {
         return Err(AppError::invalid("群名称需要 1–100 个字符"));
     }
+
     Ok(title)
 }
 
@@ -47,6 +48,7 @@ async fn lock_group(
     if member.kind != "group" {
         return Err(AppError::not_found());
     }
+
     Ok(member)
 }
 
@@ -54,6 +56,7 @@ fn require_manager(member: &Member, owner_only: bool) -> Result<(), AppError> {
     if member.role != "owner" && (owner_only || member.role != "admin") {
         return Err(AppError::forbidden());
     }
+
     Ok(())
 }
 
@@ -86,6 +89,7 @@ pub async fn create(
 ) -> Result<GroupConversationView, AppError> {
     let title = title(input)?;
     let id = ConversationId::new();
+
     let mut transaction = state.pool.begin().await?;
 
     persistence::insert_group(&mut transaction, id, title).await?;
@@ -121,6 +125,7 @@ pub async fn rename(
     input: &str,
 ) -> Result<GroupConversationView, AppError> {
     let title = title(input)?;
+
     let mut transaction = state.pool.begin().await?;
     let member = lock_group(&mut transaction, actor, id, expected).await?;
     require_manager(&member, false)?;
@@ -151,8 +156,10 @@ pub async fn members(
     if member.kind != "group" {
         return Err(AppError::not_found());
     }
+
     let roster = persistence::roster(&mut transaction, id).await?;
     transaction.commit().await?;
+
     Ok(roster)
 }
 
@@ -168,9 +175,11 @@ pub async fn set_role(
     if role == GroupRole::Owner {
         return Err(AppError::invalid("请使用群主转让操作"));
     }
+
     let mut transaction = state.pool.begin().await?;
     let manager = lock_group(&mut transaction, actor, id, expected).await?;
     require_manager(&manager, true)?;
+
     let target = repository::member(&mut transaction, user, id)
         .await?
         .ok_or_else(AppError::not_found)?;
@@ -192,6 +201,7 @@ pub async fn set_role(
     .await?;
     let roster = persistence::roster(&mut transaction, id).await?;
     transaction.commit().await?;
+
     Ok(roster)
 }
 
@@ -209,6 +219,7 @@ pub async fn transfer(
     if user == actor.user_id {
         return Err(AppError::invalid("请选择另一位成员"));
     }
+
     let target = repository::member(&mut transaction, user, id)
         .await?
         .ok_or_else(AppError::not_found)?;
@@ -227,6 +238,7 @@ pub async fn transfer(
     .await?;
     let roster = persistence::roster(&mut transaction, id).await?;
     transaction.commit().await?;
+
     Ok(roster)
 }
 
@@ -246,6 +258,7 @@ pub async fn remove(
     if target.role == "owner" {
         return Err(AppError::conflict("群主需要先转让再退出"));
     }
+
     if user != actor.user_id {
         require_manager(&member, false)?;
         if target.role == "admin" {
@@ -271,6 +284,7 @@ pub async fn remove(
     persistence::revoke_issuer_invitations(&mut transaction, id, target.user_id).await?;
     persistence::end_membership(&mut transaction, target.membership_id, envelope.event_seq).await?;
     transaction.commit().await?;
+
     Ok(())
 }
 
@@ -287,6 +301,7 @@ pub async fn invite(
     let token_hash = hex::encode(Sha256::digest(token.as_bytes()));
     let invitation_id = Uuid::now_v7();
     let expires_at = OffsetDateTime::now_utc() + time::Duration::days(INVITATION_LIFETIME_DAYS);
+
     let mut transaction = state.pool.begin().await?;
     let member = lock_group(&mut transaction, actor, id, expected).await?;
     require_manager(&member, false)?;
@@ -301,6 +316,7 @@ pub async fn invite(
     )
     .await?;
     transaction.commit().await?;
+
     Ok(GroupInvitationView {
         invitation_id,
         token,
@@ -323,6 +339,7 @@ pub async fn revoke_invite(
         return Err(AppError::not_found());
     }
     transaction.commit().await?;
+
     Ok(())
 }
 
@@ -335,11 +352,14 @@ pub async fn accept(
     if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(AppError::invalid("群邀请无效"));
     }
+
     let hash = hex::encode(Sha256::digest(token.as_bytes()));
+
     let mut transaction = state.pool.begin().await?;
     let id = persistence::invitation_conversation(&mut transaction, &hash)
         .await?
         .ok_or_else(AppError::not_found)?;
+
     // Preliminary lookup identifies the aggregate only. Lock it before the invitation,
     // then recheck every invitation condition to avoid inversion with group mutations.
     let latest = repository::lock_version(&mut transaction, id)
@@ -355,6 +375,7 @@ pub async fn accept(
     {
         return Err(AppError::conflict("群邀请已使用或失效"));
     }
+
     let issuer = repository::member(&mut transaction, invitation.issuer_id, id)
         .await?
         .ok_or_else(AppError::not_found)?;

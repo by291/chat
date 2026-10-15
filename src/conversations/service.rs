@@ -50,6 +50,7 @@ pub async fn require_membership(
 ) -> Result<Member, AppError> {
     let member = require_member(transaction, actor, id).await?;
     check_membership(&member, expected, true)?;
+
     Ok(member)
 }
 
@@ -78,6 +79,7 @@ pub(crate) fn check_membership(
     {
         return Err(AppError::conflict("群成员身份已变化，请重新同步"));
     }
+
     Ok(())
 }
 
@@ -123,6 +125,7 @@ pub async fn ensure_direct(
     let ConversationSummary::Direct(value) = get_conversation(state, actor, id).await? else {
         return Err(AppError::unavailable());
     };
+
     Ok(Created {
         value,
         is_new: new_id.is_some(),
@@ -176,7 +179,7 @@ pub async fn list_conversations(
     Ok(Page { items, next_cursor })
 }
 
-fn decode_cursor(raw: String) -> Result<(bool, OffsetDateTime, uuid::Uuid), AppError> {
+fn decode_cursor(raw: String) -> Result<repository::SummaryCursor, AppError> {
     let invalid = || AppError::invalid("分页游标无效");
     let bytes = URL_SAFE_NO_PAD.decode(raw).map_err(|_| invalid())?;
     // Previously issued opaque cursors contain only timestamp/ID. Decode them as
@@ -190,7 +193,12 @@ fn decode_cursor(raw: String) -> Result<(bool, OffsetDateTime, uuid::Uuid), AppE
     let timestamp =
         OffsetDateTime::from_unix_timestamp_nanos(timestamp.parse().map_err(|_| invalid())?)
             .map_err(|_| invalid())?;
-    Ok((pinned, timestamp, id))
+
+    Ok(repository::SummaryCursor {
+        pinned,
+        updated_at: timestamp,
+        id,
+    })
 }
 
 fn encode_cursor(row: &repository::SummaryRow) -> Result<String, AppError> {
@@ -200,6 +208,7 @@ fn encode_cursor(row: &repository::SummaryRow) -> Result<String, AppError> {
         row.id.0,
     ))
     .map_err(|_| AppError::unavailable())?;
+
     Ok(URL_SAFE_NO_PAD.encode(bytes))
 }
 

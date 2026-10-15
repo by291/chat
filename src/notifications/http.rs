@@ -43,6 +43,7 @@ pub async fn remove(
     Path(id): Path<PushSubscriptionId>,
 ) -> Result<StatusCode, AppError> {
     service::remove_subscription(&state, actor, id).await?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -55,5 +56,6 @@ pub async fn activity(
     Json(input): Json<ActivityInput>,
 ) -> Result<StatusCode, AppError> {
     service::record_activity(&state, actor, id, input).await?;
+
     Ok(StatusCode::NO_CONTENT)
 }

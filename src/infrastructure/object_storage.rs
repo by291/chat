@@ -291,6 +291,7 @@ impl ObjectStorage {
             {
                 return Err(AppError::invalid("媒体文件超过限制"));
             }
+
             let mut body = response.body;
             let mut bytes = Vec::new();
             while let Some(chunk) = body.try_next().await.map_err(|_| AppError::unavailable())? {

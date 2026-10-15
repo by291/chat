@@ -2,5 +2,6 @@
 
 pub mod http;
 pub mod model;
+pub mod presence;
 pub(crate) mod repository;
 pub mod service;

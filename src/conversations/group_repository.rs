@@ -46,6 +46,7 @@ pub async fn insert_group(
     .bind(title)
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
@@ -72,6 +73,7 @@ pub async fn insert_member(
     .bind(joined_seq)
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
@@ -108,6 +110,7 @@ pub async fn rename(
     .bind(title)
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
@@ -128,6 +131,7 @@ pub async fn set_role(
     .bind(role.as_str())
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
@@ -148,6 +152,7 @@ pub async fn end_membership(
     .bind(left_seq)
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
@@ -208,6 +213,7 @@ pub async fn insert_invitation(
     .bind(expires)
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
@@ -260,6 +266,7 @@ pub async fn consume_invitation(
     .bind(user)
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }
 
@@ -280,6 +287,7 @@ pub async fn revoke_invitation(
     .bind(conversation)
     .execute(&mut **tx)
     .await?;
+
     Ok(result.rows_affected() == 1)
 }
 
@@ -302,5 +310,6 @@ pub async fn revoke_issuer_invitations(
     .bind(issuer)
     .execute(&mut **tx)
     .await?;
+
     Ok(())
 }

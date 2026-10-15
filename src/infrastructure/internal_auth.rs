@@ -10,6 +10,7 @@ use subtle::ConstantTimeEq;
 
 use crate::{AppState, error::AppError};
 
+/// Reject missing or foreign credentials before a private listener runs its application operation.
 pub(crate) async fn credential(
     State(state): State<AppState>,
     request: Request,
@@ -27,5 +28,6 @@ pub(crate) async fn credential(
             "内部接口",
         ));
     }
+
     Ok(next.run(request).await)
 }

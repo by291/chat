@@ -138,9 +138,11 @@ impl TestSmtpServer {
     pub fn commands(&self) -> Vec<String> {
         self.commands.lock().unwrap().clone()
     }
+
     pub fn messages(&self) -> Vec<CapturedMail> {
         self.messages.lock().unwrap().clone()
     }
+
     pub fn set_behavior(&self, behavior: SmtpBehavior) {
         *self.behavior.lock().unwrap() = behavior;
     }
@@ -148,6 +150,7 @@ impl TestSmtpServer {
     pub fn connections(&self) -> usize {
         self.accepted_connections.load(Ordering::Relaxed)
     }
+
     pub fn acknowledge(&self) {
         self.acknowledge_data.notify_one();
     }
@@ -186,7 +189,9 @@ impl Drop for TestSmtpServer {
 }
 
 trait FixtureIo: AsyncRead + AsyncWrite + Unpin + Send {}
+
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> FixtureIo for T {}
+
 type FixtureStream = Box<dyn FixtureIo>;
 
 async fn capture(
@@ -202,6 +207,7 @@ async fn capture(
     if silent {
         std::future::pending::<()>().await;
     }
+
     let mut secured = encryption == SmtpEncryption::Implicit;
     let stream: FixtureStream = if secured {
         Box::new(acceptor.accept(stream).await?)
@@ -214,11 +220,13 @@ async fn capture(
         .write_all(b"220 owned-fixture ESMTP\r\n")
         .await?;
     let mut recipient = String::new();
+
     loop {
         let mut line = String::new();
         if reader.read_line(&mut line).await? == 0 {
             return Ok(());
         }
+
         commands.lock().unwrap().push(line.trim_end().to_owned());
         if line.starts_with("EHLO") {
             let reply = if encryption == SmtpEncryption::StartTls && !secured {
@@ -269,6 +277,7 @@ async fn capture(
                     .unwrap_or_default(),
                 text: parsed.get_body().map_err(std::io::Error::other)?,
             };
+
             messages.lock().unwrap().push(captured);
             let pause = matches!(*behavior.lock().unwrap(), SmtpBehavior::PauseAfterData);
             if pause {
@@ -286,6 +295,7 @@ async fn capture(
 
 async fn read_body(reader: &mut BufReader<FixtureStream>) -> std::io::Result<String> {
     let mut body = String::new();
+
     loop {
         let mut line = String::new();
         if reader.read_line(&mut line).await? == 0 {
@@ -294,6 +304,7 @@ async fn read_body(reader: &mut BufReader<FixtureStream>) -> std::io::Result<Str
         if line == ".\r\n" {
             return Ok(body);
         }
+
         body.push_str(if line.starts_with("..") {
             &line[1..]
         } else {
