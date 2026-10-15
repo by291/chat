@@ -1,5 +1,6 @@
 /** Fixture-owned native processes, database and bucket; middleware is shared separately. */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { openSync, closeSync } from 'node:fs';
 import {
   writeFile,
@@ -10,10 +11,10 @@ import {
   symlink,
   readlink,
 } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
 import pg from 'pg';
+
 import type { SmtpFixtureEnvironment } from './mail-support';
 import type { PushFixtureEnvironment } from './push-support';
 
@@ -27,6 +28,12 @@ import {
   prepareTestInfrastructure,
   type Environment,
 } from '../../../tests/infrastructure.mts';
+
+const LISTENER_READY_TIMEOUT_MS = 20_000;
+const LISTENER_PROBE_TIMEOUT_MS = 2_000;
+const LISTENER_POLL_INTERVAL_MS = 100;
+const PROCESS_DRAIN_TIMEOUT_MS = 90_000;
+const FORCED_EXIT_TIMEOUT_MS = 5_000;
 
 // Keep existing test consumers compatible while the CLI uses the dependency-free owner.
 export {
@@ -74,6 +81,7 @@ function launch(
     stdio: ['ignore', log, log],
   });
   closeSync(log);
+
   let closed!: () => void;
   const processState: NativeProcess = {
     child,
@@ -84,6 +92,7 @@ function launch(
     code: null,
     shutdownRequested: false,
   };
+
   child.once('error', (error) => {
     processState.failure = error;
     processState.done = true;
@@ -95,10 +104,14 @@ function launch(
     processState.done = true;
     closed();
   });
+
   return processState;
 }
 
-async function waitForExit(processState: NativeProcess, timeout = 90000) {
+async function waitForExit(
+  processState: NativeProcess,
+  timeout = PROCESS_DRAIN_TIMEOUT_MS,
+) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([
@@ -116,7 +129,10 @@ async function waitForExit(processState: NativeProcess, timeout = 90000) {
   } finally {
     clearTimeout(timer);
   }
-  if (processState.failure) throw processState.failure;
+
+  if (processState.failure) {
+    throw processState.failure;
+  }
 }
 
 async function ready(
@@ -124,21 +140,35 @@ async function ready(
   processState: NativeProcess,
   headers?: Record<string, string>,
 ) {
-  const deadline = Date.now() + 20000;
+  const deadline = Date.now() + LISTENER_READY_TIMEOUT_MS;
+
   while (Date.now() < deadline) {
-    if (processState.failure) throw processState.failure;
-    if (processState.done)
+    if (processState.failure) {
+      throw processState.failure;
+    }
+    if (processState.done) {
       throw new Error(
         `Owned test process exited with code ${processState.code}; inspect its log`,
       );
+    }
+
     try {
-      if ((await fetch(url, { headers, signal: AbortSignal.timeout(2000) })).ok)
+      const response = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(LISTENER_PROBE_TIMEOUT_MS),
+      });
+      if (response.ok) {
         return;
+      }
     } catch {
       /* Connection refusal is expected during startup; the deadline bounds retry. */
     }
-    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, LISTENER_POLL_INTERVAL_MS),
+    );
   }
+
   throw new Error(`Test listener did not become ready: ${url}`);
 }
 
@@ -220,6 +250,7 @@ export class TestRuntime {
 
       await writeEnvironment(runtime.envFile, runtime.env);
       await runtime.service('up', '-d', '--wait', '--wait-timeout', '90');
+
       await runtime.service(
         'exec',
         '-T',
@@ -235,11 +266,14 @@ export class TestRuntime {
       runtime.databaseCreated = true;
 
       const buildArguments = ['build', '--bins'];
-      if (options.mail || options.push)
+      if (options.mail || options.push) {
         buildArguments.push('--features', 'test-failpoints');
+      }
+
       await runCommand('cargo', buildArguments, {
         logFile: path.join(directory, 'build.log'),
       });
+
       await runCommand(nativeBinaryPath('admin'), ['media-init'], {
         env: { ...process.env, ...runtime.env },
         logFile: path.join(directory, 'media-init.log'),
@@ -248,6 +282,7 @@ export class TestRuntime {
 
       await runtime.db.connect();
       await runtime.startApi();
+
       return runtime;
     } catch (error) {
       try {
@@ -291,8 +326,10 @@ export class TestRuntime {
   }
 
   async startWorker(pauseAfterPublish = false) {
-    if (this.workerProcess && !this.workerProcess.done)
+    if (this.workerProcess && !this.workerProcess.done) {
       throw new Error('Stop the owned worker before starting another');
+    }
+
     await runCommand(
       'cargo',
       [
@@ -308,10 +345,13 @@ export class TestRuntime {
       ],
       { logFile: path.join(this.directory, 'worker-build.log') },
     );
+
     await rm(this.publishedMarker, { force: true });
     const env = { ...this.env };
-    if (pauseAfterPublish)
+    if (pauseAfterPublish) {
       env.CHAT_TEST_PAUSE_AFTER_PUBLISH_MARKER = this.publishedMarker;
+    }
+
     this.workerProcess = await this.startNative('worker', env);
     await ready(
       `http://${env.WORKER_METRICS_ADDR}/metrics`,
@@ -322,12 +362,16 @@ export class TestRuntime {
 
   /** Production previews build inside this fixture; development remains the default. */
   async startWeb(options: { mode?: 'dev' | 'preview'; version?: string } = {}) {
-    if (this.webProcess && !this.webProcess.done)
+    if (this.webProcess && !this.webProcess.done) {
       throw new Error('Stop the owned web server before replacing it');
+    }
+
     const preview = options.mode === 'preview';
     const version = options.version ?? 'one';
-    if (!/^[\w-]{1,32}$/.test(version))
+    if (!/^[\w-]{1,32}$/.test(version)) {
       throw new Error('Invalid fixture build version');
+    }
+
     const previewDirectory = path.join(
       this.directory,
       `web-preview-${version}`,
@@ -360,8 +404,9 @@ export class TestRuntime {
         if (
           (error as NodeJS.ErrnoException).code !== 'EEXIST' ||
           path.resolve(await readlink(dependencyLink)) !== modules
-        )
+        ) {
           throw error;
+        }
       }
       await runCommand(process.execPath, [vite, 'build'], {
         cwd: path.join(repositoryRoot, 'web'),
@@ -369,6 +414,7 @@ export class TestRuntime {
         logFile: path.join(this.directory, `web-build-${version}.log`),
       });
     }
+
     this.webProcess = launch(
       process.execPath,
       [
@@ -431,6 +477,7 @@ export class TestRuntime {
         `Test writer did not complete graceful shutdown: ${failed.join(', ')}`,
       );
     }
+
     this.apiProcess = undefined;
     this.workerProcess = undefined;
     await rm(this.marker);
@@ -445,29 +492,34 @@ export class TestRuntime {
         failures.push(error);
       }
     };
+
     await attempt(() => this.stopWriters());
+
     // A failed drain is a test failure, but it must not leave native writers alive.
     for (const writer of [this.apiProcess, this.workerProcess]) {
       if (writer && !writer.done) {
         writer.child.kill('SIGKILL');
-        await attempt(() => waitForExit(writer, 5000));
+        await attempt(() => waitForExit(writer, FORCED_EXIT_TIMEOUT_MS));
       }
     }
     if (this.webProcess && !this.webProcess.done) {
       this.webProcess.child.kill('SIGTERM');
       await attempt(() => waitForExit(this.webProcess!));
     }
+
     await attempt(() => this.db.end());
+
     if (this.ownsData) {
       await attempt(() => this.service('stop', 'media-gateway'));
-      if (this.bucketCreated)
+      if (this.bucketCreated) {
         await attempt(() =>
           runCommand(nativeBinaryPath('admin'), ['media-cleanup-test'], {
             env: { ...process.env, ...this.env },
             logFile: path.join(this.directory, 'cleanup.log'),
           }),
         );
-      if (this.databaseCreated)
+      }
+      if (this.databaseCreated) {
         await attempt(() => {
           if (!/^chat_e2e_[a-f0-9]{32}$/.test(this.database)) {
             throw new Error('Unowned database cleanup refused');
@@ -485,12 +537,17 @@ export class TestRuntime {
             `DROP DATABASE IF EXISTS ${this.database} WITH (FORCE)`,
           );
         });
+      }
     }
-    if (this.infrastructureCleanup) await attempt(this.infrastructureCleanup);
-    if (failures.length)
+
+    if (this.infrastructureCleanup) {
+      await attempt(this.infrastructureCleanup);
+    }
+    if (failures.length) {
       throw new AggregateError(
         failures,
         `Test cleanup failed; inspect ${this.directory}`,
       );
+    }
   }
 }

@@ -35,6 +35,7 @@ const notificationChannel =
   process.env.CHAT_TEST_PUSH_BROWSER_CHANNEL ?? 'chromium';
 if (!['chromium', 'chrome', 'msedge'].includes(notificationChannel))
   throw new Error('Invalid push test browser channel');
+
 test.use({ channel: notificationChannel });
 
 test('push controls recover after a delayed first service-worker registration without a reload', async ({

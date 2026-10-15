@@ -7,12 +7,15 @@ import {
   type IntegrationStack,
 } from './support';
 let stack: IntegrationStack;
+
 beforeAll(async () => {
   stack = await startIntegrationStack();
 });
+
 afterAll(async () => {
   await stack?.cleanup();
 });
+
 test('Cookie authenticates a real SDK and only its own channel is accessible', async () => {
   const a = await account(stack);
   const b = await account(stack);
@@ -33,6 +36,7 @@ test('Cookie authenticates a real SDK and only its own channel is accessible', a
     client.stop();
   }
 });
+
 test('revoked Cookie and wrong Origin cannot establish a connection', async () => {
   const a = await account(stack);
   await stack.db.query(
@@ -49,6 +53,7 @@ test('revoked Cookie and wrong Origin cannot establish a connection', async () =
     wrong.stop();
   }
 });
+
 test('server-side refresh meta rejects an expired database session within the 60 second lease', async () => {
   const a = await account(stack);
   const client = sdk(stack, a.cookie);

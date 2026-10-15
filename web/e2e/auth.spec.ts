@@ -1,5 +1,6 @@
 import { test, expect, signup } from './fixtures';
 import { api } from '../tests/integration/support';
+
 test('six-character password registers, logs in and restores identity', async ({
   page,
   stack,
@@ -31,6 +32,7 @@ test('six-character password registers, logs in and restores identity', async ({
     page.getByRole('button', { name: '退出登录', exact: true }),
   ).toBeVisible();
 });
+
 test('revoked device returns to login', async ({ page, stack }) => {
   const credentials = await signup(page, stack);
   const cookie = (await page.context().cookies()).find(
@@ -58,6 +60,7 @@ test('revoked device returns to login', async ({ page, stack }) => {
   await page.reload();
   await expect(page).toHaveURL(/\/login/);
 });
+
 test('profile keeps Unicode and unauthenticated app visits redirect', async ({
   page,
   stack,

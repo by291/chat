@@ -58,6 +58,26 @@ test("media and group workflows cannot import named HTTP adapters", () => {
   );
 });
 
+test("new feature workflows cannot bypass the Rust HTTP boundary", () => {
+  const source = "use super::http::register;";
+
+  for (const filename of [
+    "src/notifications/service.rs",
+    "src/notifications/job_repository.rs",
+    "src/example_feature/workflow.rs",
+  ]) {
+    assert.equal(rustLayerSourceViolations(filename, source).length, 1);
+  }
+
+  for (const filename of [
+    "src/notifications/http.rs",
+    "src/example_feature/account_http.rs",
+    "src/bin/server.rs",
+  ]) {
+    assert.deepEqual(rustLayerSourceViolations(filename, source), []);
+  }
+});
+
 test("Rust keeps business SQL in concrete repositories", async () => {
   const violations = await rustSqlViolations();
 

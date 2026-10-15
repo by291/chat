@@ -9,7 +9,9 @@ import {
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import type { Browser, Page } from '@playwright/test';
+
 test.setTimeout(60000);
+
 async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   const context = await browser.newContext();
   const peer = await context.newPage();
@@ -33,16 +35,19 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   const id = page.url().split('/').at(-1)!;
   return { context, peer, a, b, id };
 }
+
 async function cookie(page: Page) {
   const c = (await page.context().cookies()).find(
     (c) => c.name === 'chat_session',
   )!;
   return `${c.name}=${c.value}`;
 }
+
 async function send(page: Page, body: string) {
   await page.getByRole('textbox', { name: '输入消息' }).fill(body);
   await page.getByRole('textbox', { name: '输入消息' }).press('Enter');
 }
+
 test('lost HTTP response retries the same message ID and saves exactly once', async ({
   page,
   browser,
@@ -82,6 +87,7 @@ test('lost HTTP response retries the same message ID and saves exactly once', as
     await context.close();
   }
 });
+
 test('offline browser recovers every message through continuous REST replay', async ({
   page,
   browser,
@@ -106,6 +112,7 @@ test('offline browser recovers every message through continuous REST replay', as
     await context.close();
   }
 });
+
 test('publish-before-ack worker crash gives duplicate notices but one displayed message', async ({
   page,
   browser,
@@ -165,6 +172,7 @@ test('publish-before-ack worker crash gives duplicate notices but one displayed 
     await context.close();
   }
 });
+
 test('a message arriving while the history snapshot is delayed is replayed', async ({
   page,
   browser,
@@ -201,6 +209,7 @@ test('a message arriving while the history snapshot is delayed is replayed', asy
     await context.close();
   }
 });
+
 test('read receipt converges between two devices of one account', async ({
   page,
   browser,
@@ -256,6 +265,7 @@ test('read receipt converges between two devices of one account', async ({
     await context.close();
   }
 });
+
 test('revoked session loses REST, old sockets and reconnect permission', async ({
   page,
   browser,
@@ -290,6 +300,7 @@ test('revoked session loses REST, old sockets and reconnect permission', async (
     await context.close();
   }
 });
+
 test('Valkey outage rejects critical writes while committed history stays readable', async ({
   page,
   browser,
@@ -324,6 +335,7 @@ test('Valkey outage rejects critical writes while committed history stays readab
     await context.close();
   }
 });
+
 test('Centrifugo outage still commits messages and worker delivers after restart', async ({
   page,
   browser,
@@ -365,6 +377,7 @@ test('Centrifugo outage still commits messages and worker delivers after restart
     await context.close();
   }
 });
+
 test('session revalidation on focus preserves an unsent draft', async ({
   page,
   browser,
@@ -432,6 +445,7 @@ test('foreground restoration catches missed messages without reconnect or a peri
     await context.close();
   }
 });
+
 test('older history keeps its scroll anchor and long Unicode messages do not overflow', async ({
   page,
   browser,

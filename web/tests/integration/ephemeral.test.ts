@@ -9,12 +9,15 @@ import {
   type IntegrationStack,
 } from './support';
 let stack: IntegrationStack;
+
 beforeAll(async () => {
   stack = await startIntegrationStack();
 });
+
 afterAll(async () => {
   await stack?.cleanup();
 });
+
 test('typing expires without durable events and presence combines multiple devices with peer-only access', async () => {
   const a = await account(stack);
   const b = await account(stack);

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
-import WS from 'ws';
 import { Centrifuge } from 'centrifuge';
+import WS from 'ws';
 
 import { TestRuntime } from './runtime';
 
@@ -14,10 +14,13 @@ export async function startIntegrationStack(): Promise<IntegrationStack> {
 export async function account(stack: IntegrationStack) {
   const token = randomBytes(32).toString('hex');
   const username = `u${randomBytes(8).toString('hex')}`;
+
   await stack.db.query(
-    "INSERT INTO invitations(id,token_hash,expires_at) VALUES(gen_random_uuid(),$1,now()+interval '7 days')",
+    `INSERT INTO invitations(id, token_hash, expires_at)
+     VALUES (gen_random_uuid(), $1, now() + interval '7 days')`,
     [createHash('sha256').update(token).digest('hex')],
   );
+
   const response = await fetch(`${stack.apiUrl}/api/v1/auth/register`, {
     method: 'POST',
     headers: { Origin: stack.origin, 'Content-Type': 'application/json' },
@@ -28,16 +31,20 @@ export async function account(stack: IntegrationStack) {
       password: 'correct horse battery',
     }),
   });
-  if (response.status !== 201)
+  if (response.status !== 201) {
     throw new Error(`Registration failed: ${response.status}`);
+  }
+
   const user = (await response.json()) as {
     id: string;
     username: string;
     display_name: string;
   };
   const cookie = response.headers.get('set-cookie')!.split(';')[0];
+
   return { user, cookie };
 }
+
 export function sdk(
   stack: IntegrationStack,
   cookie: string,
@@ -48,16 +55,23 @@ export function sdk(
       super(url, protocols, { headers: { Cookie: cookie, Origin: origin } });
     }
   }
+
   const client = new Centrifuge(stack.wsUrl, {
     websocket: Socket as unknown as typeof WebSocket,
     timeout: 3000,
   });
-  client.on('disconnected', (ctx) =>
-    console.error('SDK disconnected', ctx.code, ctx.reason),
+  client.on('disconnected', (event) =>
+    console.error('SDK disconnected', event.code, event.reason),
   );
-  client.on('error', (ctx) =>
-    console.error('SDK error', ctx.type, ctx.error.code, ctx.error.message),
+  client.on('error', (event) =>
+    console.error(
+      'SDK error',
+      event.type,
+      event.error.code,
+      event.error.message,
+    ),
   );
+
   return {
     client,
     connect: async () => {
@@ -65,15 +79,17 @@ export function sdk(
       await client.ready(5000);
     },
     subscribe: async (channel: string) => {
-      const sub = client.newSubscription(channel);
-      sub.subscribe();
-      await sub.ready(3000);
-      return sub;
+      const subscription = client.newSubscription(channel);
+      subscription.subscribe();
+      await subscription.ready(3000);
+
+      return subscription;
     },
     publish: (channel: string, data: unknown) => client.publish(channel, data),
     stop: () => client.disconnect(),
   };
 }
+
 export async function startWorker(
   stack: IntegrationStack,
   pauseAfterPublish = false,
@@ -98,14 +114,20 @@ export async function api(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
+
 export async function eventually(
   check: () => Promise<boolean>,
   timeout = 10000,
 ) {
-  const until = Date.now() + timeout;
-  while (Date.now() < until) {
-    if (await check()) return;
+  const deadline = Date.now() + timeout;
+
+  while (Date.now() < deadline) {
+    if (await check()) {
+      return;
+    }
+
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
+
   throw new Error('Expected condition did not become true');
 }

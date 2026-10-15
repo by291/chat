@@ -10,12 +10,15 @@ import {
 } from './support';
 import { readFile } from 'node:fs/promises';
 let stack: IntegrationStack;
+
 beforeAll(async () => {
   stack = await startIntegrationStack();
 });
+
 afterAll(async () => {
   await stack?.cleanup();
 });
+
 test('committed messages survive a stopped worker and duplicate publication does not duplicate storage', async () => {
   const a = await account(stack);
   const b = await account(stack);
@@ -92,6 +95,7 @@ test('committed messages survive a stopped worker and duplicate publication does
     client.stop();
   }
 });
+
 test('a real worker crash after publish replays the leased head before later messages', async () => {
   // Stop the normal worker from the previous scenario, preserving the saved messages.
   await stack.stopWorker();

@@ -2,6 +2,7 @@ import { test, expect, signup } from './fixtures';
 import { api, startWorker } from '../tests/integration/support';
 import type { Page, Browser } from '@playwright/test';
 import type { IntegrationStack } from '../tests/integration/support';
+
 async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   const context = await browser.newContext();
   const peer = await context.newPage();
@@ -34,6 +35,7 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   await expect(peer).toHaveURL(/\/app\/chats\//);
   return { peer, context, a, b };
 }
+
 test('two users find each other, send messages and preserve keyboard/IME behavior', async ({
   page,
   browser,
@@ -70,6 +72,7 @@ test('two users find each other, send messages and preserve keyboard/IME behavio
     await context.close();
   }
 });
+
 test('mobile navigation preserves the conversation and unsent draft', async ({
   page,
   browser,
@@ -100,6 +103,7 @@ test('mobile navigation preserves the conversation and unsent draft', async ({
     await context.close();
   }
 });
+
 test('a hidden chat page does not mark a new message read', async ({
   page,
   browser,
@@ -161,6 +165,7 @@ test('a hidden chat page does not mark a new message read', async ({
     await context.close();
   }
 });
+
 test('HTML is displayed as plain text and the local theme survives reload', async ({
   page,
   browser,

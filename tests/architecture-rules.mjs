@@ -168,11 +168,13 @@ export function rustSqlSourceViolations(filename, source) {
 /** Named workflow adapters have the same boundary as a feature's http.rs. */
 export function rustLayerSourceViolations(filename, source) {
   if (
-    !/^src\/(?:auth|conversations|media|realtime|users)\//.test(filename) ||
+    !/^src\/[^/]+\//.test(filename) ||
+    filename.startsWith("src/bin/") ||
     /(?:\/|_)http\.rs$/.test(filename) ||
     filename.endsWith("/mod.rs")
   )
     return [];
+
   const imports = [...source.matchAll(/\buse\s+([^;]+);/g)];
   const importsHttpAdapter = imports.some(
     ([, declaration]) =>
@@ -188,12 +190,8 @@ export function rustLayerSourceViolations(filename, source) {
 
 export async function rustLayerViolations() {
   const violations = [];
-  const files = (await filesUnder("src")).filter(
-    (filename) =>
-      /^src\/(?:auth|conversations|media|realtime|users)\//.test(filename) &&
-      filename.endsWith(".rs") &&
-      !filename.endsWith("/http.rs") &&
-      !filename.endsWith("/mod.rs"),
+  const files = (await filesUnder("src")).filter((filename) =>
+    filename.endsWith(".rs"),
   );
 
   for (const filename of files) {
