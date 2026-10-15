@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { Bell } from '@lucide/svelte';
+
   import { Button } from '#lib/components/ui/button/index.js';
   import * as Dialog from '#lib/components/ui/dialog/index.js';
 
-  import { Bell } from '@lucide/svelte';
   import type { ChatSync } from './sync.svelte';
 
   let { sync }: { sync: ChatSync } = $props();

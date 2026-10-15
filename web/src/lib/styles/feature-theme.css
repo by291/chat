@@ -1,0 +1,5 @@
+/* Shared theme overrides load before workflow styles; specificity keeps errors legible. */
+
+[data-theme='dark'] .form-error {
+  background: #3e2828;
+}

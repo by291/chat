@@ -3,7 +3,8 @@ import {
   unwrap,
   type ApiClient,
   type components,
-} from '../../api-client';
+} from '#lib/api-client';
+
 import type { ChatApi } from './models';
 
 /** Typed chat HTTP operations; no component constructs an endpoint URL. */

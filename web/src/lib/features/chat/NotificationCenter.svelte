@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { Button } from '#lib/components/ui/button/index.js';
-
   import { onMount } from 'svelte';
   import { Bell, X } from '@lucide/svelte';
   import { goto } from '$app/navigation';
+
+  import { Button } from '#lib/components/ui/button/index.js';
+
   import type { ChatSync } from './sync.svelte';
 
   let { sync }: { sync: ChatSync } = $props();

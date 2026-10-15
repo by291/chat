@@ -1,14 +1,15 @@
 <script lang="ts">
+  import { Plus, ArrowUpRight } from '@lucide/svelte';
+  import { goto } from '$app/navigation';
+
   import * as Avatar from '#lib/components/ui/avatar/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
-
   import * as Dialog from '#lib/components/ui/dialog/index.js';
-  import { Plus, ArrowUpRight } from '@lucide/svelte';
-  import { goto } from '$app/navigation';
-  import { findUser, startDirectConversation } from './api';
   import type { components } from '#lib/api-client';
+
+  import { findUser, startDirectConversation } from './api';
   import type { ChatSync } from './sync.svelte';
 
   let {

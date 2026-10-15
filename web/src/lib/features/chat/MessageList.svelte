@@ -1,10 +1,14 @@
 <script lang="ts">
-  import { Button } from '#lib/components/ui/button/index.js';
-
   import { onMount, tick, untrack } from 'svelte';
   import { ArrowDown, RotateCcw } from '@lucide/svelte';
+
+  import { Button } from '#lib/components/ui/button/index.js';
+
   import type { ChatSync } from './sync.svelte';
   import MessageBubble from './MessageBubble.svelte';
+
+  const FOLLOW_LATEST_TOLERANCE_PX = 80;
+  const VISIBLE_BOTTOM_TOLERANCE_PX = 2;
 
   let {
     sync,
@@ -35,22 +39,27 @@
       sync.setVisible(false);
       return;
     }
+
     const viewport = scroller.getBoundingClientRect();
     const end = bottom.getBoundingClientRect();
     sync.setVisible(
-      focused && end.top >= viewport.top && end.bottom <= viewport.bottom + 2,
+      focused &&
+        end.top >= viewport.top &&
+        end.bottom <= viewport.bottom + VISIBLE_BOTTOM_TOLERANCE_PX,
     );
   }
 
   function handleScroll() {
     following =
-      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
+      scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <
+      FOLLOW_LATEST_TOLERANCE_PX;
     confirmRenderedVisibility();
   }
 
   async function scrollToLatest() {
     if (sync.history.contextual) await sync.history.latest();
     await tick();
+
     following = true;
     scroller.scrollTop = scroller.scrollHeight;
     confirmRenderedVisibility();
@@ -59,8 +68,10 @@
   async function loadOlderPreservingScroll() {
     const height = scroller.scrollHeight;
     const top = scroller.scrollTop;
+
     await sync.loadOlder();
     await tick();
+
     // Anchor the same visible history after prepending older records.
     scroller.scrollTop = top + scroller.scrollHeight - height;
     confirmRenderedVisibility();
@@ -69,8 +80,9 @@
   async function mediaLayoutChanged() {
     sync.setVisible(false);
     await tick();
-    if (following && !sync.history.contextual)
+    if (following && !sync.history.contextual) {
       scroller.scrollTop = scroller.scrollHeight;
+    }
     confirmRenderedVisibility();
   }
 

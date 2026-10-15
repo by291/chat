@@ -1,4 +1,5 @@
 import { getContext, setContext } from 'svelte';
+
 import type { ChatSync } from './sync.svelte';
 
 const key = Symbol('chat');

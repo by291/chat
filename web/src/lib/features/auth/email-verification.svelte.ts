@@ -1,4 +1,4 @@
-import type { components } from '../../api-client';
+import type { components } from '#lib/api-client';
 
 type EmailStatus = components['schemas']['EmailStatus'];
 type VerifyEmail = (
@@ -19,6 +19,7 @@ export class EmailVerificationState {
   pending = $state(false);
   done = $state(false);
   error = $state('');
+
   private generation = 0;
   private request?: AbortController;
 
@@ -50,6 +51,7 @@ export class EmailVerificationState {
   async confirm(): Promise<void> {
     const userId = this.currentUserId();
     if (!this.token || !userId || this.pending) return;
+
     const generation = ++this.generation;
     const request = new AbortController();
     this.request = request;

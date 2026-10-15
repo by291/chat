@@ -5,6 +5,7 @@
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
+
   import { auth } from '#lib/features/auth/session.svelte.ts';
 
   let currentPassword = $state('');
@@ -65,12 +66,14 @@
   }
 
   const unsubscribe = auth.onReset(resetForm);
+
   $effect(() => {
     if (authenticatedId !== formUserId) {
       formUserId = authenticatedId;
       resetForm();
     }
   });
+
   onDestroy(() => {
     unsubscribe();
     // A mutation may still commit after navigation. Clear secrets immediately,

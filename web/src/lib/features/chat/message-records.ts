@@ -56,11 +56,12 @@ export function mergeMessageRecords(
       record.id,
       latestReply(references.get(record.id), reference)!,
     );
-    if (record.reply)
+    if (record.reply) {
       references.set(
         record.reply.id,
         latestReply(references.get(record.reply.id), record.reply)!,
       );
+    }
   }
 
   return [...records.values()]

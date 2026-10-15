@@ -4,48 +4,60 @@
   .auth-page {
     display: block;
   }
+
   .auth-story {
     padding: 25px;
     background: var(--surface);
   }
+
   .auth-story .brand-mark {
     width: 37px;
     height: 37px;
     border-radius: 12px;
   }
+
   .auth-story .brand {
     font-size: 21px;
   }
+
   .story-copy,
   .story-foot,
   .auth-story:after {
     display: none;
   }
+
   .auth-main {
     padding: 35px 25px 50px;
     align-items: start;
   }
+
   .auth-card {
     max-width: 400px;
   }
+
   .auth-card h2 {
     font-size: 27px;
   }
+
   .app-rail {
     width: 60px;
     padding: 20px 0;
   }
+
   .app-rail .brand-mark {
     width: 38px;
     height: 38px;
     border-radius: 13px;
   }
+
   .settings-page {
     padding: 26px 20px;
   }
+
   .session-item {
     gap: 10px;
   }
+
   .page-heading {
     margin-top: 28px;
   }

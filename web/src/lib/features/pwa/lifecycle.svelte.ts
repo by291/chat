@@ -23,6 +23,8 @@ type PendingWork = {
   hasSubmission: boolean;
 };
 
+const UPDATE_HANDOFF_TIMEOUT_MS = 20_000;
+
 function browserPorts(): PwaPorts | undefined {
   if (typeof window === 'undefined') return undefined;
   return {
@@ -44,6 +46,7 @@ export class PwaLifecycle {
   updatePending = $state(false);
   confirmationRequired = $state(false);
   error = $state('');
+
   private active = false;
   private generation = 0;
   private cleanups: Array<() => void> = [];
@@ -129,8 +132,9 @@ export class PwaLifecycle {
       await prompt.prompt();
       await prompt.userChoice;
     } catch {
-      if (this.current(generation))
+      if (this.current(generation)) {
         this.error = '暂时无法安装，请使用浏览器菜单重试';
+      }
     } finally {
       if (this.current(generation)) {
         this.prompt = undefined;
@@ -168,7 +172,7 @@ export class PwaLifecycle {
       this.handoffRequested = false;
       this.updatePending = false;
       this.error = '更新暂未完成，请稍后重试';
-    }, 20_000);
+    }, UPDATE_HANDOFF_TIMEOUT_MS);
   }
 
   private clearDeadline() {

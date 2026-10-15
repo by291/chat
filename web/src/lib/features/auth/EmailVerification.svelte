@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
 
   import { Button } from '#lib/components/ui/button/index.js';
+
   import AuthForm from './AuthForm.svelte';
   import { createAuthApi } from './api';
   import { auth } from './session.svelte';
@@ -26,13 +27,16 @@
       verification.dispose();
     };
   });
+
   onDestroy(unsubscribe);
+
   $effect(() => {
     if (userId !== previousUserId) {
       previousUserId = userId;
       verification.invalidate();
     }
   });
+
   $effect(() => {
     if (verification.done) {
       // Completion removes the secret from history without navigating or persisting it.
@@ -73,12 +77,14 @@
         >
           {verification.pending ? '正在验证…' : '确认验证邮箱'}
         </Button>
-      {:else}<p class="form-error" role="alert">
-          链接无效或已失效，请重新申请。
-        </p>{/if}
-      {#if verification.error}<p class="form-error" role="alert">
+      {:else}
+        <p class="form-error" role="alert">链接无效或已失效，请重新申请。</p>
+      {/if}
+      {#if verification.error}
+        <p class="form-error" role="alert">
           {verification.error}
-        </p>{/if}
+        </p>
+      {/if}
       <Button type="button" variant="outline" onclick={() => auth.logout()}>
         换个账号登录
       </Button>

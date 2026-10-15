@@ -1,4 +1,4 @@
-import { api, unwrap, ApiFailure } from '../../api-client';
+import { api, unwrap, ApiFailure } from '#lib/api-client';
 
 /** Settings persistence is shared by forms, without coupling them to HTTP paths. */
 export const settingsApi = {
@@ -6,7 +6,8 @@ export const settingsApi = {
     unwrap(
       api.PATCH('/api/v1/users/me', { body: { display_name: displayName } }),
     ),
-  sessions: () => unwrap(api.GET('/api/v1/sessions')),
+  sessions: (signal?: AbortSignal) =>
+    unwrap(api.GET('/api/v1/sessions', { signal })),
   revokeSession: (id: string) =>
     unwrap(api.DELETE('/api/v1/sessions/{id}', { params: { path: { id } } })),
   setAvatar: (attachment_id: string) =>

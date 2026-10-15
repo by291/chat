@@ -1,5 +1,6 @@
-import type { ApiClient, components } from '../../api-client';
-import { api, ApiFailure } from '../../api-client';
+import type { ApiClient, components } from '#lib/api-client';
+import { api, ApiFailure } from '#lib/api-client';
+
 import { createAuthApi } from './api';
 
 /** Owns identity for the browser lifetime and fences responses from superseded sessions. */
@@ -7,12 +8,14 @@ export class SessionState {
   user = $state<components['schemas']['UserView'] | undefined>();
   pending = $state(true);
   error = $state('');
+
   private generation = 0;
   private resetHandlers = new Set<() => void>();
   private requests: ReturnType<typeof createAuthApi>;
 
   constructor(client: ApiClient = api) {
     this.requests = createAuthApi(client);
+
     const requestGenerations = new WeakMap<Request, number>();
     client.use({
       onRequest: ({ request }) => {
@@ -35,6 +38,7 @@ export class SessionState {
     this.generation++;
     this.user = undefined;
     this.pending = false;
+
     for (const callback of this.resetHandlers) {
       callback();
     }
@@ -50,8 +54,11 @@ export class SessionState {
         // calling login here. Start a new lifetime, while same-user profile
         // revalidation keeps drafts, caches and outstanding requests intact.
         if (this.user?.id !== user.id) {
-          if (this.user) this.reset();
-          else this.generation++;
+          if (this.user) {
+            this.reset();
+          } else {
+            this.generation++;
+          }
         }
         this.user = user;
         this.error = '';
@@ -112,6 +119,7 @@ export class SessionState {
     const generation = this.generation;
 
     await this.requests.changePassword(input);
+
     if (generation === this.generation) {
       this.reset();
     }

@@ -1,6 +1,7 @@
 <script lang="ts">
   import * as Card from '#lib/components/ui/card/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
+
   import { pwa } from './lifecycle.svelte';
 </script>
 
@@ -26,5 +27,7 @@
     </p>
   {/if}
   <p class="muted">离线时显示连接提示；聊天记录需要联网读取。</p>
-  {#if pwa.error}<p role="status">{pwa.error}</p>{/if}
+  {#if pwa.error}
+    <p role="status">{pwa.error}</p>
+  {/if}
 </Card.Root>

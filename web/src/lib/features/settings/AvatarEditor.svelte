@@ -4,12 +4,14 @@
   import { Input } from '#lib/components/ui/input/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
 
-  import { useChat } from '../chat/context.svelte';
-  import UploadList from '../media/UploadList.svelte';
+  import { useChat } from '#lib/features/chat/context.svelte.ts';
+  import UploadList from '#lib/features/media/UploadList.svelte';
+
   import ProfileAvatar from './ProfileAvatar.svelte';
   import { settingsApi } from './api';
 
   let { userId, name }: { userId: string; name: string } = $props();
+
   const chat = useChat();
   let revision = $state(0);
   let busy = $state(false);
@@ -33,14 +35,18 @@
     busy = true;
     error = '';
     try {
-      if (clear) await settingsApi.clearAvatar();
-      else await settingsApi.setAvatar(ready!.attachmentId!);
+      if (clear) {
+        await settingsApi.clearAvatar();
+      } else {
+        await settingsApi.setAvatar(ready!.attachmentId!);
+      }
       if (!scope?.alive || chat.sync !== scope) return;
       if (ready?.attachmentId) uploads?.consume([ready.attachmentId]);
       revision++;
     } catch (reason) {
-      if (scope?.alive && chat.sync === scope)
+      if (scope?.alive && chat.sync === scope) {
         error = reason instanceof Error ? reason.message : '头像保存失败';
+      }
     } finally {
       busy = false;
     }
@@ -65,7 +71,9 @@
       if (selected) void uploads?.add([selected], { purpose: 'avatar' });
     }}
   />
-  {#if uploads && entries.length}<UploadList {uploads} {entries} />{/if}
+  {#if uploads && entries.length}
+    <UploadList {uploads} {entries} />
+  {/if}
   <div class="form-actions">
     <Button disabled={busy || !ready} onclick={() => save(false)}>
       保存头像
@@ -74,5 +82,7 @@
       移除头像
     </Button>
   </div>
-  {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+  {#if error}
+    <p class="form-error" role="alert">{error}</p>
+  {/if}
 </Card.Root>

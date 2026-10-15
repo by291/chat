@@ -1,4 +1,4 @@
-import { api, unwrap, type ApiClient, type components } from '../../api-client';
+import { api, unwrap, type ApiClient, type components } from '#lib/api-client';
 
 /** Authentication endpoints are independent of reactive session ownership. */
 export function createAuthApi(client: ApiClient = api) {

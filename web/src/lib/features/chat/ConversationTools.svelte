@@ -1,12 +1,14 @@
 <script lang="ts">
+  import { Search, Settings2 } from '@lucide/svelte';
+
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import * as Dialog from '#lib/components/ui/dialog/index.js';
 
-  import { Search, Settings2 } from '@lucide/svelte';
   import type { ChatSync } from './sync.svelte';
 
   let { sync }: { sync: ChatSync } = $props();
+
   let searchOpen = $state(false);
   let settingsOpen = $state(false);
 

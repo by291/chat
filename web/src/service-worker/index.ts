@@ -30,8 +30,9 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('message', (event) => {
   // Only the explicit UI update action asks a waiting worker to replace its predecessor.
   // Installation never claims clients or interrupts an authenticated page automatically.
-  if (event.data?.type === 'activate-update')
+  if (event.data?.type === 'activate-update') {
     event.waitUntil(self.skipWaiting());
+  }
 });
 
 self.addEventListener('push', (event) => {

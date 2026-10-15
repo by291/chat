@@ -1,10 +1,13 @@
 <script lang="ts">
-  import * as Avatar from '#lib/components/ui/avatar/index.js';
-  import { Button } from '#lib/components/ui/button/index.js';
-
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { ArrowLeft, MessageCircle, ShieldCheck } from '@lucide/svelte';
+
+  import * as Avatar from '#lib/components/ui/avatar/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
+
+  import ProfileAvatar from '#lib/features/settings/ProfileAvatar.svelte';
+
   import { useChat } from './context.svelte';
   import ConversationList from './ConversationList.svelte';
   import MessageList from './MessageList.svelte';
@@ -12,7 +15,6 @@
   import GroupDetails from './GroupDetails.svelte';
   import ConversationTools from './ConversationTools.svelte';
   import MessageDialogs from './MessageDialogs.svelte';
-  import ProfileAvatar from '../settings/ProfileAvatar.svelte';
   import { isGroup, conversationName } from './models';
 
   let {

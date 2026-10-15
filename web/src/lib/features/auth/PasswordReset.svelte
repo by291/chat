@@ -4,6 +4,7 @@
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
+
   import { createAuthApi } from './api';
   import { auth } from './session.svelte';
   import { PasswordResetState } from './password-recovery.svelte';
@@ -11,22 +12,6 @@
   const reset = new PasswordResetState(createAuthApi().resetPassword);
   let password = $state('');
   let confirmation = $state('');
-
-  onMount(() => {
-    const read = () => {
-      reset.initialize(window.location.hash);
-      password = '';
-      confirmation = '';
-    };
-    read();
-    window.addEventListener('hashchange', read);
-    return () => {
-      window.removeEventListener('hashchange', read);
-      reset.dispose();
-      password = '';
-      confirmation = '';
-    };
-  });
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
@@ -44,9 +29,27 @@
       if (auth.user) void auth.restore();
     }
   }
+
+  onMount(() => {
+    const read = () => {
+      reset.initialize(window.location.hash);
+      password = '';
+      confirmation = '';
+    };
+    read();
+    window.addEventListener('hashchange', read);
+    return () => {
+      window.removeEventListener('hashchange', read);
+      reset.dispose();
+      password = '';
+      confirmation = '';
+    };
+  });
 </script>
 
-<svelte:head><title>重置密码 · Chat</title></svelte:head>
+<svelte:head>
+  <title>重置密码 · Chat</title>
+</svelte:head>
 <main class="auth-main">
   <section class="auth-card">
     {#if reset.done}
@@ -81,7 +84,9 @@
           </Button>
         </form>
       {/if}
-      {#if reset.error}<p class="form-error" role="alert">{reset.error}</p>{/if}
+      {#if reset.error}
+        <p class="form-error" role="alert">{reset.error}</p>
+      {/if}
       <p>提交后若连接中断，请先尝试用新密码登录；仍无法登录时再申请邮件。</p>
       <a href="/login">使用新密码登录</a>
       <p><a href="/forgot-password">重新申请找回邮件</a></p>

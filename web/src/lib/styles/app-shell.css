@@ -5,6 +5,7 @@
   height: 100dvh;
   overflow: hidden;
 }
+
 .app-rail {
   width: 76px;
   border-right: 1px solid var(--line);
@@ -15,6 +16,7 @@
   padding: 24px 0;
   flex-shrink: 0;
 }
+
 .rail-bottom {
   margin-top: auto;
   display: flex;
@@ -22,12 +24,14 @@
   gap: 16px;
   flex-direction: column;
 }
+
 .app-content {
   flex: 1;
   min-width: 0;
   position: relative;
   overflow: auto;
 }
+
 .empty-page {
   height: 100%;
   display: flex;
@@ -38,9 +42,18 @@
   padding: 30px;
   text-align: center;
 }
+
 .empty-page h1 {
   font-size: 28px;
 }
+
 .empty-page p {
   font-size: 14px;
+}
+
+@media (max-width: 700px) {
+  .has-conversation ~ .app-rail,
+  .app-frame:has(.has-conversation) .app-rail {
+    display: none;
+  }
 }

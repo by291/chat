@@ -5,6 +5,11 @@
   import { useBackgroundPush } from './context.svelte';
 
   const push = useBackgroundPush();
+  const cannotEnable = $derived(
+    !push.owner?.supported ||
+      !push.owner.configured ||
+      push.owner.permission === 'denied',
+  );
 </script>
 
 <Card.Root class="settings-card gap-0 p-6" role="region" aria-label="后台推送">
@@ -26,11 +31,7 @@
     {/if}
     <Button
       type="button"
-      disabled={push.owner.pending ||
-        (!push.owner.enabled &&
-          (!push.owner.supported ||
-            !push.owner.configured ||
-            push.owner.permission === 'denied'))}
+      disabled={push.owner.pending || (!push.owner.enabled && cannotEnable)}
       onclick={() =>
         push.owner?.enabled ? push.owner.disable() : push.owner?.enable()}
     >

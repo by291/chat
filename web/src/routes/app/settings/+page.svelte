@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { ArrowLeft } from '@lucide/svelte';
+
   import * as Card from '#lib/components/ui/card/index.js';
   import * as NativeSelect from '#lib/components/ui/native-select/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
@@ -10,12 +12,13 @@
   import EmailForm from '#lib/features/settings/EmailForm.svelte';
   import InstallHelp from '#lib/features/pwa/InstallHelp.svelte';
   import BackgroundPushSettings from '#lib/features/notifications/BackgroundPushSettings.svelte';
-  import { ArrowLeft } from '@lucide/svelte';
   import { theme, type Theme } from '#lib/features/settings/theme.svelte.ts';
   import { auth } from '#lib/features/auth/session.svelte.ts';
 </script>
 
-<svelte:head><title>个人设置 · Chat</title></svelte:head>
+<svelte:head>
+  <title>个人设置 · Chat</title>
+</svelte:head>
 <main class="settings-page">
   <a class="back-link" href="/app"><ArrowLeft size={16} />返回聊天</a>
   <header class="page-heading">

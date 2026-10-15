@@ -1,11 +1,12 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
+
   import * as Card from '#lib/components/ui/card/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
+  import type { components } from '#lib/api-client';
 
-  import { untrack } from 'svelte';
-  import type { components } from '../../api-client';
   import { settingsApi } from './api';
 
   let {
@@ -16,6 +17,8 @@
     onSaved: (user: components['schemas']['UserView']) => void;
   } = $props();
 
+  // Initialize the editable draft once; same-user profile revalidation must not
+  // overwrite text the user has not submitted yet.
   let displayName = $state(untrack(() => user.display_name));
   let pending = $state(false);
   let error = $state('');

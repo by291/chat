@@ -4,6 +4,7 @@
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
+
   import { createAuthApi } from './api';
 
   const requests = createAuthApi();
@@ -49,7 +50,9 @@
   });
 </script>
 
-<svelte:head><title>找回密码 · Chat</title></svelte:head>
+<svelte:head>
+  <title>找回密码 · Chat</title>
+</svelte:head>
 <main class="auth-main">
   <section class="auth-card">
     <h1>找回密码</h1>
@@ -75,7 +78,9 @@
         分钟后失效；请检查垃圾邮件。
       </p>
     {/if}
-    {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+    {#if error}
+      <p class="form-error" role="alert">{error}</p>
+    {/if}
     <p>没有绑定邮箱或无法收信时，请联系管理员协助找回。</p>
     <a href="/login">返回登录</a>
   </section>

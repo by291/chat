@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { Check, CheckCheck } from '@lucide/svelte';
+
   import { Button } from '#lib/components/ui/button/index.js';
 
-  import { Check, CheckCheck } from '@lucide/svelte';
+  import AttachmentList from '#lib/features/media/AttachmentList.svelte';
+
   import type { Message } from './models';
-  import { isGroup } from './models';
+  import { isGroup, sequence } from './models';
   import type { ChatSync } from './sync.svelte';
-  import AttachmentList from '../media/AttachmentList.svelte';
   import MessageReactions from './MessageReactions.svelte';
 
   let {
@@ -39,8 +41,8 @@
         kind: 'group',
       };
     }
-    return BigInt(sync.current?.peer_read_seq ?? '0') >=
-      BigInt(message.created_seq)
+    return sequence(sync.current?.peer_read_seq ?? '0') >=
+      sequence(message.created_seq)
       ? { label: '已读', kind: 'read' }
       : { label: '已保存', kind: 'saved' };
   });

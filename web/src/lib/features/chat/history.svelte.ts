@@ -1,6 +1,8 @@
 import type { ChatApi, Message } from './models';
 import type { ConversationStore } from './conversation-store';
 
+const MAX_SEARCH_CHARACTERS = 200;
+
 /** Search/context hold IDs only; all records remain in the conversation query cache.
  * Context windows never establish a continuous latest cursor or authorize receipts.
  */
@@ -16,6 +18,7 @@ export class HistoryNavigation {
   private contextIds = $state<string[]>([]);
   private searchBefore = $state<string | null>(null);
   private contextBefore = $state<string | null>(null);
+
   private generation = 0;
   private searchGeneration = 0;
   private contextGeneration = 0;
@@ -92,7 +95,7 @@ export class HistoryNavigation {
     if (
       !id ||
       !query ||
-      [...query].length > 200 ||
+      [...query].length > MAX_SEARCH_CHARACTERS ||
       (more && (!this.hasMoreResults || this.searching))
     ) {
       return;
@@ -155,6 +158,7 @@ export class HistoryNavigation {
   async jump(messageId: string) {
     const id = this.options.selectedId();
     if (!id) return;
+
     this.contextAbort.abort();
     this.contextAbort = new AbortController();
     const request = ++this.contextGeneration;
@@ -203,6 +207,7 @@ export class HistoryNavigation {
   async older() {
     const id = this.options.selectedId();
     if (!id || !this.contextBefore || this.loading) return;
+
     const generation = this.generation;
     const request = this.contextGeneration;
     const membership = this.options.store.membership(id);

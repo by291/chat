@@ -1,6 +1,10 @@
 import type { Conversation, Message } from './models';
 import { conversationName } from './models';
 
+const MAX_SEEN_MESSAGES = 200;
+const MAX_VISIBLE_ALERTS = 5;
+const SOUND_DURATION_SECONDS = 0.15;
+
 export type Alert = {
   messageId: string;
   conversationId: string;
@@ -33,6 +37,7 @@ export class ChatNotifications {
   system = $state(false);
   permission = $state<NotificationPermission | 'unsupported'>('unsupported');
   feedback = $state('');
+
   private active = true;
   private seen = new Set<string>();
   private audio: AudioContext | undefined;
@@ -67,7 +72,7 @@ export class ChatNotifications {
     // A duplicate publication after leaving/unmuting must not revive that alert;
     // replay without a live candidate stays eligible for its later exact hint.
     this.seen.add(record.id);
-    if (this.seen.size > 200) {
+    if (this.seen.size > MAX_SEEN_MESSAGES) {
       this.seen.delete(this.seen.values().next().value!);
     }
 
@@ -90,7 +95,7 @@ export class ChatNotifications {
       conversationId: record.conversation_id,
       title: conversationName(conversation),
     };
-    this.items = [...this.items, alert].slice(-5);
+    this.items = [...this.items, alert].slice(-MAX_VISIBLE_ALERTS);
     if (this.sound && this.audio) void this.playSound();
     if (this.system && this.permission === 'granted') {
       try {
@@ -109,7 +114,7 @@ export class ChatNotifications {
         };
         // System notifications carry no sender text or message body. Browsers may
         // keep them beyond their page lifetime unless they are explicitly closed.
-        if (this.alerts.size > 5) {
+        if (this.alerts.size > MAX_VISIBLE_ALERTS) {
           const oldest = this.alerts.values().next().value!;
           oldest.close();
           this.alerts.delete(oldest);
@@ -175,12 +180,12 @@ export class ChatNotifications {
       gain.gain.setValueAtTime(0.06, this.audio.currentTime);
       gain.gain.exponentialRampToValueAtTime(
         0.001,
-        this.audio.currentTime + 0.15,
+        this.audio.currentTime + SOUND_DURATION_SECONDS,
       );
       oscillator.connect(gain);
       gain.connect(this.audio.destination);
       oscillator.start();
-      oscillator.stop(this.audio.currentTime + 0.15);
+      oscillator.stop(this.audio.currentTime + SOUND_DURATION_SECONDS);
       oscillator.onended = () => {
         oscillator.disconnect();
         gain.disconnect();

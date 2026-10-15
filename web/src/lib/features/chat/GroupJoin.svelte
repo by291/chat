@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { Button } from '#lib/components/ui/button/index.js';
-
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
 
-  import { auth } from '../auth/session.svelte';
+  import { Button } from '#lib/components/ui/button/index.js';
+
+  import { auth } from '#lib/features/auth/session.svelte.ts';
+
   import { createGroupApi } from './api';
   import { useChat } from './context.svelte';
 
@@ -22,8 +23,9 @@
     error = '';
     try {
       const group = await requests.accept(token);
-      if (auth.user?.id !== userId || !scope?.alive || chat.sync !== scope)
+      if (auth.user?.id !== userId || !scope?.alive || chat.sync !== scope) {
         return;
+      }
       await chat.sync?.refreshSummaries();
       // Replace the token-bearing route after acceptance rather than retaining it in history.
       await goto(`/app/chats/${group.id}`, { replaceState: true });
@@ -35,7 +37,9 @@
   }
 </script>
 
-<svelte:head><title>加入群聊 · Chat</title></svelte:head>
+<svelte:head>
+  <title>加入群聊 · Chat</title>
+</svelte:head>
 <section class="group-join-page">
   <h1>加入私人群聊</h1>
   <p class="muted">
@@ -45,5 +49,7 @@
     {busy ? '正在加入…' : '确认加入'}
   </Button>
   <Button variant="secondary" href="/app">返回聊天</Button>
-  {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+  {#if error}
+    <p class="form-error" role="alert">{error}</p>
+  {/if}
 </section>

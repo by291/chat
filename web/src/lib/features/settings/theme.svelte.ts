@@ -1,7 +1,9 @@
 export type Theme = 'system' | 'light' | 'dark';
 
+/** Browser appearance state; preference storage contains no session-owned records. */
 class ThemeState {
   value = $state<Theme>('system');
+
   private media: MediaQueryList | undefined;
 
   init() {
@@ -13,12 +15,15 @@ class ThemeState {
     } catch {
       // Storage may be disabled; system theme remains a usable default.
     }
+
     if (saved === 'light' || saved === 'dark') {
       this.value = saved;
     }
+
     this.apply();
     const update = () => this.apply();
     this.media.addEventListener('change', update);
+
     return () => this.media?.removeEventListener('change', update);
   }
 
@@ -30,6 +35,7 @@ class ThemeState {
     } catch {
       // Apply the selected theme for this page even when persistence is unavailable.
     }
+
     this.apply();
   }
 

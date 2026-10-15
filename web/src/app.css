@@ -4,6 +4,7 @@
 
 /* UI utilities use layers; workflow layouts and final overrides retain their order. */
 @import './lib/features/chat/chat.css';
+@import './lib/styles/feature-theme.css';
 @import './lib/features/media/media.css';
 @import './lib/styles/foundation.css';
 @import './lib/features/auth/auth.css';

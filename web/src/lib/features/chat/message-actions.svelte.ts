@@ -1,6 +1,8 @@
 import type { ChatApi, Message, Preferences, ReactionKind } from './models';
 import type { ConversationStore } from './conversation-store';
 
+const MAX_MESSAGE_CHARACTERS = 4_096;
+
 /** Owns reply selection and edit drafts; durable records stay in ConversationStore. */
 export class MessageActions {
   replyId = $state<string | null>(null);
@@ -9,6 +11,7 @@ export class MessageActions {
   editBody = $state('');
   busy = $state(false);
   reacting = $state<string[]>([]);
+
   private generation = 0;
 
   constructor(
@@ -56,7 +59,7 @@ export class MessageActions {
       !target.withdrawn &&
       target.sender_id === this.options.userId &&
       (!!this.editBody.trim() || !!target.attachments?.length) &&
-      [...this.editBody].length <= 4096
+      [...this.editBody].length <= MAX_MESSAGE_CHARACTERS
     );
   }
 
@@ -90,6 +93,7 @@ export class MessageActions {
   async saveEdit() {
     const messageId = this.editingId;
     if (!messageId || !this.canSaveEdit) return;
+
     const succeeded = await this.mutate((id, membership) =>
       this.options.api.edit(id, messageId, this.editBody, membership),
     );
@@ -115,6 +119,7 @@ export class MessageActions {
   ) {
     const id = this.options.selectedId();
     if (!id || !this.options.active() || this.busy) return false;
+
     const membership = this.options.store.membership(id);
     const generation = this.generation;
     this.busy = true;
@@ -153,12 +158,14 @@ export class MessageActions {
   /** Serialize one choice per message and merge only within its selected authenticated episode. */
   async reaction(messageId: string, kind: ReactionKind | null): Promise<void> {
     const id = this.options.selectedId();
-    if (!id || !this.options.active() || this.reactionPending(messageId))
+    if (!id || !this.options.active() || this.reactionPending(messageId)) {
       return;
+    }
     const target = this.options.store
       .messages(id)
       .find((message) => message.id === messageId);
     if (!target || target.withdrawn) return;
+
     const membership = this.options.store.membership(id);
     const generation = this.generation;
     this.reacting = [...this.reacting, messageId];
@@ -172,8 +179,9 @@ export class MessageActions {
         generation !== this.generation ||
         id !== this.options.selectedId() ||
         membership !== this.options.store.membership(id)
-      )
+      ) {
         return;
+      }
 
       this.options.store.merge(id, [record]);
       this.options.store.raiseTarget(id, record.revision_seq);
@@ -190,14 +198,16 @@ export class MessageActions {
         );
       }
     } finally {
-      if (generation === this.generation)
+      if (generation === this.generation) {
         this.reacting = this.reacting.filter((id) => id !== messageId);
+      }
     }
   }
 
   async preferences(patch: Partial<Preferences>) {
     const id = this.options.selectedId();
     if (!id || !this.options.active() || this.busy) return;
+
     const membership = this.options.store.membership(id);
     const generation = this.generation;
     this.busy = true;

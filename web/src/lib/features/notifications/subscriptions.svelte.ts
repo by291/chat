@@ -23,7 +23,8 @@ type PushPorts = {
   activity(): Pick<PushActivity, 'visible' | 'focused'>;
 };
 
-const WORKER_READY_TIMEOUT_MS = 15000;
+const WORKER_READY_TIMEOUT_MS = 15_000;
+const ACTIVITY_REFRESH_INTERVAL_MS = 10_000;
 
 /** Registration begins at window.load; cancellation must not retain a disposed owner. */
 async function activeRegistration(
@@ -56,8 +57,9 @@ function browserPorts(): PushPorts | undefined {
     !('serviceWorker' in navigator) ||
     typeof PushManager === 'undefined' ||
     typeof Notification === 'undefined'
-  )
+  ) {
     return undefined;
+  }
   return {
     events: window,
     documentEvents: document,
@@ -69,8 +71,9 @@ function browserPorts(): PushPorts | undefined {
         waitForActive &&
         signal &&
         registration?.active?.state !== 'activated'
-      )
+      ) {
         return activeRegistration(signal);
+      }
       return registration;
     },
     activity: () => ({
@@ -103,6 +106,7 @@ export class PushSubscriptions {
   enabled = $state(false);
   pending = $state(false);
   error = $state('');
+
   private active = false;
   private revokeCapability = false;
   private generation = 0;
@@ -149,8 +153,9 @@ export class PushSubscriptions {
       if (!this.current(generation) || !this.registration) return;
       this.supported = true;
       const refresh = () => {
-        if (this.ports)
+        if (this.ports) {
           this.setActivity({ ...this.activity, ...this.ports.activity() });
+        }
       };
       this.listen(this.ports.events, 'focus', refresh);
       this.listen(this.ports.events, 'blur', refresh);
@@ -158,7 +163,7 @@ export class PushSubscriptions {
       this.listen(this.ports.events, 'pagehide', () =>
         this.setActivity({ ...this.activity, visible: false, focused: false }),
       );
-      this.timer = setInterval(refresh, 10000);
+      this.timer = setInterval(refresh, ACTIVITY_REFRESH_INTERVAL_MS);
       await serialized(async () => {
         if (!this.current(generation)) return;
         const subscription =
@@ -167,8 +172,9 @@ export class PushSubscriptions {
           subscription &&
           this.permission === 'granted' &&
           this.current(generation)
-        )
+        ) {
           await this.bind(subscription, generation);
+        }
       });
     } catch (error) {
       if (this.current(generation)) this.error = this.failure(error);
@@ -185,8 +191,9 @@ export class PushSubscriptions {
       !this.supported ||
       !this.configured ||
       !this.ports
-    )
+    ) {
       return;
+    }
     const generation = this.generation;
     const permission =
       this.ports.permission() === 'default'
@@ -237,8 +244,9 @@ export class PushSubscriptions {
     try {
       await serialized(async () => {
         try {
-          if (binding && this.current(generation))
+          if (binding && this.current(generation)) {
             await this.api.remove(binding.id, this.controller.signal);
+          }
         } finally {
           await this.clearBrowser(subscription, this.registration);
         }
@@ -308,8 +316,9 @@ export class PushSubscriptions {
     generation: number,
   ): Promise<void> {
     const input = subscription.toJSON();
-    if (!input.endpoint || !input.keys?.p256dh || !input.keys.auth)
+    if (!input.endpoint || !input.keys?.p256dh || !input.keys.auth) {
       throw new Error('浏览器推送订阅无效');
+    }
     this.subscription = subscription;
     const binding = await this.api.register(
       {
@@ -347,8 +356,9 @@ export class PushSubscriptions {
   private key(): ArrayBuffer {
     const decoded = atob(this.publicKey!.replace(/-/g, '+').replace(/_/g, '/'));
     const bytes = new Uint8Array(decoded.length);
-    for (let index = 0; index < decoded.length; index++)
+    for (let index = 0; index < decoded.length; index++) {
       bytes[index] = decoded.charCodeAt(index);
+    }
     return bytes.buffer;
   }
 

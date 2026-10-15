@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Button } from '#lib/components/ui/button/index.js';
   import * as Dialog from '#lib/components/ui/dialog/index.js';
+
   import { pwa } from './lifecycle.svelte';
 
   let {
@@ -19,7 +20,9 @@
     <div>
       <strong>发现新版本</strong>
       <p>重新加载会中断进行中的操作并丢失未保存内容，请先完成或保存。</p>
-      {#if pwa.error}<p>{pwa.error}</p>{/if}
+      {#if pwa.error}
+        <p>{pwa.error}</p>
+      {/if}
     </div>
     <Button
       type="button"

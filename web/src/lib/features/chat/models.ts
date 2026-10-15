@@ -1,4 +1,4 @@
-import type { components } from '../../api-client';
+import type { components } from '#lib/api-client';
 
 /** Database bigint sequences arrive as canonical strings; Number would lose bits. */
 export const sequence = (value: string) => BigInt(value);

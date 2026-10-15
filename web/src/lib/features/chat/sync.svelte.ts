@@ -1,4 +1,8 @@
 import type { QueryClient } from '@tanstack/svelte-query';
+
+import { createMediaApi } from '#lib/features/media/api.ts';
+import { MediaUploads } from '#lib/features/media/uploads.svelte.ts';
+
 import type {
   ChatApi,
   Message,
@@ -9,12 +13,17 @@ import type {
 import type { RealtimeTransport, ConnectionStatus } from './realtime';
 import { ConversationStore } from './conversation-store';
 import { PeerActivity } from './activity.svelte';
-import { sequence as seq, isGroup, membershipId } from './models';
-import { createMediaApi } from '../media/api';
-import { MediaUploads } from '../media/uploads.svelte';
+import { sequence, isGroup, membershipId } from './models';
 import { HistoryNavigation } from './history.svelte';
 import { MessageActions } from './message-actions.svelte';
 import { ChatNotifications } from './notifications.svelte';
+import {
+  createPendingMessage,
+  pendingMessageInput,
+  unacknowledgedMessages,
+} from './pending-messages';
+
+const RECONCILIATION_INTERVAL_MS = 60_000;
 
 export type { PendingMessage } from './models';
 
@@ -31,6 +40,7 @@ export class ChatSync {
   drafts = $state<Record<string, string>>({});
   connection = $state<ConnectionStatus>('connecting');
   error = $state('');
+
   private revision = $state(0);
   private store: ConversationStore;
   private activity: PeerActivity;
@@ -59,12 +69,14 @@ export class ChatSync {
       selectedId: () => this.selectedId,
       visible: () => this.focused,
     });
+
     this.activity = new PeerActivity({
       ...options,
       active: () => this.active,
       epoch: () => this.epoch,
       membership: (id) => this.store?.membership(id),
     });
+
     this.store = new ConversationStore({
       ...options,
       active: () => this.active,
@@ -102,19 +114,14 @@ export class ChatSync {
           fresh,
         ),
       messagesMerged: (incoming) => {
-        // Only our sender/client-ID pair resolves an optimistic send; another
-        // member can independently choose the same client-generated UUID.
-        this.pending = this.pending.filter(
-          (pending) =>
-            !incoming.some(
-              (message) =>
-                message.conversation_id === pending.conversation_id &&
-                message.sender_id === options.userId &&
-                message.client_message_id === pending.client_message_id,
-            ),
+        this.pending = unacknowledgedMessages(
+          this.pending,
+          incoming,
+          options.userId,
         );
       },
     });
+
     this.actions = new MessageActions({
       ...options,
       store: this.store,
@@ -124,6 +131,7 @@ export class ChatSync {
         this.error = reason;
       },
     });
+
     this.history = new HistoryNavigation({
       ...options,
       store: this.store,
@@ -138,6 +146,7 @@ export class ChatSync {
         this.revision++;
       },
     });
+
     this.uploads = new MediaUploads({
       queryClient: options.queryClient,
       api: createMediaApi(),
@@ -150,6 +159,7 @@ export class ChatSync {
               membershipId(conversation) === scope.membershipId,
           )),
     });
+
     this.unsubscribeCache = options.queryClient
       .getQueryCache()
       .subscribe(() => {
@@ -157,6 +167,8 @@ export class ChatSync {
       });
   }
 
+  // Cache records stay authoritative. Reading this rune makes cache notifications
+  // observable to Svelte getters without mirroring those records in another store.
   get conversations(): Conversation[] {
     this.revision;
     return this.store.conversations;
@@ -210,16 +222,16 @@ export class ChatSync {
     );
   }
 
-  readCount(sequence: string) {
-    return this.readers(sequence).length;
+  readCount(messageSequence: string) {
+    return this.readers(messageSequence).length;
   }
 
-  readers(sequence: string) {
+  readers(messageSequence: string) {
     return this.groupMembers.filter(
       (member) =>
         member.user.id !== this.userId &&
-        seq(member.joined_seq) <= seq(sequence) &&
-        seq(member.read_seq) >= seq(sequence),
+        sequence(member.joined_seq) <= sequence(messageSequence) &&
+        sequence(member.read_seq) >= sequence(messageSequence),
     );
   }
 
@@ -293,6 +305,7 @@ export class ChatSync {
     if (this.readiness) {
       return this.readiness;
     }
+
     this.active = true;
     const epoch = this.epoch;
     this.readiness = (async () => {
@@ -310,29 +323,35 @@ export class ChatSync {
               this.notificationsReady = false;
               this.notificationGeneration++;
               this.store.clearFresh();
-            } else if (this.initialized && previous !== 'online')
+            } else if (this.initialized && previous !== 'online') {
               void this.restoreConnection();
+            }
           },
         );
         if (this.active) {
           this.connection = 'online';
         }
       } catch {
+        // Readiness can time out while the SDK keeps reconnecting. REST polling
+        // still restores durable state, so optional realtime startup is not fatal.
         if (this.active) {
           this.connection = 'offline';
         }
       }
+
       if (!this.active || this.epoch !== epoch) {
         return;
       }
+
       await this.refreshSummaries();
       if (!this.active || this.epoch !== epoch) return;
       this.store.captureNotificationBaseline();
       this.initialized = true;
       this.notificationsReady = this.connection === 'online';
+
       this.interval = setInterval(() => {
         void this.refresh();
-      }, 60000);
+      }, RECONCILIATION_INTERVAL_MS);
     })();
     return this.readiness;
   }
@@ -342,8 +361,9 @@ export class ChatSync {
     const id = this.selectedId;
     if (this.initialized && id && isGroup(this.current)) {
       const stream = this.store.stream(id);
-      if (!stream.ready && !stream.loading)
+      if (!stream.ready && !stream.loading) {
         await this.store.select(id, async () => {});
+      }
     }
   }
 
@@ -379,10 +399,12 @@ export class ChatSync {
     if (this.selectedId && this.selectedId !== id) {
       this.store.invalidate(this.selectedId);
     }
+
     this.selectedId = id;
     this.visible = false;
     this.focused = false;
     this.error = '';
+
     await this.store.select(id, () => this.readiness ?? this.start());
   }
 
@@ -390,6 +412,7 @@ export class ChatSync {
     if (!this.selectedId) {
       return;
     }
+
     this.store.stream(this.selectedId).ready = false;
     this.store.stream(this.selectedId).hasSnapshot = false;
     await this.select(this.selectedId);
@@ -402,6 +425,7 @@ export class ChatSync {
       this.store.invalidate(this.selectedId);
       void this.setTyping(this.selectedId, false);
     }
+
     this.selectedId = null;
     this.visible = false;
     this.focused = false;
@@ -448,48 +472,23 @@ export class ChatSync {
     if (!id || (!body.trim() && !attachmentIds.length) || !this.active) {
       return;
     }
-    let pending = this.pending.find(
-      (pendingMessage) =>
-        pendingMessage.conversation_id === id &&
-        pendingMessage.client_message_id === clientMessageId,
+
+    const pending = this.preparePendingSend(
+      id,
+      body,
+      clientMessageId,
+      attachmentIds,
+      membership,
     );
-    if (pending?.status === 'sending') {
-      return;
-    }
-    if (!pending) {
-      pending = {
-        conversation_id: id,
-        client_message_id: clientMessageId,
-        body,
-        status: 'sending',
-        created_at: new Date().toISOString(),
-        membership_id: membership,
-        attachment_ids: [...attachmentIds],
-        ...(this.replyTarget
-          ? { reply_to_message_id: this.replyTarget.id }
-          : {}),
-      };
-      this.pending.push(pending);
-      this.uploads.consume(attachmentIds);
-      this.actions.replyId = null;
-    } else {
-      pending.status = 'sending';
-      body = pending.body;
-    }
+    if (!pending) return;
+
     const epoch = this.epoch;
 
     try {
-      const message = await this.options.api.send(id, {
-        client_message_id: clientMessageId,
-        body,
-        membership_id: pending.membership_id,
-        ...(pending.reply_to_message_id
-          ? { reply_to_message_id: pending.reply_to_message_id }
-          : {}),
-        ...(pending.attachment_ids.length
-          ? { attachment_ids: pending.attachment_ids }
-          : {}),
-      });
+      const message = await this.options.api.send(
+        id,
+        pendingMessageInput(pending),
+      );
       if (
         !this.active ||
         epoch !== this.epoch ||
@@ -497,6 +496,7 @@ export class ChatSync {
       ) {
         return;
       }
+
       this.store.merge(id, [message]);
       this.store.raiseTarget(id, message.created_seq);
       void this.store.drain(id);
@@ -507,16 +507,51 @@ export class ChatSync {
         epoch === this.epoch &&
         this.store.membership(id) === membership
       ) {
-        const item = this.pending.find(
+        // A lost response may still have committed. Keep the frozen payload and
+        // client ID so an explicit retry can obtain that same authoritative record.
+        const submission = this.pending.find(
           (pendingMessage) =>
             pendingMessage.conversation_id === id &&
             pendingMessage.client_message_id === clientMessageId,
         );
-        if (item) {
-          item.status = 'failed';
-        }
+        if (submission) submission.status = 'failed';
       }
     }
+  }
+
+  private preparePendingSend(
+    conversationId: string,
+    body: string,
+    clientMessageId: string,
+    attachmentIds: string[],
+    membershipId: string | undefined,
+  ): PendingMessage | undefined {
+    let pending = this.pending.find(
+      (pendingMessage) =>
+        pendingMessage.conversation_id === conversationId &&
+        pendingMessage.client_message_id === clientMessageId,
+    );
+    if (pending?.status === 'sending') {
+      return;
+    }
+
+    if (!pending) {
+      pending = createPendingMessage({
+        conversationId,
+        clientMessageId,
+        body,
+        membershipId,
+        attachmentIds,
+        replyToMessageId: this.replyTarget?.id,
+      });
+      this.pending.push(pending);
+      this.uploads.consume(attachmentIds);
+      this.actions.replyId = null;
+    } else {
+      pending.status = 'sending';
+    }
+
+    return pending;
   }
 
   async retry(clientMessageId: string) {
@@ -535,6 +570,7 @@ export class ChatSync {
       await this.history.older();
       return;
     }
+
     if (this.selectedId) {
       await this.store.loadOlder(this.selectedId);
     }
@@ -569,16 +605,18 @@ export class ChatSync {
     ) {
       return;
     }
+
     const state = this.store.stream(id);
     // A saved send can appear ahead of replay. Both rendering and contiguous
     // application are required before this cursor is safe to acknowledge.
     if (
       state.reading ||
-      seq(cursor) <= state.lastRead ||
-      seq(cursor) > seq(state.applied)
+      sequence(cursor) <= state.lastRead ||
+      sequence(cursor) > sequence(state.applied)
     ) {
       return;
     }
+
     state.reading = cursor;
     const epoch = this.epoch;
     const generation = state.generation;
@@ -593,9 +631,9 @@ export class ChatSync {
         this.store.membership(id) === membership
       ) {
         state.lastRead =
-          state.lastRead > seq(result.my_read_seq)
+          state.lastRead > sequence(result.my_read_seq)
             ? state.lastRead
-            : seq(result.my_read_seq);
+            : sequence(result.my_read_seq);
         void this.refreshSummaries();
       }
     } catch {
@@ -607,7 +645,7 @@ export class ChatSync {
         this.visible &&
         this.selectedId === id &&
         this.renderedReadSeq &&
-        seq(this.renderedReadSeq) > seq(cursor)
+        sequence(this.renderedReadSeq) > sequence(cursor)
       ) {
         void this.readLatest();
       }
@@ -634,6 +672,7 @@ export class ChatSync {
     if (this.interval) {
       clearInterval(this.interval);
     }
+
     this.activity.stop();
     this.history.reset();
     this.actions.reset();
@@ -641,6 +680,7 @@ export class ChatSync {
     this.uploads.stop();
     this.options.transport.close();
     this.unsubscribeCache();
+
     this.pending = [];
     this.drafts = {};
     this.store.stop();

@@ -1,15 +1,17 @@
 <script lang="ts">
+  import { Search, MessageCircle, Pin, BellOff } from '@lucide/svelte';
+
   import * as Avatar from '#lib/components/ui/avatar/index.js';
   import { Badge } from '#lib/components/ui/badge/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
 
-  import ProfileAvatar from '../settings/ProfileAvatar.svelte';
-  import { Search, MessageCircle, Pin, BellOff } from '@lucide/svelte';
+  import ProfileAvatar from '#lib/features/settings/ProfileAvatar.svelte';
+
   import NotificationSettings from './NotificationSettings.svelte';
   import StartConversationDialog from './StartConversationDialog.svelte';
   import GroupDialog from './GroupDialog.svelte';
-  import { isGroup, conversationName } from './models';
+  import { isGroup, conversationName, type Conversation } from './models';
   import type { ChatSync } from './sync.svelte';
 
   let {
@@ -21,20 +23,29 @@
   let filter = $state('');
   let archived = $state(false);
 
+  const archivedCount = $derived(
+    sync.conversations.filter(
+      (conversation) => conversation.preferences.archived,
+    ).length,
+  );
   let conversations = $derived(
     sync.conversations
       .filter(
         (conversation) =>
           conversation.preferences.archived === archived &&
-          `${conversationName(conversation)} ${isGroup(conversation) ? '' : conversation.peer.username}`
-            .toLowerCase()
-            .includes(filter.toLowerCase()),
+          matchesFilter(conversation),
       )
       .sort(
         (left, right) =>
           Number(right.preferences.pinned) - Number(left.preferences.pinned),
       ),
   );
+
+  function matchesFilter(conversation: Conversation): boolean {
+    const username = isGroup(conversation) ? '' : conversation.peer.username;
+    const searchableText = `${conversationName(conversation)} ${username}`;
+    return searchableText.toLowerCase().includes(filter.toLowerCase());
+  }
 
   const time = (value: string) =>
     new Date(value).toLocaleTimeString('zh-CN', {
@@ -83,9 +94,7 @@
       aria-pressed={archived}
       onclick={() => (archived = true)}
     >
-      归档 ({sync.conversations.filter(
-        (conversation) => conversation.preferences.archived,
-      ).length})
+      归档 ({archivedCount})
     </Button>
   </div>
   <div class="connection-status" aria-live="polite">

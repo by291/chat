@@ -6,6 +6,8 @@ import type { Attachment, MediaApi, UploadScope } from './models';
 const MAX_FILE_BYTES = 52_428_800;
 const MAX_FILES = 10;
 const POLL_DEADLINE_MS = 120_000;
+const POLL_INTERVAL_MS = 500;
+
 const attachmentKey = (id: string) => ['media', id] as const;
 
 export type UploadDraft = {
@@ -27,7 +29,7 @@ function pause(signal: AbortSignal) {
     const timer = setTimeout(() => {
       signal.removeEventListener('abort', abort);
       resolve();
-    }, 500);
+    }, POLL_INTERVAL_MS);
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) abort();
   });
@@ -37,6 +39,7 @@ function pause(signal: AbortSignal) {
 export class MediaUploads {
   entries = $state<UploadDraft[]>([]);
   error = $state('');
+
   private revision = $state(0);
   private active = true;
   private controllers = new Map<string, AbortController>();
@@ -56,6 +59,8 @@ export class MediaUploads {
   }
 
   metadata(entry: UploadDraft): Attachment | undefined {
+    // Query-cache notifications rerun consumers without making the draft own a
+    // mutable second copy of the server's processing metadata.
     this.revision;
     return entry.attachmentId
       ? this.options.queryClient.getQueryData(attachmentKey(entry.attachmentId))
@@ -127,12 +132,15 @@ export class MediaUploads {
 
   private async poll(entry: UploadDraft, controller: AbortController) {
     const deadline = Date.now() + POLL_DEADLINE_MS;
+
     while (this.valid(entry, controller)) {
       const record = this.metadata(entry);
       if (record?.state === 'ready') return;
-      if (record?.state === 'failed' || record?.state === 'expired')
+      if (record?.state === 'failed' || record?.state === 'expired') {
         throw new Error('文件处理失败，请重新选择文件');
+      }
       if (Date.now() >= deadline) throw new Error('文件仍在处理中，请稍后重试');
+
       await pause(controller.signal);
       const next = await this.options.api.status(
         entry.attachmentId!,
@@ -144,6 +152,7 @@ export class MediaUploads {
 
   private async run(entry: UploadDraft, retry: boolean) {
     if (!this.active || !this.options.authorized(entry.scope)) return;
+
     this.controllers.get(entry.localId)?.abort();
     const controller = new AbortController();
     this.controllers.set(entry.localId, controller);
@@ -165,6 +174,7 @@ export class MediaUploads {
           return;
         }
       }
+
       const grant = entry.attachmentId
         ? await this.options.api.renew(entry.attachmentId, controller.signal)
         : await this.options.api.create(
@@ -181,6 +191,7 @@ export class MediaUploads {
       if (!this.valid(entry, controller)) return;
       this.save(entry, grant.attachment);
       entry.progress = 0;
+
       await (this.options.transfer ?? uploadObject)(grant, entry.file, {
         signal: controller.signal,
         progress: (percent) => {
@@ -188,6 +199,7 @@ export class MediaUploads {
         },
       });
       if (!this.valid(entry, controller)) return;
+
       const record = await this.options.api.complete(
         grant.attachment.id,
         grant.attempt_id,
@@ -195,11 +207,13 @@ export class MediaUploads {
       );
       if (!this.valid(entry, controller)) return;
       this.save(entry, record);
+
       await this.poll(entry, controller);
     } catch (reason) {
-      if (this.valid(entry, controller))
+      if (this.valid(entry, controller)) {
         entry.error =
           reason instanceof Error ? reason.message : '上传失败，请重试';
+      }
     } finally {
       if (this.controllers.get(entry.localId) === controller) {
         this.controllers.delete(entry.localId);
@@ -216,14 +230,17 @@ export class MediaUploads {
   async cancel(localId: string) {
     const entry = this.entries.find((item) => item.localId === localId);
     if (!entry) return;
+
     this.controllers.get(localId)?.abort();
+
     try {
       if (entry.attachmentId) await this.options.api.cancel(entry.attachmentId);
       this.discard(entry);
     } catch (reason) {
-      if (this.active && this.entries.includes(entry))
+      if (this.active && this.entries.includes(entry)) {
         entry.error =
           reason instanceof Error ? reason.message : '取消失败，请重试';
+      }
     }
   }
 
@@ -236,9 +253,11 @@ export class MediaUploads {
   }
 
   consume(ids: string[]) {
-    for (const entry of this.entries)
-      if (entry.attachmentId && ids.includes(entry.attachmentId))
+    for (const entry of this.entries) {
+      if (entry.attachmentId && ids.includes(entry.attachmentId)) {
         this.discard(entry);
+      }
+    }
   }
 
   forgetConversation(id: string) {

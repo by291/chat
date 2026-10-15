@@ -1,8 +1,10 @@
-import { api, unwrap, type ApiClient, type components } from '../../api-client';
+import { api, unwrap, type ApiClient, type components } from '#lib/api-client';
 
 export type PushBinding = components['schemas']['SubscriptionBinding'];
 export type PushActivity = components['schemas']['ActivityInput'];
 export type PushInput = components['schemas']['SubscriptionInput'];
+
+const REQUEST_DEADLINE_MS = 5_000;
 
 /** Optional push requests have a short deadline; a lost activity hint expires on the server. */
 async function bounded<T>(
@@ -13,7 +15,7 @@ async function bounded<T>(
   const abort = () => controller.abort();
   parent?.addEventListener('abort', abort, { once: true });
   if (parent?.aborted) controller.abort();
-  const deadline = setTimeout(abort, 5000);
+  const deadline = setTimeout(abort, REQUEST_DEADLINE_MS);
 
   try {
     return await request(controller.signal);

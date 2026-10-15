@@ -1,43 +1,36 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
+  import { useQueryClient } from '@tanstack/svelte-query';
+  import { Monitor, ShieldCheck } from '@lucide/svelte';
+
   import * as Card from '#lib/components/ui/card/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
 
-  import { onMount } from 'svelte';
-  import { Monitor, ShieldCheck } from '@lucide/svelte';
-  import { settingsApi } from './api';
-  import type { components } from '../../api-client';
+  import { auth } from '#lib/features/auth/session.svelte.ts';
 
-  let sessions = $state<components['schemas']['SessionView'][]>([]);
-  let pending = $state<string | null>(null);
-  let error = $state('');
+  import { SettingsSessions } from './sessions.svelte';
 
-  async function load() {
-    try {
-      sessions = await settingsApi.sessions();
-    } catch (reason) {
-      error = reason instanceof Error ? reason.message : '加载失败';
-    }
-  }
+  const queryClient = useQueryClient();
+  let owner = $state<SettingsSessions | null>(null);
 
-  async function revoke(id: string) {
-    if (pending) {
-      return;
-    }
-    pending = id;
-    error = '';
+  const authenticatedId = $derived(auth.user?.id);
 
-    try {
-      await settingsApi.revokeSession(id);
-      await load();
-    } catch (reason) {
-      error = reason instanceof Error ? reason.message : '撤销失败';
-    } finally {
-      pending = null;
-    }
-  }
+  $effect(() => {
+    const userId = authenticatedId;
+    if (!userId) return;
 
-  onMount(() => {
-    void load();
+    const sessions = new SettingsSessions({ queryClient, userId });
+    owner = sessions;
+    const removeReset = auth.onReset(() => sessions.stop());
+    // Identity owns this lifetime; loading/cache feedback must not subscribe the
+    // effect to records and restart it during same-user profile revalidation.
+    untrack(() => void sessions.load());
+
+    return () => {
+      removeReset();
+      sessions.stop();
+      owner = null;
+    };
   });
 </script>
 
@@ -48,7 +41,7 @@
     <p class="muted">撤销不再使用的设备，让账号保持安全。</p>
   </div>
   <div class="sessions-list">
-    {#each sessions as session (session.id)}
+    {#each owner?.sessions ?? [] as session (session.id)}
       <div class="session-item">
         <div class="device-icon"><Monitor size={22} /></div>
         <div class="session-description">
@@ -64,10 +57,10 @@
         </div>
         <Button
           variant="secondary"
-          disabled={pending !== null}
-          onclick={() => revoke(session.id)}
+          disabled={owner?.pending !== null}
+          onclick={() => owner?.revoke(session.id)}
         >
-          {pending === session.id
+          {owner?.pending === session.id
             ? '撤销中…'
             : session.is_current
               ? '撤销此设备'
@@ -76,7 +69,7 @@
       </div>
     {/each}
   </div>
-  {#if error}
-    <p class="form-error" role="alert">{error}</p>
+  {#if owner?.error}
+    <p class="form-error" role="alert">{owner.error}</p>
   {/if}
 </Card.Root>

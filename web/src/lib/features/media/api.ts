@@ -1,4 +1,5 @@
-import { api, unwrap } from '../../api-client';
+import { api, unwrap } from '#lib/api-client';
+
 import type { MediaApi } from './models';
 
 /** Media authorization stays on the application origin; transfers use separate signed grants. */

@@ -1,12 +1,18 @@
 <script lang="ts">
+  import { Send, Paperclip, X } from '@lucide/svelte';
+
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
 
-  import { Send, Paperclip, X } from '@lucide/svelte';
+  import UploadList from '#lib/features/media/UploadList.svelte';
+
   import type { ChatSync } from './sync.svelte';
   import { membershipId } from './models';
-  import UploadList from '../media/UploadList.svelte';
+
+  const MAX_MESSAGE_CHARACTERS = 4_096;
+  const CHARACTER_WARNING_THRESHOLD = 3_500;
+  const MAX_COMPOSER_HEIGHT_PX = 160;
 
   let {
     sync,
@@ -28,29 +34,34 @@
   const entries = $derived(sync.uploads.forConversation(id));
   const attachmentIds = $derived(sync.uploads.readyIds(id));
   const attachmentsReady = $derived(entries.length === attachmentIds.length);
+  const canSend = $derived(
+    (!!draft.trim() || !!attachmentIds.length) &&
+      attachmentsReady &&
+      characterCount <= MAX_MESSAGE_CHARACTERS &&
+      !sync.loading,
+  );
 
   function resizeAndPublishTyping() {
     sync.drafts[id] = input.value;
+
     input.style.height = 'auto';
-    input.style.height = `${Math.min(160, input.scrollHeight)}px`;
+    input.style.height = `${Math.min(MAX_COMPOSER_HEIGHT_PX, input.scrollHeight)}px`;
+
     void sync.setTyping(id, !!input.value.trim());
   }
 
   function sendDraft() {
-    if (
-      composing ||
-      (!draft.trim() && !attachmentIds.length) ||
-      !attachmentsReady ||
-      characterCount > 4096 ||
-      sync.loading
-    ) {
+    if (composing || !canSend) {
       return;
     }
+
     const body = draft;
     sync.drafts[id] = '';
     input.style.height = 'auto';
     void sync.setTyping(id, false);
     void sync.send(body, undefined, attachmentIds);
+    // Keep the existing explicit-send focus behavior; receiving a reply does not
+    // call this handler or move focus into the composer.
     input.focus();
   }
 
@@ -149,18 +160,15 @@
       size="icon"
       class="size-11 rounded-xl"
       aria-label="发送消息"
-      disabled={(!draft.trim() && !attachmentIds.length) ||
-        !attachmentsReady ||
-        characterCount > 4096 ||
-        sync.loading}
+      disabled={!canSend}
     >
       <Send size={19} />
     </Button>
   </form>
   <div class="composer-hint">
     <span>Enter 发送 · Shift + Enter 换行</span>
-    {#if characterCount > 3500}
-      <span class:too-long={characterCount > 4096}>
+    {#if characterCount > CHARACTER_WARNING_THRESHOLD}
+      <span class:too-long={characterCount > MAX_MESSAGE_CHARACTERS}>
         {characterCount} / 4096
       </span>
     {:else}

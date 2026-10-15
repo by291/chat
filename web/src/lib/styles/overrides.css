@@ -13,9 +13,11 @@
   color: var(--text);
   background: var(--background);
 }
+
 .mobile-back {
   display: none;
 }
+
 @media (max-width: 700px) {
   .mobile-back {
     display: grid;

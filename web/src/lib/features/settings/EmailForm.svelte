@@ -6,6 +6,7 @@
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
+
   import { createAuthApi } from '#lib/features/auth/api.ts';
   import { auth } from '#lib/features/auth/session.svelte.ts';
 
@@ -63,12 +64,14 @@
   }
 
   const unsubscribe = auth.onReset(resetForm);
+
   $effect(() => {
     if (userId !== formUserId) {
       formUserId = userId;
       resetForm();
     }
   });
+
   onDestroy(() => {
     unsubscribe();
     resetForm();
@@ -122,10 +125,12 @@
             {pending ? '申请中…' : '发送验证邮件'}
           </Button>
         </div>
-        {#if requested}<p class="success" role="status">
-            验证邮件已申请，请查收邮箱。
-          </p>{/if}
-        {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+        {#if requested}
+          <p class="success" role="status">验证邮件已申请，请查收邮箱。</p>
+        {/if}
+        {#if error}
+          <p class="form-error" role="alert">{error}</p>
+        {/if}
       </form>
     {:else}
       <p class="field-help">邮件服务暂未启用，忘记密码时请联系管理员。</p>

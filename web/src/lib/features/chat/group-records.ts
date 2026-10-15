@@ -39,6 +39,7 @@ export class GroupRecords {
   async load(id: string, signal?: AbortSignal) {
     const membership = this.options.membership(id);
     if (!membership || !this.options.active()) return;
+
     const previous = this.flights.get(id);
     const epoch = this.options.epoch();
     if (
@@ -51,6 +52,7 @@ export class GroupRecords {
       previous.rerun = true;
       return previous.work;
     }
+
     previous?.controller.abort();
     const controller = new AbortController();
     const flight: RosterFlight = {
@@ -65,6 +67,7 @@ export class GroupRecords {
     };
     this.flights.set(id, flight);
     flight.work = this.refresh(id, flight);
+
     try {
       await flight.work;
     } finally {
@@ -86,11 +89,13 @@ export class GroupRecords {
     do {
       flight.rerun = false;
       if (!this.live(id, flight)) return;
+
       try {
         const rows = await this.options.api.members(id, flight.signal);
         const own = rows.find(
           (member) => member.user.id === this.options.userId,
         );
+
         // The roster identifies its own actor episode. A late response cannot
         // insert newly joined records into an older stream, or the reverse.
         if (
@@ -109,6 +114,7 @@ export class GroupRecords {
                     record.membership_id === member.membership_id &&
                     record.user.id === member.user.id,
                 );
+
                 return existing &&
                   sequence(existing.read_seq) > sequence(member.read_seq)
                   ? { ...member, read_seq: existing.read_seq }

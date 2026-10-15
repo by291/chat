@@ -1,4 +1,4 @@
-import type { components } from '../../api-client';
+import type { components } from '#lib/api-client';
 
 export type Attachment = components['schemas']['AttachmentView'];
 export type UploadGrant = components['schemas']['UploadGrant'];

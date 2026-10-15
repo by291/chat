@@ -1,12 +1,13 @@
 <script lang="ts">
-  import { Button } from '#lib/components/ui/button/index.js';
-  import { Input } from '#lib/components/ui/input/index.js';
-  import { Label } from '#lib/components/ui/label/index.js';
-
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { MessageCircle, ArrowRight, ShieldCheck } from '@lucide/svelte';
+
+  import { Button } from '#lib/components/ui/button/index.js';
+  import { Input } from '#lib/components/ui/input/index.js';
+  import { Label } from '#lib/components/ui/label/index.js';
+
   import { auth } from './session.svelte';
 
   let {
@@ -44,16 +45,6 @@
     }
   }
 
-  onMount(() => {
-    invitation = page.url.searchParams.get('invite') ?? '';
-    void auth.restore().then(() => {
-      if (auth.user) {
-        if (onAuthenticated) void onAuthenticated();
-        else void goto(destination());
-      }
-    });
-  });
-
   async function submit(event: SubmitEvent) {
     event.preventDefault();
     if (auth.pending) {
@@ -77,12 +68,28 @@
         });
       }
       password = '';
-      if (onAuthenticated) await onAuthenticated();
-      else await goto(destination());
+      if (onAuthenticated) {
+        await onAuthenticated();
+      } else {
+        await goto(destination());
+      }
     } catch (reason) {
       error = reason instanceof Error ? reason.message : '请稍后重试';
     }
   }
+
+  onMount(() => {
+    invitation = page.url.searchParams.get('invite') ?? '';
+    void auth.restore().then(() => {
+      if (auth.user) {
+        if (onAuthenticated) {
+          void onAuthenticated();
+        } else {
+          void goto(destination());
+        }
+      }
+    });
+  });
 </script>
 
 <svelte:head>

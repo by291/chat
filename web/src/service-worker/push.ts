@@ -16,14 +16,15 @@ type AppClients = {
   openWindow(url: string): Promise<unknown>;
 };
 
-const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const conversationPath = new RegExp(`^/app/chats/${uuid}$`);
-const eventTag = new RegExp(`^chat:${uuid}$`);
-const generation = new RegExp(`^${uuid}$`);
+const UUID_PATTERN =
+  '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const conversationPathPattern = new RegExp(`^/app/chats/${UUID_PATTERN}$`);
+const eventTagPattern = new RegExp(`^chat:${UUID_PATTERN}$`);
+const generationPattern = new RegExp(`^${UUID_PATTERN}$`);
 
 /** Accept only the existing conversation route; arbitrary URLs and query tokens are rejected. */
 export function notificationPath(value: unknown): string {
-  return typeof value === 'string' && conversationPath.test(value)
+  return typeof value === 'string' && conversationPathPattern.test(value)
     ? value
     : '/app';
 }
@@ -40,9 +41,9 @@ export async function showPush(
   const valid =
     candidate.schema_version === 1 &&
     typeof candidate.tag === 'string' &&
-    eventTag.test(candidate.tag) &&
+    eventTagPattern.test(candidate.tag) &&
     typeof candidate.generation === 'string' &&
-    generation.test(candidate.generation) &&
+    generationPattern.test(candidate.generation) &&
     notificationPath(candidate.path) !== '/app';
 
   await registration.showNotification('Chat', {

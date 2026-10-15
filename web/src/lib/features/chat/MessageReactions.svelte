@@ -4,11 +4,6 @@
   import type { Message, ReactionKind } from './models';
   import type { MessageActions } from './message-actions.svelte';
 
-  let { message, actions }: { message: Message; actions: MessageActions } =
-    $props();
-  let opened = $state(false);
-  let trigger = $state<HTMLButtonElement | HTMLAnchorElement | null>(null);
-  const pending = $derived(actions.reactionPending(message.id));
   const choices: ReadonlyArray<{
     kind: ReactionKind;
     emoji: string;
@@ -21,6 +16,13 @@
     { kind: 'sad', emoji: '😢', label: '难过' },
     { kind: 'celebrate', emoji: '🎉', label: '庆祝' },
   ];
+
+  let { message, actions }: { message: Message; actions: MessageActions } =
+    $props();
+
+  let opened = $state(false);
+  let trigger = $state<HTMLButtonElement | HTMLAnchorElement | null>(null);
+  const pending = $derived(actions.reactionPending(message.id));
 
   async function choose(kind: ReactionKind | null) {
     opened = false;

@@ -1,5 +1,6 @@
 /** Shared cookie-authenticated transport. Feature adapters own endpoint calls. */
 import createClient from 'openapi-fetch';
+
 import type { paths } from './schema';
 
 export function createApiClient(

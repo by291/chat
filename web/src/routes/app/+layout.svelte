@@ -1,14 +1,15 @@
 <script lang="ts">
-  import * as Avatar from '#lib/components/ui/avatar/index.js';
-  import { Button } from '#lib/components/ui/button/index.js';
-
   import { onMount, untrack, type Snippet } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { MessageCircle, Settings2, LogOut } from '@lucide/svelte';
-  import { auth } from '#lib/features/auth/session.svelte.ts';
   import { QueryClientProvider } from '@tanstack/svelte-query';
+
+  import * as Avatar from '#lib/components/ui/avatar/index.js';
+  import { Button } from '#lib/components/ui/button/index.js';
   import { api } from '#lib/api-client';
+
+  import { auth } from '#lib/features/auth/session.svelte.ts';
   import { createQueryClient } from '#lib/features/chat/cache.ts';
   import { createChatApi } from '#lib/features/chat/api.ts';
   import { createChatSync } from '#lib/features/chat/sync.svelte.ts';
@@ -20,9 +21,7 @@
   import { PushSubscriptions } from '#lib/features/notifications/subscriptions.svelte.ts';
   import { createNotificationApi } from '#lib/features/notifications/api.ts';
 
-  const queryClient = createQueryClient();
-  const chat = provideChat();
-  const backgroundPush = provideBackgroundPush();
+  const SESSION_REFRESH_INTERVAL_MS = 60_000;
 
   let {
     children,
@@ -30,14 +29,40 @@
     children: Snippet;
   } = $props();
 
+  const queryClient = createQueryClient();
+  const chat = provideChat();
+  const backgroundPush = provideBackgroundPush();
+
   let error = $state('');
 
   // Profile revalidation replaces the user object. Only an identity change may
   // recreate the coordinator, otherwise the same user's unsent drafts are lost.
   const authenticatedId = $derived(auth.user?.id);
+  const hasDraft = $derived(
+    Object.values(chat.sync?.drafts ?? {}).some((text) => !!text) ||
+      !!chat.sync?.actions.editingId,
+  );
+  const hasUpload = $derived(!!chat.sync?.uploads.entries.length);
+  const hasSubmission = $derived(
+    chat.sync?.pending.some((message) => message.status === 'sending') ||
+      chat.sync?.actions.busy ||
+      !!chat.sync?.actions.reacting.length ||
+      false,
+  );
+
+  async function logout() {
+    try {
+      await backgroundPush.owner?.disable();
+      await auth.logout();
+      await goto('/login');
+    } catch (reason) {
+      error = reason instanceof Error ? reason.message : '退出失败';
+    }
+  }
 
   onMount(() => {
     void auth.restore();
+
     const restore = async () => {
       if (document.visibilityState !== 'visible') {
         return;
@@ -47,9 +72,10 @@
         await chat.sync?.refresh();
       }
     };
-    const interval = setInterval(restore, 60000);
+    const interval = setInterval(restore, SESSION_REFRESH_INTERVAL_MS);
     window.addEventListener('focus', restore);
     document.addEventListener('visibilitychange', restore);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', restore);
@@ -71,17 +97,22 @@
   $effect(() => {
     const userId = authenticatedId;
     if (!userId) return;
+
     const owner = new PushSubscriptions(createNotificationApi());
     backgroundPush.owner = owner;
     const removeReset = auth.onReset(() => void owner.stop());
     // Optional capability startup reads UI flags; identity alone owns this lifetime.
     untrack(() => void owner.start());
+
     return () => {
       removeReset();
       // Leaving /app can preserve authentication (for example /login redirects).
       // Only identity replacement/reset revokes the shared browser capability.
-      if (auth.user?.id !== userId) void owner.stop();
-      else owner.dispose();
+      if (auth.user?.id !== userId) {
+        void owner.stop();
+      } else {
+        owner.dispose();
+      }
       backgroundPush.owner = null;
     };
   });
@@ -92,6 +123,7 @@
       ? (chat.sync?.selectedId ?? null)
       : null;
     if (!owner) return;
+
     untrack(() =>
       owner.setActivity({
         visible: document.visibilityState === 'visible',
@@ -106,6 +138,7 @@
     if (!userId) {
       return;
     }
+
     const sync = createChatSync({
       api: createChatApi(api),
       transport: createRealtimeTransport(userId, () => auth.reset()),
@@ -116,21 +149,12 @@
     // Starting reads reactive coordination fields; these must not become effect
     // dependencies that repeatedly tear down the authenticated session lifetime.
     untrack(() => void sync.start());
+
     return () => {
       sync.stop();
       chat.sync = null;
     };
   });
-
-  async function logout() {
-    try {
-      await backgroundPush.owner?.disable();
-      await auth.logout();
-      await goto('/login');
-    } catch (reason) {
-      error = reason instanceof Error ? reason.message : '退出失败';
-    }
-  }
 </script>
 
 {#if auth.user}
@@ -175,18 +199,7 @@
       {#if chat.sync}
         <NotificationCenter sync={chat.sync} />
       {/if}
-      <UpdateNotice
-        hasDraft={Object.values(chat.sync?.drafts ?? {}).some(
-          (text) => !!text,
-        ) || !!chat.sync?.actions.editingId}
-        hasUpload={!!chat.sync?.uploads.entries.length}
-        hasSubmission={chat.sync?.pending.some(
-          (message) => message.status === 'sending',
-        ) ||
-          chat.sync?.actions.busy ||
-          !!chat.sync?.actions.reacting.length ||
-          false}
-      />
+      <UpdateNotice {hasDraft} {hasUpload} {hasSubmission} />
     </div>
   </QueryClientProvider>
 {:else}

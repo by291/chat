@@ -1,4 +1,5 @@
-import type { components } from '../../api-client';
+import type { components } from '#lib/api-client';
+
 import { securityToken } from './email-verification.svelte';
 
 type ResetPassword = (
@@ -12,6 +13,7 @@ export class PasswordResetState {
   pending = $state(false);
   done = $state(false);
   error = $state('');
+
   private generation = 0;
   private request?: AbortController;
 
@@ -35,14 +37,18 @@ export class PasswordResetState {
 
   async reset(password: string, confirmation: string): Promise<void> {
     if (!this.token || this.pending || this.done) return;
+
     if (password !== confirmation) {
       this.error = '两次输入的新密码不一致';
       return;
     }
-    if (Array.from(password).length < 6 || Array.from(password).length > 128) {
+
+    const passwordLength = Array.from(password).length;
+    if (passwordLength < 6 || passwordLength > 128) {
       this.error = '密码需要 6–128 个字符';
       return;
     }
+
     const generation = ++this.generation;
     const request = new AbortController();
     this.request = request;
