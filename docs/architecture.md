@@ -63,23 +63,33 @@ src/
   users/
     http.rs               profile/search/status REST adapters
     model.rs              user/profile/status DTOs
-    service.rs            profile rules and relationship-based presence
-    repository.rs         profile and presence relationship SQL
+    service.rs            profile rules and compatibility presence exports
+    presence.rs           relationship-authorized presence and transition maintenance
+    repository.rs         profile and relationship authorization SQL
   media/
     http.rs               authenticated upload/status/download adapters
     model.rs              stable metadata and short-lived transfer grants
-    service.rs            scoped authorization, quota and composed references
-    repository.rs         attachment/attempt/object/lease/reference SQL and CAS
+    uploads.rs            scoped upload allocation, renewal, completion and cancellation
+    references.rs         authorized downloads and transaction-composed message/avatar binding
+    processing_lifecycle.rs candidate/publication/lease/failure transaction decisions
+    retirement.rs         cleanup/reconciliation fencing and single quota release
+    attachment_repository.rs attachment/object rows, common locks and quota/state SQL
+    upload_repository.rs  upload attempts, sealing and processing enqueue SQL
+    processing_repository.rs processing claims, immutable candidates and lease/job SQL
+    reference_repository.rs message/avatar reference and visibility SQL
+    retirement_repository.rs retirement discovery, tombstones and scheduling SQL
+    service.rs            explicit application compatibility exports
+    repository.rs         explicit persistence/worker compatibility exports
     processing.rs         bounded image inspection and sanitized variants
     worker.rs             independent processing, cleanup and retired-key reconciliation
   realtime/
     http.rs               private Centrifugo and metrics HTTP adapters
-    model.rs              proxy request/reply DTOs
+    model.rs              proxy and realtime publication DTOs
     service.rs            connect/refresh authorization and session leases
-    repository.rs         connection/outbox persistence, leased row mapping and CAS
+    repository.rs         connection/presence/outbox persistence, leased rows and CAS
     delivery.rs           durable fanout and revoked-client disconnects
     outbox.rs             cancellation-aware worker orchestration
-    client.rs             bounded Centrifugo HTTP transport and event DTOs
+    client.rs             bounded Centrifugo HTTP transport and publication compatibility exports
   infrastructure/         configuration, DB setup, rate limiting and observability
 ```
 
@@ -88,6 +98,27 @@ Services own transactions so related writes can commit together. Repositories do
 not commit caller-owned transactions or import HTTP adapters. Concrete functions
 are sufficient for this single PostgreSQL implementation; adding a trait is not
 required to make a boundary clear.
+
+`infrastructure::db` owns bounded acquisition and connection recycling. Cancellation
+can interrupt transaction startup before SQLx records its transaction depth, leaving
+server-side transaction state on a released connection. Recycling clears that state
+after the workflow relinquishes the connection; timeout or cleanup failure discards
+the connection. Application operations continue to own commit and rollback decisions.
+The reset adds one simple-protocol batch per release to enforce this ownership
+boundary even when client-side transaction bookkeeping was interrupted.
+
+Media upload, processing, reference and retirement operations own their transactions.
+Concrete repositories accept those transactions and never begin/commit them.
+Processing and retirement share quota/attachment/job primitives without importing
+one another's workflows. Common helpers preserve statement-level lock ordering:
+conversation → owner quota → sorted attachments → job/object where applicable;
+lease renewal retains its job → object order and separate READ COMMITTED statements.
+Storage/network work stays outside these transactions. The legacy `media::service`
+and `media::repository` paths remain explicit compatibility facades.
+
+`users::presence` owns authorization/maintenance, `infrastructure::presence` owns
+Valkey transitions, and realtime persistence owns stale connection pruning.
+The 120-second connection retention remains separate from transition expiry.
 
 The realtime repository owns `LeasedJob` because it maps the claimed database row.
 Delivery and orchestration consume that record; persistence does not import either
@@ -110,6 +141,7 @@ web/src/
     features/
       auth/                     auth API, session lifetime, identity form and styles
       settings/                 profile/device API, forms, theme and styles
+        sessions.svelte.ts      authenticated device-list cache and revoke coordination
       pwa/                      install/update browser lifecycle and consent controls
       notifications/            session-owned background capability and activity lifecycle
       media/                    scoped uploads, ephemeral transfer state and previews
@@ -118,7 +150,11 @@ web/src/
         models.ts               aliases to generated DTOs and application contracts
         cache.ts                query cache configuration and key ownership
         conversation-store.ts   summaries, snapshots, history, continuous replay
+        conversation-summaries.ts paginated collection without independent lifetime state
+        conversation-projections.ts pure summary/receipt/last-message projections
         message-records.ts      revision fences and independently revised reply previews
+        pending-messages.ts     immutable optimistic send/retry records and acknowledgement matching
+        group-actions.svelte.ts group mutation and canonical cache reconciliation
         history.svelte.ts       search/context ID windows and latest-history navigation
         message-actions.svelte.ts reply selection, edit drafts and personal preferences
         notifications.svelte.ts open-page alert policy and ephemeral browser capabilities
@@ -152,6 +188,21 @@ The query cache owns authoritative server records. The coordinator owns selectio
 drafts and optimistic sends. The conversation store owns per-conversation request
 generations and continuous event cursors. Peer activity owns expiring information.
 There is no second mutable copy of authoritative messages.
+
+Manually maintained canonical records are retained for the authenticated lifetime.
+Query-cache subscriptions report changes but do not pin queries as observers;
+automatic garbage collection must not remove messages while applied stream cursors
+remain live. Membership replacement/removal clears the affected records, and
+logout/coordinator teardown clears the session cache. Settings device-list owners
+also abort/fence late responses and remove their own query on teardown.
+
+Pure conversation summary, receipt and preview transforms live in
+`conversation-projections.ts`; `conversation-summaries.ts` owns paginated collection.
+The conversation store retains summary-flight/revision checks, membership episodes
+and stream generations. `pending-messages.ts` freezes optimistic send identity and
+content while `ChatSync` retains the existing lifetime and acknowledgement fences.
+`group-actions.svelte.ts` coordinates group mutations with canonical summary/roster
+refresh; group components retain inputs, dialogs and presentation.
 
 Background capabilities are private acknowledgements owned by one authenticated
 notification lifecycle. They never become message records or persistent browser
@@ -212,6 +263,9 @@ capabilities; they never become message fields or persistent cache records.
 - UI animation and semantic theme layers load before workflow styles in `app.css`.
   Feature styles and shared styles retain their relative cascade order.
   Shared overrides remain last because their specificity/order is observable.
+  `styles/feature-theme.css` preserves the shared dark form-error theme rule
+  immediately after chat styles. Feature-specific auth/settings and application-rail
+  selectors live with their owners.
 
 ## Verification
 
@@ -220,6 +274,8 @@ boundaries without imposing arbitrary file-size rules. Frontend checks inspect
 TypeScript plus Svelte scripts, template expressions and custom-element options.
 Typed methods and direct `fetch`/browser-global calls are restricted to feature APIs
 and shared transport.
+Rust source inspection includes new feature directories automatically, while
+startup composition and HTTP adapters retain their legitimate adapter dependencies.
 Static bracket access, optional calls and expression wrappers are covered; comments,
 strings and unrelated object methods are ignored. Aliases and dynamic property access
 still require review; the guard is not a complete dependency analysis.

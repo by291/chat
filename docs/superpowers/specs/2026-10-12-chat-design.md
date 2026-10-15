@@ -28,11 +28,11 @@ require their own actual-infrastructure acceptance when those phases are impleme
 
 ## Architecture choice
 
-| Approach | Benefit | Cost and decision |
-| --- | --- | --- |
-| Static SvelteKit client, modular Rust monolith, background worker | Unified permissions, static hosting, clear dependencies | Client restores identity; selected for this product |
-| SvelteKit SSR/BFF plus Rust | Public rendering and frontend aggregation | Resident Node and another identity boundary; revisit for public/SEO needs |
-| Rust microservices and event bus | Independent scaling by subsystem | Distributed consistency/operations; revisit for demonstrated team/scale needs |
+| Approach                                                          | Benefit                                                 | Cost and decision                                                             |
+| ----------------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Static SvelteKit client, modular Rust monolith, background worker | Unified permissions, static hosting, clear dependencies | Client restores identity; selected for this product                           |
+| SvelteKit SSR/BFF plus Rust                                       | Public rendering and frontend aggregation               | Resident Node and another identity boundary; revisit for public/SEO needs     |
+| Rust microservices and event bus                                  | Independent scaling by subsystem                        | Distributed consistency/operations; revisit for demonstrated team/scale needs |
 
 One Rust crate builds API, worker, and operator CLI. PostgreSQL supplies the durable
 queue. Kafka, RabbitMQ, and Kubernetes are not initial dependencies.
@@ -42,23 +42,23 @@ queue. Kafka, RabbitMQ, and Kubernetes are not initial dependencies.
 This is the selection baseline reviewed on 2026-10-12, not a claim about future latest
 versions. Current exact dependencies/images are in manifests, toolchain, and lockfiles.
 
-| Layer | Selection | Responsibility |
-| --- | --- | --- |
-| UI | Svelte 5, SvelteKit 3 | Runes, routing, static SPA |
-| Build/language | TypeScript 6, Vite 8, Node 24, pnpm | Types and reproducible tooling |
-| Styling/components | Tailwind CSS 4, Bits UI, Lucide | Controls, accessibility, icons; shadcn-svelte only as needed |
-| Server records | TanStack Svelte Query | Authoritative in-memory message/summary cache |
-| UI state | Runes and component context | Selection, drafts, optimistic sends, connection state |
-| Backend | Rust 1.99, Axum 0.8, Tokio, Tower | HTTP, async execution, middleware |
-| Database | SQLx 0.9, PostgreSQL 18 | Transactions, migrations, permanent records |
-| Realtime | Centrifugo 6, official centrifuge SDK | Connections and event hints |
-| Temporary data | Valkey | Realtime broker/history, rates and presence |
-| Objects, phase two | SeaweedFS S3, AWS SDK for Rust | Avatars, images and files |
-| Contract | utoipa, openapi-typescript, openapi-fetch | Rust-owned schema and generated typed client |
-| Identity | Argon2id, PostgreSQL opaque sessions | Passwords, device expiry and revocation |
-| Deployment | Caddy, Docker Compose | HTTPS, static files, API/WebSocket proxy |
-| Observability | tracing, Prometheus | Correlation, failures and worker backlog |
-| Verification | Rust integration tests, Vitest, Playwright | Invariants and actual browser/infra behavior |
+| Layer              | Selection                                  | Responsibility                                               |
+| ------------------ | ------------------------------------------ | ------------------------------------------------------------ |
+| UI                 | Svelte 5, SvelteKit 3                      | Runes, routing, static SPA                                   |
+| Build/language     | TypeScript 6, Vite 8, Node 24, pnpm        | Types and reproducible tooling                               |
+| Styling/components | Tailwind CSS 4, Bits UI, Lucide            | Controls, accessibility, icons; shadcn-svelte only as needed |
+| Server records     | TanStack Svelte Query                      | Authoritative in-memory message/summary cache                |
+| UI state           | Runes and component context                | Selection, drafts, optimistic sends, connection state        |
+| Backend            | Rust 1.99, Axum 0.8, Tokio, Tower          | HTTP, async execution, middleware                            |
+| Database           | SQLx 0.9, PostgreSQL 18                    | Transactions, migrations, permanent records                  |
+| Realtime           | Centrifugo 6, official centrifuge SDK      | Connections and event hints                                  |
+| Temporary data     | Valkey                                     | Realtime broker/history, rates and presence                  |
+| Objects, phase two | SeaweedFS S3, AWS SDK for Rust             | Avatars, images and files                                    |
+| Contract           | utoipa, openapi-typescript, openapi-fetch  | Rust-owned schema and generated typed client                 |
+| Identity           | Argon2id, PostgreSQL opaque sessions       | Passwords, device expiry and revocation                      |
+| Deployment         | Caddy, Docker Compose                      | HTTPS, static files, API/WebSocket proxy                     |
+| Observability      | tracing, Prometheus                        | Correlation, failures and worker backlog                     |
+| Verification       | Rust integration tests, Vitest, Playwright | Invariants and actual browser/infra behavior                 |
 
 Selection snapshots included Svelte 5.57.2, Kit 3.0.1, SQLx 0.9.0, Centrifugo 6.9.7,
 SeaweedFS 4.48, and PostgreSQL 18.6. Toolchain/locks/images are pinned without `latest`.
@@ -97,11 +97,12 @@ Replies, editing/deleting one's own messages for everyone, reactions; per-user s
 pin/mute/archive preferences; conversation search and a PWA shell. The implemented
 experience batch uses literal PostgreSQL substring matching for Chinese and open-page
 notifications; see [its design](2026-10-14-chat-experience.md). Reactions and the PWA
-shell remain future work. No initial offline send queue or promise of notifications
+shell were implemented in the subsequent [product readiness work](2026-10-14-product-readiness-design.md).
+The original phase-one scope included no offline send queue or promise of notifications
 after the browser closes. Each batch has its own implementation/acceptance plan.
 
 Later designs may cover channels/large groups, contacts, forwarding/saved messages,
-Web Push, audio/video, bot APIs, Tauri, native mobile, and E2EE. Evaluate LiveKit for
+audio/video, bot APIs, Tauri, native mobile, and E2EE. Evaluate LiveKit for
 calls. Encryption needs its own device/key/history protocol.
 
 ## Component and deployment boundaries
@@ -219,18 +220,18 @@ must include business PostgreSQL, filer metadata and volume bytes, with a restor
 
 ## Data and API contracts
 
-| Entity | Rule |
-| --- | --- |
-| users/invitations | Normalized unique username, atomic single use, Argon2id |
-| sessions | Hashed token, device label, expiry and revocation |
-| conversations | Latest sequence and unique canonical direct pair; groups later |
-| members | Role/join/leave/read boundaries, retained historical membership |
-| preferences, later | Per-user pin/mute/archive |
-| messages | UUID, creation sequence, sender/body; later replies/edit/delete |
-| events | Unique conversation sequence and versioned replay payload |
-| outbox | Aggregate order, payload, attempts, next attempt, lease and completion |
-| attachments, later | Staging/permanent keys, actual size, readiness and associations |
-| reactions, later | Unique user/message/reaction tuple |
+| Entity             | Rule                                                                   |
+| ------------------ | ---------------------------------------------------------------------- |
+| users/invitations  | Normalized unique username, atomic single use, Argon2id                |
+| sessions           | Hashed token, device label, expiry and revocation                      |
+| conversations      | Latest sequence and unique canonical direct pair; groups later         |
+| members            | Role/join/leave/read boundaries, retained historical membership        |
+| preferences, later | Per-user pin/mute/archive                                              |
+| messages           | UUID, creation sequence, sender/body; later replies/edit/delete        |
+| events             | Unique conversation sequence and versioned replay payload              |
+| outbox             | Aggregate order, payload, attempts, next attempt, lease and completion |
+| attachments, later | Staging/permanent keys, actual size, readiness and associations        |
+| reactions, later   | Unique user/message/reaction tuple                                     |
 
 REST uses `/api/v1`, stable error code/message/request ID and cursor pagination.
 Auth, sessions, users, conversations, messages, events, read, typing and later

@@ -38,3 +38,4 @@ Comments and documentation are English; product localization remains Chinese.
 - [Product design and roadmap](docs/superpowers/specs/2026-10-12-chat-design.md)
 - [Phase-one implementation plan](docs/superpowers/plans/2026-10-12-phase-1-private-chat.md)
 - [Architecture refactor plan](docs/superpowers/plans/2026-10-13-code-architecture-and-readability.md)
+- [Current architecture and readability review](docs/development/architecture-review.md)

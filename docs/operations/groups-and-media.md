@@ -82,7 +82,9 @@ stay out of Git and logs.
 This is a single-host small-team release. End-to-end encryption, public channels,
 voice/video and multi-host storage remain future work. Message editing, withdrawal,
 search and contextual history are covered by [chat experience](chat-experience.md).
-PWA/background push is planned in the [product readiness roadmap](../superpowers/plans/2026-10-14-product-readiness-roadmap.md).
+PWA installation, updates and background push are implemented; see
+[PWA and background notifications](pwa-notifications.md) for configuration and
+the remaining deployment/device acceptance requirements.
 
 ## Verification
 
