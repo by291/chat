@@ -1,10 +1,19 @@
 //! Scoped upload grants, immutable processing, references and retryable cleanup.
 
+pub mod attachment_repository;
 pub mod http;
 pub mod model;
 pub mod processing;
+pub mod processing_lifecycle;
+pub mod processing_repository;
+pub mod reference_repository;
+pub mod references;
 pub mod repository;
+pub mod retirement;
+pub mod retirement_repository;
 pub mod service;
+pub mod upload_repository;
+pub mod uploads;
 pub mod worker;
 
 pub const MAX_UPLOAD_BYTES: u64 = 52_428_800;

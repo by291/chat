@@ -33,6 +33,7 @@ pub async fn process(
         .acquire_owned()
         .await
         .map_err(|_| AppError::unavailable())?;
+
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
         inspect(&bytes, &claimed_type, avatar)
@@ -80,6 +81,7 @@ pub fn inspect(bytes: &[u8], claimed_type: &str, avatar: bool) -> Result<Inspect
     if width == 0 || height == 0 || u64::from(width) * u64::from(height) > MAX_PIXELS {
         return Err(AppError::invalid("媒体图片尺寸超过限制"));
     }
+
     let image =
         DynamicImage::from_decoder(decoder).map_err(|_| AppError::invalid("媒体图片无法解码"))?;
     let thumbnail = image.thumbnail(THUMBNAIL_DIMENSION, THUMBNAIL_DIMENSION);
@@ -102,5 +104,6 @@ pub fn inspect(bytes: &[u8], claimed_type: &str, avatar: bool) -> Result<Inspect
     if avatar {
         inspected.avatar = Some(sanitized);
     }
+
     Ok(inspected)
 }
