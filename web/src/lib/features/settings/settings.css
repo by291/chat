@@ -1,7 +1,11 @@
 /* Profile, device sessions and preferences. */
 
 .settings-page {
-  padding: 38px 52px 28px;
+  padding-block: 38px 28px;
+}
+
+.settings-container {
+  padding-inline: 52px;
   max-width: 860px;
   margin: auto;
 }
@@ -31,6 +35,42 @@
   min-width: 0;
 }
 
+/* The sticky surface covers the viewport; the inner container aligns its links. */
+.settings-navigation-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding-bottom: 24px;
+  background: var(--background);
+}
+
+.settings-navigation {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-navigation a {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  border-bottom: 2px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--subtle-text);
+}
+
+.settings-navigation a:hover,
+.settings-navigation a[aria-current='location'] {
+  color: var(--brand);
+}
+
+.settings-navigation a[aria-current='location'] {
+  border-bottom-color: var(--brand);
+}
+
 .settings-group {
   display: grid;
   gap: 14px;
@@ -41,6 +81,7 @@
 }
 
 .settings-group-heading h2 {
+  scroll-margin-top: var(--settings-navigation-height, 0px);
   font-size: 20px;
 }
 
@@ -129,6 +170,15 @@
 }
 
 @media (max-width: 700px) {
+  .settings-navigation {
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .settings-navigation a {
+    font-size: 12px;
+  }
+
   .settings-page select {
     font-size: 14px;
   }

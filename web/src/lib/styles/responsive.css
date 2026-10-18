@@ -51,7 +51,11 @@
   }
 
   .settings-page {
-    padding: 26px 20px;
+    padding-block: 26px;
+  }
+
+  .settings-container {
+    padding-inline: 20px;
   }
 
   .session-item {
