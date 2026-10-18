@@ -5,6 +5,41 @@ or later, pnpm 12.11.2, and Docker with Compose v2. Windows and macOS can use Do
 Desktop; Linux can use Docker Engine. Shared tooling uses Node built-ins and does
 not require PowerShell, Bash, or a task runner.
 
+## Background development with Make
+
+On macOS/Linux, the optional Makefile uses Process Compose to manage application
+processes in the background. Install it once, separately from starting the app
+(macOS: `brew install f1bonacc1/tap/process-compose`; other platforms: see the
+[Process Compose installation guide](https://f1bonacc1.github.io/process-compose/installation/)).
+`make dev` checks for the tool but never installs it. Frontend packages are installed
+automatically with `pnpm install --frozen-lockfile` during background startup.
+
+```sh
+make dev-init      # Create local credentials; keep them if already initialized
+make infra        # Start Docker dependencies and wait for readiness
+make dev          # Return immediately; compile and start apps in the background
+make dev-status    # Check build progress and API/web health
+make dev-logs      # Follow logs; Ctrl+C leaves the apps running
+make dev-stop      # Stop API, worker and web; Docker dependencies keep running
+make infra-stop    # Stop Docker dependencies separately; keep their volumes
+```
+
+Wait for API and web to become healthy, then open `http://localhost:5173`.
+Before detaching, `make dev` checks every Compose service and tells you to run
+`make infra` if dependencies are missing or unhealthy. Startup builds the Rust
+binaries, installs frontend packages, initializes the media bucket, and launches the
+applications. A failed build/setup or an exited application stops the other managed
+processes; inspect logs before retrying. Repeating `make dev` while the supervisor
+is running prints a notice and exits successfully. Rust edits require `make dev-stop` followed
+by `make dev`; Vite reloads frontend edits automatically.
+
+The supervisor settings, socket and logs live in `.local/dev/` (an explicit
+`PROC_COMP_CONFIG` overrides the settings directory). It only stops its own
+application processes. Stop any manually started instances before `make dev`;
+`make dev-stop` does not manage those terminals. Use `make infra-stop` after stopping
+applications. Neither stop command removes database or media volumes. The commands
+below remain available for foreground development without Make or Process Compose.
+
 ## First startup
 
 ```sh

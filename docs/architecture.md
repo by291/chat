@@ -308,8 +308,13 @@ restore drills reuse the same Compose file under a fresh `chat-restore-*` projec
 Production service requirements live in `docs/operations/deployment.md` and do not
 prescribe Compose. HTTPS browser checks target an operator-provided staging address.
 
-Public tooling has three entry points: `scripts/init-env.mjs` creates local secrets,
-`scripts/check.mjs` runs checks, and `scripts/generate-api.mjs` generates the contract.
+Public tooling includes `scripts/init-env.mjs` to create local secrets,
+`scripts/check.mjs` to run checks, and `scripts/generate-api.mjs` to generate the contract.
+The optional root `Makefile` separates Docker dependency lifecycle from background
+application lifecycle. `process-compose.yaml` delegates application supervision and
+reverse-order shutdown to Process Compose; it does not define containers or install
+the supervisor. `scripts/check-dev-infra.mjs` checks dependency readiness before
+detaching. Its private socket and logs live in `.local/dev/`, without PID files.
 `tests/architecture-rules.mjs` owns source boundary inspection.
 `tests/infrastructure.mts` owns dependency-free middleware configuration and argv
 execution. It can serve Rust checks without importing frontend packages.

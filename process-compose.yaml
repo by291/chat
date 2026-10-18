@@ -1,0 +1,78 @@
+# Local host processes only; compose.yaml remains the infrastructure definition.
+version: "0.5"
+
+log_location: ${CHAT_DEV_DIR}/processes.log
+log_configuration:
+  rotation:
+    max_size_mb: 5
+    max_backups: 3
+
+processes:
+  build:
+    command: cargo build --locked --bins
+    availability:
+      restart: exit_on_failure
+
+  web-install:
+    command: pnpm install --frozen-lockfile
+    working_dir: web
+    availability:
+      restart: exit_on_failure
+
+  media-init:
+    command: ./target/debug/admin media-init
+    depends_on:
+      build:
+        condition: process_completed_successfully
+    availability:
+      restart: exit_on_failure
+
+  api:
+    command: ./target/debug/api
+    depends_on:
+      media-init:
+        condition: process_completed_successfully
+    readiness_probe:
+      http_get:
+        host: 127.0.0.1
+        port: 8080
+        path: /health/ready
+      period_seconds: 1
+      timeout_seconds: 2
+    availability:
+      exit_on_end: true
+    shutdown:
+      signal: 15
+      timeout_seconds: 30
+
+  worker:
+    command: ./target/debug/worker
+    depends_on:
+      api:
+        condition: process_healthy
+    availability:
+      exit_on_end: true
+    shutdown:
+      signal: 15
+      timeout_seconds: 30
+
+  web:
+    command: pnpm dev --port 5173 --strictPort
+    working_dir: web
+    depends_on:
+      api:
+        condition: process_healthy
+      web-install:
+        condition: process_completed_successfully
+    readiness_probe:
+      http_get:
+        host: localhost
+        port: 5173
+        path: /
+      period_seconds: 1
+      timeout_seconds: 2
+    availability:
+      exit_on_end: true
+    shutdown:
+      signal: 15
+      timeout_seconds: 30
