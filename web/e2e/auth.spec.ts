@@ -1,6 +1,32 @@
 import { test, expect, signup } from './fixtures';
 import { api } from '../tests/integration/support';
 
+test('login keyboard navigation reaches password before recovery and submit', async ({
+  page,
+  stack,
+}) => {
+  await page.goto(`${stack.origin}/login`);
+  const username = page.getByLabel('用户名', { exact: true });
+  const password = page.getByLabel('密码', { exact: true });
+  const recovery = page.getByRole('link', { name: '忘记密码？', exact: true });
+  const submit = page.getByRole('button', { name: '登录', exact: true });
+
+  await username.focus();
+  await page.keyboard.press('Tab');
+
+  await expect(password).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(recovery).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(submit).toBeFocused();
+
+  await page.keyboard.press('Shift+Tab');
+  await expect(recovery).toBeFocused();
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(/\/forgot-password$/);
+});
+
 test('six-character password registers, logs in and restores identity', async ({
   page,
   stack,

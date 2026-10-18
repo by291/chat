@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { MessageCircle, ArrowRight, ShieldCheck } from '@lucide/svelte';
+  import { MessageCircle, ArrowRight } from '@lucide/svelte';
 
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
@@ -166,16 +166,22 @@
             placeholder="朋友怎么称呼你"
           />
         {/if}
-        <Label class="form-label" for="password">密码</Label>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          bind:value={password}
-          autocomplete={registering ? 'new-password' : 'current-password'}
-          required
-          placeholder={registering ? '至少 6 个字符' : '输入你的密码'}
-        />
+        <div class="auth-password-field">
+          <Label for="password">密码</Label>
+          <Input
+            class="auth-password-input"
+            id="password"
+            name="password"
+            type="password"
+            bind:value={password}
+            autocomplete={registering ? 'new-password' : 'current-password'}
+            required
+            placeholder={registering ? '至少 6 个字符' : '输入你的密码'}
+          />
+          {#if !registering}
+            <a class="auth-recovery" href="/forgot-password">忘记密码？</a>
+          {/if}
+        </div>
         {#if error}
           <p class="form-error" role="alert">{error}</p>
         {/if}
@@ -187,19 +193,12 @@
               : '登录'}<ArrowRight size={18} />
         </Button>
       </form>
-      {#if !registering}
-        <p><a href="/forgot-password">忘记密码？</a></p>
-      {/if}
       <p class="auth-switch">
         {registering ? '已有账号？' : '第一次来到这里？'}
         <a href={registering ? '/login' : '/register'}>
           {registering ? '去登录' : '使用邀请注册'}
         </a>
       </p>
-      <div class="auth-note">
-        <ShieldCheck size={16} />
-        <span>你的登录凭据只由浏览器的安全 Cookie 保存。</span>
-      </div>
     </div>
   </main>
 </div>
