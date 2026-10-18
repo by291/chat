@@ -1,9 +1,59 @@
 import { Centrifuge } from 'centrifuge';
+import { z } from 'zod';
 
 import type { RealtimeEvent } from './models';
 
 const SUBSCRIPTION_READY_TIMEOUT_MS = 5_000;
 const MAX_EVENT_SEQUENCE = 9_223_372_036_854_775_807n;
+
+// Keep transport validation compatible with the generated DTOs without coercing
+// exact sequences or narrowing the existing Date.parse-compatible typing expiry.
+const realtimeEventSchema: z.ZodType<RealtimeEvent> = z.discriminatedUnion(
+  'kind',
+  [
+    z.looseObject({
+      kind: z.enum([
+        'conversation.created',
+        'message.created',
+        'message.edited',
+        'message.withdrawn',
+        'message.reactions_updated',
+        'receipt.updated',
+        'group.updated',
+        'membership.updated',
+      ]),
+      schema_version: z.literal(1),
+      event_id: z.string(),
+      conversation_id: z.string(),
+      event_seq: z
+        .string()
+        .regex(/^(0|[1-9][0-9]*)$/, { abort: true })
+        .refine((value) => BigInt(value) <= MAX_EVENT_SEQUENCE),
+    }),
+    z.looseObject({
+      kind: z.literal('conversation.preferences.updated'),
+      conversation_id: z.string(),
+    }),
+    z.looseObject({
+      kind: z.literal('membership.invalidated'),
+      conversation_id: z.string(),
+      membership_id: z.string(),
+    }),
+    z.looseObject({
+      kind: z.literal('presence.changed'),
+      user_id: z.string(),
+    }),
+    z.looseObject({
+      kind: z.literal('typing.changed'),
+      conversation_id: z.string(),
+      user_id: z.string(),
+      is_typing: z.boolean(),
+      expires_at: z
+        .string()
+        .refine((value) => Number.isFinite(Date.parse(value))),
+    }),
+  ],
+);
 
 export type ConnectionStatus = 'connecting' | 'online' | 'offline';
 
@@ -14,53 +64,6 @@ export interface RealtimeTransport {
     onStatus?: (state: ConnectionStatus) => void,
   ): Promise<void>;
   close(): void;
-}
-
-function isEvent(publication: unknown): publication is RealtimeEvent {
-  if (!publication || typeof publication !== 'object') {
-    return false;
-  }
-  const candidate = publication as Record<string, unknown>;
-
-  if (candidate.kind === 'conversation.preferences.updated') {
-    return typeof candidate.conversation_id === 'string';
-  }
-  if (candidate.kind === 'membership.invalidated') {
-    return (
-      typeof candidate.conversation_id === 'string' &&
-      typeof candidate.membership_id === 'string'
-    );
-  }
-  if (candidate.kind === 'presence.changed') {
-    return typeof candidate.user_id === 'string';
-  }
-  if (candidate.kind === 'typing.changed') {
-    return (
-      typeof candidate.conversation_id === 'string' &&
-      typeof candidate.user_id === 'string' &&
-      typeof candidate.is_typing === 'boolean' &&
-      typeof candidate.expires_at === 'string' &&
-      Number.isFinite(Date.parse(candidate.expires_at))
-    );
-  }
-  return (
-    [
-      'conversation.created',
-      'message.created',
-      'message.edited',
-      'message.withdrawn',
-      'message.reactions_updated',
-      'receipt.updated',
-      'group.updated',
-      'membership.updated',
-    ].includes(String(candidate.kind)) &&
-    candidate.schema_version === 1 &&
-    typeof candidate.event_id === 'string' &&
-    typeof candidate.conversation_id === 'string' &&
-    typeof candidate.event_seq === 'string' &&
-    /^(0|[1-9][0-9]*)$/.test(candidate.event_seq) &&
-    BigInt(candidate.event_seq) <= MAX_EVENT_SEQUENCE
-  );
 }
 
 export function createRealtimeTransport(
@@ -86,8 +89,9 @@ export function createRealtimeTransport(
 
       const subscription = client.newSubscription(`personal:#${userId}`);
       subscription.on('publication', (context) => {
-        if (isEvent(context.data)) {
-          onEvent(context.data);
+        const publication = realtimeEventSchema.safeParse(context.data);
+        if (publication.success) {
+          onEvent(publication.data);
         }
       });
       subscription.on('subscribed', () => {

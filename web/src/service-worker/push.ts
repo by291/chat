@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 type NotificationRegistration = {
   showNotification(title: string, options: NotificationOptions): Promise<void>;
 };
@@ -22,11 +24,19 @@ const conversationPathPattern = new RegExp(`^/app/chats/${UUID_PATTERN}$`);
 const eventTagPattern = new RegExp(`^chat:${UUID_PATTERN}$`);
 const generationPattern = new RegExp(`^${UUID_PATTERN}$`);
 
+const notificationPathSchema = z.string().regex(conversationPathPattern);
+const pushPayloadSchema = z.object({
+  schema_version: z.literal(1),
+  tag: z.string().regex(eventTagPattern),
+  generation: z.string().regex(generationPattern),
+  path: notificationPathSchema,
+});
+const notificationClickSchema = z.object({ path: notificationPathSchema });
+
 /** Accept only the existing conversation route; arbitrary URLs and query tokens are rejected. */
 export function notificationPath(value: unknown): string {
-  return typeof value === 'string' && conversationPathPattern.test(value)
-    ? value
-    : '/app';
+  const result = notificationPathSchema.safeParse(value);
+  return result.success ? result.data : '/app';
 }
 
 /** Push announces unread work with generic visible text; it never loads or acknowledges records. */
@@ -34,24 +44,14 @@ export async function showPush(
   registration: NotificationRegistration,
   payload: unknown,
 ): Promise<void> {
-  const candidate =
-    payload && typeof payload === 'object'
-      ? (payload as Record<string, unknown>)
-      : {};
-  const valid =
-    candidate.schema_version === 1 &&
-    typeof candidate.tag === 'string' &&
-    eventTagPattern.test(candidate.tag) &&
-    typeof candidate.generation === 'string' &&
-    generationPattern.test(candidate.generation) &&
-    notificationPath(candidate.path) !== '/app';
+  const result = pushPayloadSchema.safeParse(payload);
 
   await registration.showNotification('Chat', {
     body: '你有新消息',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    tag: valid ? (candidate.tag as string) : 'chat-new-message',
-    data: { path: valid ? candidate.path : '/app' },
+    tag: result.success ? result.data.tag : 'chat-new-message',
+    data: { path: result.success ? result.data.path : '/app' },
   });
 }
 
@@ -61,11 +61,8 @@ export async function openNotification(
   payload: unknown,
   origin: string,
 ): Promise<void> {
-  const path = notificationPath(
-    payload && typeof payload === 'object'
-      ? (payload as Record<string, unknown>).path
-      : undefined,
-  );
+  const result = notificationClickSchema.safeParse(payload);
+  const path = result.success ? result.data.path : '/app';
   const windows = await clients.matchAll({
     type: 'window',
     includeUncontrolled: true,

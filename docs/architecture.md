@@ -201,6 +201,9 @@ There is no second mutable copy of authoritative messages.
 Settings device lists use TanStack Query observers for request cancellation,
 cache subscriptions and revoke results. Their owner still fences logout/navigation,
 removes its query on teardown and ignores completed revocations after disposal.
+Realtime publications and service-worker push/click payloads use Zod runtime
+schemas. Rust/OpenAPI remains the HTTP type source; event validation preserves exact
+decimal sequences and notification navigation remains restricted to conversation routes.
 
 Manually maintained canonical records are retained for the authenticated lifetime.
 Query-cache subscriptions report changes but do not pin queries as observers;

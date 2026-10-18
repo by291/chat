@@ -16,7 +16,12 @@ describe('background push presentation', () => {
 
     await showPush(
       { showNotification },
-      { ...payload, body: 'Secret body', sender: 'Secret person' },
+      {
+        ...payload,
+        generation: '00000000-0000-0000-0000-000000000000',
+        body: 'Secret body',
+        sender: 'Secret person',
+      },
     );
 
     expect(showNotification).toHaveBeenCalledWith(
@@ -34,6 +39,8 @@ describe('background push presentation', () => {
     for (const input of [
       undefined,
       { ...payload, schema_version: 2 },
+      { ...payload, generation: 'invalid-generation' },
+      { ...payload, tag: 'chat:invalid-tag' },
       { ...payload, path: 'https://evil.test/app' },
       { ...payload, path: '//evil.test/app' },
       { ...payload, path: '/api/v1/messages' },
