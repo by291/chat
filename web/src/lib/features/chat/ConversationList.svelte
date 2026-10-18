@@ -68,8 +68,9 @@
     </div>
   </header>
   <div class="search-field">
-    <Search size={16} />
+    <Search size={16} aria-hidden="true" />
     <Input
+      class="bg-background pl-10 dark:bg-background"
       aria-label="筛选会话"
       bind:value={filter}
       placeholder="搜索你的聊天"
