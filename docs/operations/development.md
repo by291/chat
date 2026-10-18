@@ -15,9 +15,10 @@ cargo run --bin admin -- media-init
 ```
 
 Initialize once. The initializer creates `.env` and `infra/seaweedfs/s3.json` with
-random local secrets. It refuses to overwrite either file; existing credentials
-must continue to match the persisted services. Do not put passwords on the command
-line or commit these files.
+random local secrets. If both files exist, it exits successfully without changing
+them. If only one exists, it stops and asks you to restore the missing configuration;
+existing credentials must continue to match the persisted services. Do not put
+passwords on the command line or commit these files.
 
 With Docker Engine on Linux, Centrifugo reaches the host via `host.docker.internal`
 and the Docker bridge. In `.env`, set `INTERNAL_BIND_ADDR` to a host address reachable

@@ -1,11 +1,13 @@
 /** Initialize development credentials once; existing configuration is never replaced. */
 import { randomBytes } from "node:crypto";
-import { readFile, writeFile, access } from "node:fs/promises";
+import { readFile, writeFile, access, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const root = new URL("../", import.meta.url);
 const envFile = new URL(".env", root);
 const storageFile = new URL("infra/seaweedfs/s3.json", root);
+const existingFiles = [];
+
 for (const file of [envFile, storageFile]) {
   try {
     await access(file);
@@ -13,9 +15,20 @@ for (const file of [envFile, storageFile]) {
     if (error.code === "ENOENT") continue;
     throw error;
   }
-  throw new Error(
-    `${fileURLToPath(file)} already exists; preserve its credentials`,
+  existingFiles.push(file);
+}
+
+if (existingFiles.length === 2) {
+  console.log(
+    "Development credentials are already initialized; keeping existing files.",
   );
+  process.exit(0);
+}
+if (existingFiles.length === 1) {
+  console.error(
+    `Incomplete configuration: ${fileURLToPath(existingFiles[0])} exists, but its companion file is missing. Restore the missing file with matching credentials; no files were changed.`,
+  );
+  process.exit(1);
 }
 
 const secret = () => randomBytes(32).toString("hex");
@@ -46,6 +59,9 @@ const storage = {
     },
   ],
 };
+
+// Git does not retain the empty directory when the local credentials are ignored.
+await mkdir(new URL("./", storageFile), { recursive: true });
 await writeFile(storageFile, JSON.stringify(storage, null, 2), {
   flag: "wx",
   mode: 0o600,
