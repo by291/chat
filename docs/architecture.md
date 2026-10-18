@@ -150,7 +150,7 @@ web/src/
     features/
       auth/                     auth API, session lifetime, identity form and styles
       settings/                 profile/device API, forms, theme and styles
-        sessions.svelte.ts      authenticated device-list cache and revoke coordination
+        sessions.svelte.ts      query/mutation observers and authenticated device-list lifetime
       pwa/                      install/update browser lifecycle and consent controls
       notifications/            session-owned background capability and activity lifecycle
       media/                    scoped uploads, ephemeral transfer state and previews
@@ -197,6 +197,10 @@ The query cache owns authoritative server records. The coordinator owns selectio
 drafts and optimistic sends. The conversation store owns per-conversation request
 generations and continuous event cursors. Peer activity owns expiring information.
 There is no second mutable copy of authoritative messages.
+
+Settings device lists use TanStack Query observers for request cancellation,
+cache subscriptions and revoke results. Their owner still fences logout/navigation,
+removes its query on teardown and ignores completed revocations after disposal.
 
 Manually maintained canonical records are retained for the authenticated lifetime.
 Query-cache subscriptions report changes but do not pin queries as observers;

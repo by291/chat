@@ -19,7 +19,11 @@
     const userId = authenticatedId;
     if (!userId) return;
 
-    const sessions = new SettingsSessions({ queryClient, userId });
+    // Observer construction publishes cache events. Their reactive listeners must
+    // not make cache records dependencies of this identity-owned effect.
+    const sessions = untrack(
+      () => new SettingsSessions({ queryClient, userId }),
+    );
     owner = sessions;
     const removeReset = auth.onReset(() => sessions.stop());
     // Identity owns this lifetime; loading/cache feedback must not subscribe the
