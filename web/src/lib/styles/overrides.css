@@ -10,6 +10,8 @@
   --brand: #67c4a6;
   --brand-hover: #4ab08f;
   --danger: #ed9da1;
+  --warning-surface: #433625;
+  --warning-text: #f0cf92;
   color: var(--text);
   background: var(--background);
 }

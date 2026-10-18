@@ -18,8 +18,14 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   const a = await signup(page, stack),
     b = await signup(peer, stack);
   await startWorker(stack);
-  await expect(page.getByText('已连接', { exact: true })).toBeVisible();
-  await expect(peer.getByText('已连接', { exact: true })).toBeVisible();
+  await expect(page.locator('.chat-shell')).toHaveAttribute(
+    'data-connection',
+    'online',
+  );
+  await expect(peer.locator('.chat-shell')).toHaveAttribute(
+    'data-connection',
+    'online',
+  );
   await page.getByRole('button', { name: '发起聊天', exact: true }).click();
   await page.getByLabel('对方的用户名', { exact: true }).fill(b.username);
   await page.getByRole('button', { name: '查找用户', exact: true }).click();
@@ -421,7 +427,10 @@ test('foreground restoration catches missed messages without reconnect or a peri
     });
     await page.reload();
     await expect(page.getByRole('textbox', { name: '输入消息' })).toBeVisible();
-    await expect(page.getByText('已连接', { exact: true })).toBeVisible();
+    await expect(page.locator('.chat-shell')).toHaveAttribute(
+      'data-connection',
+      'online',
+    );
     let reconnects = 0;
     page.on('websocket', () => reconnects++);
     await stack.stopWorker();

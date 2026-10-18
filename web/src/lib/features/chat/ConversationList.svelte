@@ -95,17 +95,6 @@
       归档 ({archivedCount})
     </Button>
   </div>
-  <div class="connection-status" aria-live="polite">
-    <span
-      class:connected={sync.connection === 'online'}
-      class="connection-dot"
-    ></span>
-    {sync.connection === 'online'
-      ? '已连接'
-      : sync.connection === 'connecting'
-        ? '正在连接'
-        : '实时连接中断，正在重连'}
-  </div>
   <nav class="conversation-nav" aria-label="会话列表">
     {#each conversations as conversation (conversation.id)}
       <a
@@ -183,5 +172,4 @@
       </div>
     {/if}
   </nav>
-  <footer class="sidebar-footer">轻松联系，认真交谈。</footer>
 </aside>

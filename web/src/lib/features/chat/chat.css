@@ -16,7 +16,7 @@
 }
 
 .archive-tabs {
-  padding: 12px 21px 0;
+  padding: 12px 21px;
 }
 
 .chat-person {
@@ -234,8 +234,36 @@
 
 .chat-shell {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-columns {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.connection-notice {
+  flex-shrink: 0;
+}
+
+.connection-notice-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  background: var(--warning-surface);
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.connection-notice-content svg {
+  flex-shrink: 0;
 }
 
 .conversation-sidebar {
@@ -303,26 +331,6 @@
   font-size: 12px;
   padding: 12px 0;
   outline-offset: 6px;
-}
-
-.connection-status {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 10px;
-  color: var(--subtle-text);
-  padding: 15px 25px 17px;
-}
-
-.connection-dot {
-  height: 5px;
-  width: 5px;
-  border-radius: 50%;
-  background: #c99761;
-}
-
-.connection-dot.connected {
-  background: #66b590;
 }
 
 .conversation-nav {
@@ -417,15 +425,6 @@
   font-size: 10px;
 }
 
-.sidebar-footer {
-  padding: 20px;
-  text-align: center;
-  font-size: 9px;
-  color: var(--subtle-text);
-  border-top: 1px solid var(--line);
-  letter-spacing: 1px;
-}
-
 .chat-panel {
   display: flex;
   flex-direction: column;
@@ -511,16 +510,6 @@
 .welcome-chat p {
   font-size: 12px;
   line-height: 2;
-  color: var(--subtle-text);
-}
-
-.welcome-foot {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 7px;
-  margin-top: 50px;
-  font-size: 9px;
   color: var(--subtle-text);
 }
 
@@ -733,7 +722,7 @@
 }
 
 @media (max-width: 900px) {
-  .chat-shell {
+  .chat-columns {
     grid-template-columns: 285px minmax(0, 1fr);
   }
 
@@ -755,18 +744,16 @@
 }
 
 @media (max-width: 700px) {
-  .chat-shell {
-    display: block;
+  .chat-columns {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .conversation-sidebar {
-    height: 100%;
     border: 0;
   }
 
   .chat-panel {
     display: none;
-    height: 100%;
   }
 
   .has-conversation .conversation-sidebar {

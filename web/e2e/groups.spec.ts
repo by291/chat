@@ -59,7 +59,10 @@ test('three browsers manage a private group and rejoining hides the old episode'
     const second = await signup(member, stack);
     const third = await signup(guest, stack);
     await startWorker(stack);
-    await expect(page.getByText('已连接', { exact: true })).toBeVisible();
+    await expect(page.locator('.chat-shell')).toHaveAttribute(
+      'data-connection',
+      'online',
+    );
 
     await page.getByRole('button', { name: '创建或加入群聊' }).click();
     await page.getByLabel('群名称', { exact: true }).fill('三人项目组');
@@ -143,7 +146,10 @@ test('three browsers manage a private group and rejoining hides the old episode'
     expect(staleRead.status).toBe(409);
 
     await guest.reload();
-    await expect(guest.getByText('已连接', { exact: true })).toBeVisible();
+    await expect(guest.locator('.chat-shell')).toHaveAttribute(
+      'data-connection',
+      'online',
+    );
     await send(page, '重新加入后的消息');
     await expect(
       guest.getByRole('log').getByText('重新加入后的消息', { exact: true }),

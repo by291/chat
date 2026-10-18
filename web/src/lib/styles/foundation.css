@@ -14,6 +14,8 @@
   --text: #263b3b;
   --soft: #edf5f1;
   --danger: #bd484b;
+  --warning-surface: #fff4df;
+  --warning-text: #805b21;
 }
 * {
   box-sizing: border-box;

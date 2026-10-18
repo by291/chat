@@ -75,7 +75,10 @@ for (const kind of ['direct', 'group'] as const) {
       );
       await second.getByRole('button', { name: '登录', exact: true }).click();
       await initialList;
-      await expect(second.getByText('已连接', { exact: true })).toBeVisible();
+      await expect(second.locator('.chat-shell')).toHaveAttribute(
+        'data-connection',
+        'online',
+      );
       await second.getByRole('link', { name: '设置', exact: true }).click();
       await expect(
         second.getByRole('heading', { name: '个人设置', exact: true }),

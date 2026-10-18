@@ -9,8 +9,14 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   const a = await signup(page, stack);
   const b = await signup(peer, stack);
   await startWorker(stack);
-  await expect(page.getByText('已连接', { exact: true })).toBeVisible();
-  await expect(peer.getByText('已连接', { exact: true })).toBeVisible();
+  await expect(page.locator('.chat-shell')).toHaveAttribute(
+    'data-connection',
+    'online',
+  );
+  await expect(peer.locator('.chat-shell')).toHaveAttribute(
+    'data-connection',
+    'online',
+  );
   await page.getByRole('button', { name: '发起聊天', exact: true }).click();
   await page.getByLabel('对方的用户名', { exact: true }).fill(b.username);
   await page.getByRole('button', { name: '查找用户', exact: true }).click();

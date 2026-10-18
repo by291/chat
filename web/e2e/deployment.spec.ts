@@ -116,8 +116,14 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
   try {
     const ownerUsername = await signup(page, invitations[0]!);
     const username = await signup(peer, invitations[1]!);
-    await expect(page.getByText('已连接', { exact: true })).toBeVisible();
-    await expect(peer.getByText('已连接', { exact: true })).toBeVisible();
+    await expect(page.locator('.chat-shell')).toHaveAttribute(
+      'data-connection',
+      'online',
+    );
+    await expect(peer.locator('.chat-shell')).toHaveAttribute(
+      'data-connection',
+      'online',
+    );
     const cookie = (await page.context().cookies()).find(
       (entry) => entry.name === '__Host-chat_session',
     )!;

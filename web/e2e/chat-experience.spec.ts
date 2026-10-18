@@ -42,8 +42,14 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
     const author = await signup(page, stack);
     const partner = await signup(peer, stack);
     await startWorker(stack);
-    await expect(page.getByText('已连接', { exact: true })).toBeVisible();
-    await expect(peer.getByText('已连接', { exact: true })).toBeVisible();
+    await expect(page.locator('.chat-shell')).toHaveAttribute(
+      'data-connection',
+      'online',
+    );
+    await expect(peer.locator('.chat-shell')).toHaveAttribute(
+      'data-connection',
+      'online',
+    );
     await page.getByRole('button', { name: '发起聊天', exact: true }).click();
     await page
       .getByLabel('对方的用户名', { exact: true })
@@ -130,7 +136,10 @@ test('replies follow edits and withdrawals across live and offline browsers with
       await dismiss.click();
 
     await context.setOffline(true);
-    await expect(peer.locator('.connection-dot.connected')).toHaveCount(0);
+    await expect(peer.locator('.chat-shell')).not.toHaveAttribute(
+      'data-connection',
+      'online',
+    );
     await originalRow(page)
       .getByRole('button', { name: '编辑', exact: true })
       .click();
@@ -332,7 +341,10 @@ test('personal pin mute and archive synchronize through the worker to another ac
     await second.getByRole('button', { name: '登录', exact: true }).click();
     await expect(second).toHaveURL(/\/app/);
     await second.goto(`/app/chats/${id}`);
-    await expect(second.getByText('已连接', { exact: true })).toBeVisible();
+    await expect(second.locator('.chat-shell')).toHaveAttribute(
+      'data-connection',
+      'online',
+    );
     await second.getByRole('button', { name: '会话设置', exact: true }).click();
     await page.getByRole('button', { name: '会话设置', exact: true }).click();
     for (const [before, after] of [
@@ -465,7 +477,10 @@ test('open-page alerts request permission only on click omit private bodies open
       });
     });
     await page.goto('/app');
-    await expect(page.getByText('已连接', { exact: true })).toBeVisible();
+    await expect(page.locator('.chat-shell')).toHaveAttribute(
+      'data-connection',
+      'online',
+    );
     const state = () =>
       page.evaluate(
         () =>
