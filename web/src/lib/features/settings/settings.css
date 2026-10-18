@@ -6,7 +6,7 @@
 
 .settings-container {
   padding-inline: 52px;
-  max-width: 860px;
+  max-width: 960px;
   margin: auto;
 }
 
@@ -14,7 +14,7 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  font-size: 12px;
+  font-size: var(--font-secondary);
   color: var(--subtle-text);
 }
 
@@ -28,7 +28,7 @@
 }
 
 .page-heading .muted {
-  font-size: 13px;
+  font-size: var(--font-body);
 }
 
 .settings-content {
@@ -56,7 +56,7 @@
   align-items: center;
   min-height: 40px;
   border-bottom: 2px solid transparent;
-  font-size: 13px;
+  font-size: var(--font-secondary);
   font-weight: 600;
   white-space: nowrap;
   color: var(--subtle-text);
@@ -96,7 +96,7 @@
 }
 
 .section-heading .muted {
-  font-size: 12px;
+  font-size: var(--font-secondary);
   margin-top: 8px;
 }
 
@@ -136,12 +136,12 @@
 }
 
 .session-description strong {
-  font-size: 12px;
+  font-size: var(--font-secondary);
   overflow-wrap: anywhere;
 }
 
 .session-description > span {
-  font-size: 10px;
+  font-size: var(--font-caption);
   color: var(--subtle-text);
 }
 
@@ -161,7 +161,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
-  font-size: 13px;
+  font-size: var(--font-secondary);
   box-shadow: 0 8px 30px #20382c12;
 }
 
@@ -176,7 +176,7 @@
   }
 
   .settings-navigation a {
-    font-size: 12px;
+    font-size: 0.8125rem;
   }
 
   .settings-page select {

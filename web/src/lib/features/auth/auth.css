@@ -58,13 +58,13 @@
 }
 
 .story-copy p {
-  font-size: 14px;
+  font-size: var(--font-body);
   color: #6e897a;
   line-height: 2;
 }
 
 .story-foot {
-  font-size: 11px;
+  font-size: var(--font-caption);
   color: #769281;
   display: flex;
   align-items: center;
@@ -81,7 +81,7 @@
 
 .auth-card {
   width: 100%;
-  max-width: 360px;
+  max-width: 400px;
 }
 
 .auth-card h2 {
@@ -90,7 +90,7 @@
 }
 
 .auth-card > .muted {
-  font-size: 12px;
+  font-size: var(--font-secondary);
   margin-bottom: 28px;
 }
 
@@ -117,7 +117,7 @@
   grid-column: 2;
   grid-row: 1;
   color: var(--brand);
-  font-size: 12px;
+  font-size: var(--font-secondary);
   font-weight: 600;
 }
 
@@ -127,7 +127,7 @@
 }
 
 .auth-switch {
-  font-size: 12px;
+  font-size: var(--font-secondary);
   color: var(--subtle-text);
   text-align: center;
   margin: 25px 0 0;

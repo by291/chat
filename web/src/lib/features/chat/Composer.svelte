@@ -114,7 +114,7 @@
   <Input
     type="file"
     multiple
-    class="sr-only"
+    class="hidden"
     bind:ref={files}
     aria-label="选择附件"
     onchange={() => {

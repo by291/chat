@@ -43,10 +43,15 @@
         selectedAnchor = undefined;
       }
 
-      const readingLine = Math.ceil(navigation.getBoundingClientRect().bottom);
+      // Native anchor scrolling rounds scroll positions, while text layout can
+      // retain fractional pixels. Compare both edges at the same CSS-pixel precision.
+      const readingLine = Math.round(navigation.getBoundingClientRect().bottom);
       let current = sections[0].id;
       for (const heading of headings) {
-        if (heading && heading.getBoundingClientRect().top <= readingLine) {
+        if (
+          heading &&
+          Math.round(heading.getBoundingClientRect().top) <= readingLine
+        ) {
           current = heading.id;
         }
       }

@@ -5,6 +5,9 @@
   color: #263b3b;
   background: #f6f8f7;
   font-synthesis: none;
+  --font-body: 1rem;
+  --font-secondary: 0.875rem;
+  --font-caption: 0.75rem;
   --brand: #18816f;
   --brand-hover: #126a5c;
   --surface: #fff;
@@ -75,7 +78,7 @@ h2 {
 
 .eyebrow {
   display: block;
-  font-size: 11px;
+  font-size: var(--font-caption);
   letter-spacing: 2px;
   font-weight: 650;
   color: var(--brand);
@@ -128,7 +131,7 @@ h2 {
 }
 
 .form-error {
-  font-size: 13px;
+  font-size: var(--font-secondary);
   color: var(--danger);
   background: #fff1f0;
   border-radius: 9px;
@@ -145,13 +148,13 @@ h2 {
 }
 
 .field-help {
-  font-size: 11px;
+  font-size: var(--font-caption);
   color: var(--subtle-text);
   margin-top: 8px;
 }
 
 .success {
-  font-size: 12px;
+  font-size: var(--font-secondary);
   color: var(--brand);
 }
 

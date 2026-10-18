@@ -61,6 +61,13 @@ Feature CSS retains layout, message bubbles, read-status display and media geome
 The previous global button/input/select/dialog/avatar styling has been removed.
 Prefer variants and utility overrides over adding a competing global control style.
 
+Reading text uses the shared `foundation.css` scale: `--font-body` (1rem) for
+messages and conversation names, `--font-secondary` (0.875rem) for previews and
+supporting descriptions, and `--font-caption` (0.75rem) for timestamps and metadata.
+Keep message text at the same scale on mobile; adapt available width and spacing
+instead of shrinking the content. Chat history and composer share
+`--chat-content-width` so their desktop reading areas expand together.
+
 ## Adding and updating components
 
 Run from `web/`:

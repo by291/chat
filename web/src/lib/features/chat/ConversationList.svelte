@@ -70,7 +70,7 @@
   <div class="search-field">
     <Search size={16} aria-hidden="true" />
     <Input
-      class="bg-background pl-10 dark:bg-background"
+      class="h-11 bg-background pl-10 text-base md:text-base dark:bg-background"
       aria-label="筛选会话"
       bind:value={filter}
       placeholder="搜索你的聊天"
@@ -80,7 +80,6 @@
     <Button
       type="button"
       variant={archived ? 'ghost' : 'secondary'}
-      size="sm"
       aria-pressed={!archived}
       onclick={() => (archived = false)}
     >
@@ -89,7 +88,6 @@
     <Button
       type="button"
       variant={archived ? 'secondary' : 'ghost'}
-      size="sm"
       aria-pressed={archived}
       onclick={() => (archived = true)}
     >

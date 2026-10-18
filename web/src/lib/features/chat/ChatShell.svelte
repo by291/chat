@@ -156,19 +156,21 @@
             {/if}
           {/key}
         {:else}
-          <div class="welcome-chat">
-            <span class="welcome-icon"><MessageCircle size={38} /></span>
-            <span class="eyebrow">ROOM FOR YOUR PEOPLE</span>
-            <h2>
-              让日常的联系
-              <br />
-              多一点温度。
-            </h2>
-            <p>
-              选一个聊天，或找到新的伙伴。
-              <br />
-              你们的对话，从这里开始。
-            </p>
+          <div class="welcome-layout">
+            <div class="welcome-chat">
+              <span class="welcome-icon"><MessageCircle size={38} /></span>
+              <span class="eyebrow">ROOM FOR YOUR PEOPLE</span>
+              <h2>
+                让日常的联系
+                <br />
+                多一点温度。
+              </h2>
+              <p>
+                选一个聊天，或找到新的伙伴。
+                <br />
+                你们的对话，从这里开始。
+              </p>
+            </div>
           </div>
         {/if}
       </section>

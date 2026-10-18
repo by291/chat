@@ -71,6 +71,12 @@ test('two users find each other, send messages and preserve keyboard/IME behavio
     await expect(
       peer.getByRole('log').getByText('第一行\na', { exact: true }),
     ).toBeVisible();
+    // The hidden attachment picker must not widen the scrollable application.
+    expect(
+      await page
+        .locator('.app-content')
+        .evaluate((element) => element.scrollWidth <= element.clientWidth),
+    ).toBe(true);
     await page.screenshot({
       path: test.info().outputPath('chat-desktop.png'),
     });
@@ -105,6 +111,11 @@ test('mobile navigation preserves the conversation and unsent draft', async ({
     await expect(page.getByRole('textbox', { name: '输入消息' })).toHaveValue(
       '还没说完的话',
     );
+    expect(
+      await page
+        .locator('.app-content')
+        .evaluate((element) => element.scrollWidth <= element.clientWidth),
+    ).toBe(true);
   } finally {
     await context.close();
   }

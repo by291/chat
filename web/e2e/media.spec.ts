@@ -49,7 +49,10 @@ test('real signed uploads report progress, retry and send image/files with avata
         await route.abort('internetdisconnected');
       } else await route.continue();
     });
-    await page.getByLabel('选择附件', { exact: true }).setInputFiles(sample);
+    const chooserOpened = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: '添加附件', exact: true }).click();
+    const chooser = await chooserOpened;
+    await chooser.setFiles(sample);
     await expect(
       page.getByRole('button', { name: '重试', exact: true }),
     ).toBeVisible();
