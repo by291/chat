@@ -8,6 +8,11 @@ existing in-page feedback. Installation does not enable push automatically.
 
 ## Static cache and updates
 
+Development (`make dev`) uses Vite hot updates and does not register a Service Worker
+or show release-update prompts. It unregisters an existing worker for this app on
+the same origin without reloading the page or clearing account data. Use a production
+build and preview to exercise installation, offline caching and update handoff.
+
 The worker caches only explicitly listed immutable build assets, public icons,
 the manifest and generic offline content. API responses, authenticated HTML, security
 routes and media transfers bypass its cache. Offline app navigation shows a generic

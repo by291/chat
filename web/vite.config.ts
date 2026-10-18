@@ -44,10 +44,11 @@ if (
 // Runtime URL validation above narrows this environment value to a CSP host source.
 const cspMediaOrigin =
   mediaOrigin as `${'http' | 'https'}://${string}.${string}`;
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     tailwindcss(),
     sveltekit({
+      serviceWorker: { register: command === 'build' },
       ...(previewDirectory
         ? {
             outDir: path.join(previewDirectory, 'kit'),
@@ -82,4 +83,4 @@ export default defineConfig({
     proxy,
   },
   preview: { proxy },
-});
+}));

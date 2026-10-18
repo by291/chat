@@ -25,11 +25,40 @@ type PendingWork = {
 
 const UPDATE_HANDOFF_TIMEOUT_MS = 20_000;
 
+async function unregisterDevelopmentWorker(container: ServiceWorkerContainer) {
+  try {
+    const registration = await container.getRegistration();
+    const scriptURL = new URL('/service-worker.js', window.location.origin)
+      .href;
+    const workers = [
+      registration?.active,
+      registration?.waiting,
+      registration?.installing,
+    ];
+    if (workers.some((worker) => worker?.scriptURL === scriptURL)) {
+      await registration?.unregister();
+    }
+  } catch {
+    // A failed optional cleanup must not interrupt the current page or discard drafts.
+    console.warn(
+      'Could not unregister the development Service Worker; reload to retry.',
+    );
+  }
+}
+
 function browserPorts(): PwaPorts | undefined {
   if (typeof window === 'undefined') return undefined;
+  const serviceWorker = window.isSecureContext
+    ? navigator.serviceWorker
+    : undefined;
+  if (import.meta.env.DEV && serviceWorker) {
+    // HMR is the development update mechanism. Retire this app's old registration
+    // without reloading the page or touching other applications on the same origin.
+    void unregisterDevelopmentWorker(serviceWorker);
+  }
   return {
     events: window,
-    serviceWorker: window.isSecureContext ? navigator.serviceWorker : undefined,
+    serviceWorker: import.meta.env.DEV ? undefined : serviceWorker,
     standalone: () =>
       window.matchMedia('(display-mode: standalone)').matches ||
       (navigator as Navigator & { standalone?: boolean }).standalone === true,
