@@ -138,6 +138,46 @@ async fn username_is_case_insensitive() {
 }
 
 #[tokio::test]
+async fn session_cookies_preserve_header_order_and_opaque_token_values() {
+    let app = support::spawn_test_app().await;
+    let response = register(&app, &app.client(), &invite(&app).await, "cookie_user").await;
+    let issued_cookie = response.headers()["set-cookie"]
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap();
+    let (name, token) = issued_cookie.split_once('=').unwrap();
+    let encoded_token = format!("%{:02X}{}", token.as_bytes()[0], &token[1..]);
+    let client = reqwest::Client::new();
+
+    for (headers, expected_status) in [
+        (
+            vec!["broken; ; unrelated=value".into(), issued_cookie.into()],
+            200,
+        ),
+        (vec![format!("{issued_cookie}; {name}=invalid")], 200),
+        (vec![format!("{name}=invalid"), issued_cookie.into()], 401),
+        (vec![format!("{name}=; {issued_cookie}")], 401),
+        (vec![format!("{name}=\"{token}\"")], 401),
+        (vec![format!("{name}={encoded_token}")], 401),
+    ] {
+        let mut request = client.get(format!("{}/api/v1/auth/me", app.base_url));
+        for header in headers {
+            request = request.header("cookie", header);
+        }
+
+        let response = request.send().await.unwrap();
+
+        assert_eq!(response.status().as_u16(), expected_status);
+        if expected_status == 200 {
+            let user = response.json::<serde_json::Value>().await.unwrap();
+            assert_eq!(user["username"], "cookie_user");
+        }
+    }
+}
+
+#[tokio::test]
 async fn revoked_or_expired_session_is_rejected() {
     let app = support::spawn_test_app().await;
     let client = app.client();

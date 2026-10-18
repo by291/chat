@@ -38,12 +38,12 @@ pub fn cookie_token(headers: &HeaderMap, state: &AppState) -> Option<String> {
     headers
         .get_all(axum::http::header::COOKIE)
         .iter()
-        .filter_map(|h| h.to_str().ok())
-        .flat_map(|s| s.split(';'))
-        .find_map(|pair| {
-            let (key, value) = pair.trim().split_once('=')?;
-            (key == name).then(|| value.to_owned())
-        })
+        .filter_map(|header| header.to_str().ok())
+        .flat_map(cookie::Cookie::split_parse)
+        // Tokens are opaque: never percent-decode them or prefer a later duplicate.
+        // Malformed unrelated pairs cannot hide a valid session cookie.
+        .filter_map(Result::ok)
+        .find_map(|cookie| (cookie.name() == name).then(|| cookie.value().to_owned()))
 }
 
 /// Reject untrusted mutation origins before an application operation can run.
