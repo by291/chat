@@ -11,3 +11,4 @@ pub mod rate_limit;
 pub mod web_push;
 
 pub(crate) mod internal_auth;
+pub(crate) mod valkey;

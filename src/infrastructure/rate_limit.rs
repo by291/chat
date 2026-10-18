@@ -2,13 +2,14 @@
 
 use std::time::Duration;
 
-use redis::Client;
 use sha2::{Digest, Sha256};
 
-use super::presence::PresenceTracker;
+use super::{
+    presence::PresenceTracker,
+    valkey::{DEPENDENCY_TIMEOUT, Valkey},
+};
 use crate::{error::AppError, types::UserId};
 
-const DEPENDENCY_TIMEOUT: Duration = Duration::from_secs(2);
 const RATE_WINDOW: &str = r#"
     local count = redis.call('INCR', KEYS[1])
     if count == 1 then
@@ -19,7 +20,7 @@ const RATE_WINDOW: &str = r#"
 
 #[derive(Clone)]
 pub struct RateLimiter {
-    client: Client,
+    valkey: Valkey,
     namespace: String,
 }
 
@@ -27,14 +28,14 @@ impl RateLimiter {
     /// Isolate rate/presence keys per database; namespace keys contain only a digest.
     pub fn new(url: &str, namespace: &str) -> Result<Self, AppError> {
         Ok(Self {
-            client: Client::open(url).map_err(|_| AppError::invalid("Valkey 配置无效"))?,
+            valkey: Valkey::new(url)?,
             namespace: hex::encode(Sha256::digest(namespace.as_bytes())),
         })
     }
 
-    /// Share stateless connection configuration; Valkey remains the owner of presence records.
+    /// Share the lazy connection manager; Valkey remains the owner of presence records.
     pub(crate) fn presence_tracker(&self) -> PresenceTracker {
-        PresenceTracker::from_client(self.client.clone(), self.namespace.clone())
+        PresenceTracker::from_valkey(self.valkey.clone(), self.namespace.clone())
     }
 
     /// Consume a fixed-window permit atomically; connection acquisition is also bounded.
@@ -53,7 +54,7 @@ impl RateLimiter {
         // Increment and expiry belong to one script: interrupted requests must not
         // leave a counter without a TTL. Hashing also keeps raw IPs/usernames out of keys.
         let count: i64 = tokio::time::timeout(DEPENDENCY_TIMEOUT, async {
-            let mut connection = self.client.get_multiplexed_async_connection().await?;
+            let mut connection = self.valkey.connection().await?;
             redis::Script::new(RATE_WINDOW)
                 .key(key)
                 .arg(window.as_millis() as u64)

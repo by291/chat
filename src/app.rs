@@ -39,7 +39,7 @@ impl AppState {
         let passwords = PasswordService::default();
         let dummy_password_hash = Arc::new(passwords.hash("dummy password for timing").await?);
         let limiter = RateLimiter::new(&config.valkey_url, &config.database_url)?;
-        let presence = PresenceTracker::new(&config.valkey_url, &config.database_url)?;
+        let presence = limiter.presence_tracker();
 
         let centrifugo = crate::realtime::client::CentrifugoClient::new(&config)?;
         let object_storage = config

@@ -1,13 +1,11 @@
 //! Expiring Valkey presence transitions and candidates for offline announcements.
 
-use std::time::Duration;
-
-use redis::{AsyncCommands, Client};
+use redis::AsyncCommands;
 use sha2::{Digest, Sha256};
 
+use super::valkey::{DEPENDENCY_TIMEOUT, Valkey};
 use crate::{error::AppError, types::UserId};
 
-const DEPENDENCY_TIMEOUT: Duration = Duration::from_secs(2);
 const PRESENCE_TRANSITION: &str = r#"
     local old = redis.call('GET', KEYS[1]) or '0'
     redis.call('SET', KEYS[1], ARGV[1], 'EX', 180)
@@ -25,7 +23,7 @@ const PRESENCE_TRANSITION: &str = r#"
 
 #[derive(Clone)]
 pub struct PresenceTracker {
-    client: Client,
+    valkey: Valkey,
     namespace: String,
 }
 
@@ -33,21 +31,21 @@ impl PresenceTracker {
     /// Configure a hashed, database-isolated namespace without opening a network connection.
     /// Invalid configuration is redacted; requests include acquisition in their two-second deadline.
     pub fn new(url: &str, namespace: &str) -> Result<Self, AppError> {
-        let client = Client::open(url).map_err(|_| AppError::invalid("Valkey 配置无效"))?;
+        let valkey = Valkey::new(url)?;
         let namespace = hex::encode(Sha256::digest(namespace.as_bytes()));
 
-        Ok(Self::from_client(client, namespace))
+        Ok(Self::from_valkey(valkey, namespace))
     }
 
-    /// Reuse private client configuration and an already hashed namespace without reparsing them.
-    pub(crate) fn from_client(client: Client, namespace: String) -> Self {
-        Self { client, namespace }
+    /// Reuse the private connection manager and an already hashed namespace.
+    pub(crate) fn from_valkey(valkey: Valkey, namespace: String) -> Self {
+        Self { valkey, namespace }
     }
 
     /// Include previously online users so disappearance can produce an offline transition.
     pub async fn candidates(&self, active: &[UserId]) -> Result<Vec<UserId>, AppError> {
         let known: Vec<String> = tokio::time::timeout(DEPENDENCY_TIMEOUT, async {
-            let mut connection = self.client.get_multiplexed_async_connection().await?;
+            let mut connection = self.valkey.connection().await?;
             connection
                 .smembers(format!("chat:presence:{}:known", self.namespace))
                 .await
@@ -76,7 +74,7 @@ impl PresenceTracker {
         let candidate_key = format!("chat:presence:{}:known", self.namespace);
 
         let changed: i32 = tokio::time::timeout(DEPENDENCY_TIMEOUT, async {
-            let mut connection = self.client.get_multiplexed_async_connection().await?;
+            let mut connection = self.valkey.connection().await?;
             redis::Script::new(PRESENCE_TRANSITION)
                 .key(state_key)
                 .key(candidate_key)

@@ -119,6 +119,10 @@ and `media::repository` paths remain explicit compatibility facades.
 `users::presence` owns authorization/maintenance, `infrastructure::presence` owns
 Valkey transitions, and realtime persistence owns stale connection pruning.
 The 120-second connection retention remains separate from transition expiry.
+`infrastructure::valkey` shares a lazy Redis `ConnectionManager` between rate limits
+and presence. Library-owned reconnection preserves the two-second operation deadline;
+startup does not require a live Valkey connection, and failed commands are not
+automatically retried because an uncertain increment may already have committed.
 
 The realtime repository owns `LeasedJob` because it maps the claimed database row.
 Delivery and orchestration consume that record; persistence does not import either
