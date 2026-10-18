@@ -44,11 +44,9 @@
   }
 </script>
 
-<Card.Root class="settings-card gap-0 p-6" role="region" aria-label="个人资料">
+<Card.Root class="settings-card gap-0 p-6" role="region" aria-label="基本资料">
   <div class="section-heading">
-    <span class="eyebrow">PROFILE</span>
-    <h2>个人资料</h2>
-    <p class="muted">让朋友更容易认出你。</p>
+    <h3>基本资料</h3>
   </div>
   <form onsubmit={submit}>
     <Label class="form-label" for="profile-username">用户名</Label>

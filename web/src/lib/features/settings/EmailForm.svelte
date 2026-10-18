@@ -80,7 +80,7 @@
 
 <Card.Root class="settings-card gap-0 p-6" role="region" aria-label="恢复邮箱">
   <div class="section-heading">
-    <h2>恢复邮箱</h2>
+    <h3>恢复邮箱</h3>
     <p class="muted">验证邮箱后，可以通过邮件找回忘记的密码。</p>
   </div>
   {#if emailStatus.isPending}

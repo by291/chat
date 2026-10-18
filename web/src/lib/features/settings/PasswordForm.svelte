@@ -84,7 +84,7 @@
 
 <Card.Root class="settings-card gap-0 p-6" role="region" aria-label="账号安全">
   <div class="section-heading">
-    <h2>修改密码</h2>
+    <h3>修改密码</h3>
     <p class="muted">
       修改成功后，所有设备都会退出登录，需要使用新密码重新登录。
     </p>

@@ -1,7 +1,7 @@
 /* Profile, device sessions and preferences. */
 
 .settings-page {
-  padding: 38px 52px 60px;
+  padding: 38px 52px 28px;
   max-width: 860px;
   margin: auto;
 }
@@ -27,23 +27,36 @@
   font-size: 13px;
 }
 
-.settings-card {
-  margin-top: 22px;
+.settings-content {
+  min-width: 0;
 }
 
-.section-heading h2 {
-  font-size: 18px;
+.settings-group {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-group + .settings-group {
+  margin-top: 24px;
+}
+
+.settings-group-heading h2 {
+  font-size: 20px;
+}
+
+.settings-card .form-actions {
+  flex-wrap: wrap;
+}
+
+.section-heading h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
 }
 
 .section-heading .muted {
   font-size: 12px;
   margin-top: 8px;
-}
-
-.section-heading .eyebrow {
-  font-size: 9px;
-  letter-spacing: 1.5px;
-  margin-bottom: 8px;
 }
 
 .sessions-list {

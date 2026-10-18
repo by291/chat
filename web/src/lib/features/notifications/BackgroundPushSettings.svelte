@@ -14,7 +14,7 @@
 
 <Card.Root class="settings-card gap-0 p-6" role="region" aria-label="后台推送">
   <div class="section-heading">
-    <h2>后台推送</h2>
+    <h3>后台推送</h3>
     <p class="muted">
       关闭页面后也可收到通用的新消息提醒。页面内的声音和提醒另行设置。
     </p>

@@ -55,7 +55,7 @@
 
 <Card.Root class="settings-card gap-0 p-6" role="region" aria-label="头像">
   <div class="section-heading">
-    <h2>头像</h2>
+    <h3>头像</h3>
     <p class="muted">选择 JPEG、PNG 或 WebP 图片。</p>
   </div>
   <ProfileAvatar {userId} {name} {revision} />

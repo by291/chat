@@ -40,8 +40,7 @@
 
 <Card.Root class="settings-card gap-0 p-6" role="region" aria-label="登录设备">
   <div class="section-heading">
-    <span class="eyebrow">SECURITY</span>
-    <h2>登录设备</h2>
+    <h3>登录设备</h3>
     <p class="muted">撤销不再使用的设备，让账号保持安全。</p>
   </div>
   <div class="sessions-list">

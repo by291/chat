@@ -7,7 +7,7 @@
 
 <Card.Root class="settings-card gap-0 p-6" role="region" aria-label="安装应用">
   <div class="section-heading">
-    <h2>安装应用</h2>
+    <h3>安装应用</h3>
     <p class="muted">将 Chat 放到桌面或主屏幕，方便下次打开。</p>
   </div>
   {#if pwa.installed}
