@@ -56,14 +56,12 @@
 
 <aside class="conversation-sidebar">
   <header class="sidebar-heading">
-    <div>
-      <span class="eyebrow">YOUR EVERYDAY SPACE</span>
-      <h1>
-        聊天
-        <span class="heading-dot">.</span>
-      </h1>
-    </div>
-    <div class="group-actions">
+    <span class="eyebrow">YOUR EVERYDAY SPACE</span>
+    <h1>
+      聊天
+      <span class="heading-dot">.</span>
+    </h1>
+    <div class="sidebar-actions">
       <StartConversationDialog {sync} />
       <GroupDialog {sync} />
       <NotificationSettings {sync} />

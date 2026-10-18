@@ -68,7 +68,7 @@
     }}
   >
     {#snippet child({ props })}
-      <Button variant="ghost" size="icon" class="new-chat" {...props}>
+      <Button variant="ghost" size="icon" class="new-chat size-9" {...props}>
         <Plus size={21} />
       </Button>
     {/snippet}

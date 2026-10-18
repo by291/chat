@@ -247,22 +247,34 @@
 }
 
 .sidebar-heading {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  padding: 33px 25px 22px;
+  gap: 12px;
+  padding: 24px 21px 18px;
 }
 
 .sidebar-heading h1 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   font-size: 29px;
+  line-height: 1.2;
   letter-spacing: -1px;
 }
 
 .sidebar-heading .eyebrow {
+  grid-column: 1 / -1;
   font-size: 8px;
   letter-spacing: 1.4px;
-  margin-bottom: 7px;
+  margin-bottom: 0;
   color: var(--subtle-text);
+}
+
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .heading-dot {
@@ -272,8 +284,6 @@
 .new-chat {
   background: var(--soft);
   color: var(--brand);
-  width: 36px;
-  height: 36px;
 }
 
 .search-field {
@@ -727,10 +737,6 @@
     grid-template-columns: 285px minmax(0, 1fr);
   }
 
-  .sidebar-heading {
-    padding: 28px 23px 20px;
-  }
-
   .message-inner {
     padding: 24px 22px 10px;
   }
@@ -825,9 +831,5 @@
 
   .composer {
     gap: 8px;
-  }
-
-  .sidebar-heading {
-    padding-top: 30px;
   }
 }

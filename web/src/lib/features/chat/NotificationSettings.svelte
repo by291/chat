@@ -10,11 +10,12 @@
 </script>
 
 <Dialog.Root>
-  <Dialog.Trigger
-    class="inline-flex size-8 items-center justify-center rounded-md hover:bg-accent"
-    aria-label="通知设置"
-  >
-    <Bell size={17} />
+  <Dialog.Trigger aria-label="通知设置">
+    {#snippet child({ props })}
+      <Button variant="ghost" size="icon" class="size-9" {...props}>
+        <Bell size={17} />
+      </Button>
+    {/snippet}
   </Dialog.Trigger>
   <Dialog.Content closeLabel="关闭">
     <Dialog.Header>
