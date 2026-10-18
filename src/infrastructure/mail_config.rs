@@ -2,11 +2,15 @@
 
 use base64::{Engine, engine::general_purpose::STANDARD};
 use lettre::message::Mailbox;
+use serde::{Deserialize, Deserializer, de};
 
+use super::environment;
 use crate::error::AppError;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum SmtpTlsMode {
+    #[serde(rename = "starttls")]
     StartTls,
     Implicit,
 }
@@ -19,62 +23,55 @@ pub enum FixtureMailTransport {
 }
 
 /// Optional mail configuration. Debug is absent because credentials and queue keys are private.
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub struct MailConfig {
+    #[serde(rename = "app_public_origin")]
     pub public_origin: String,
+    #[serde(rename = "smtp_host")]
     pub host: String,
+    #[serde(rename = "smtp_port")]
+    #[serde(deserialize_with = "environment::unsigned")]
     pub port: u16,
+    #[serde(rename = "smtp_tls_mode")]
     pub tls_mode: SmtpTlsMode,
+    #[serde(rename = "smtp_username")]
     pub username: String,
+    #[serde(rename = "smtp_password")]
     pub password: String,
+    #[serde(rename = "smtp_from")]
     pub from: String,
+    #[serde(rename = "mail_queue_encryption_key")]
+    #[serde(deserialize_with = "queue_key")]
     pub encryption_key: [u8; 32],
     #[cfg(feature = "test-failpoints")]
+    #[serde(skip)]
     pub fixture_transport: Option<FixtureMailTransport>,
 }
 
 impl MailConfig {
-    pub(crate) fn from_env() -> Result<Option<Self>, AppError> {
-        Self::from_values(|name| std::env::var(name).ok())
-    }
-
-    fn from_values(value: impl Fn(&str) -> Option<String>) -> Result<Option<Self>, AppError> {
-        match value("MAIL_ENABLED").as_deref() {
-            None | Some("false") => return Ok(None),
-            Some("true") => {}
-            _ => return Err(invalid_config()),
+    pub(crate) fn from_settings(settings: &config::Config) -> Result<Option<Self>, AppError> {
+        // Disabled services must not deserialize malformed provider variables.
+        if !environment::enabled(settings, "mail_enabled").map_err(|_| invalid_config())? {
+            return Ok(None);
         }
-        let required = |name| {
-            value(name)
-                .filter(|value| !value.is_empty())
-                .ok_or_else(invalid_config)
-        };
-        let encryption_key = STANDARD
-            .decode(required("MAIL_QUEUE_ENCRYPTION_KEY")?)
-            .map_err(|_| invalid_config())?
-            .try_into()
+        let config: Self = settings
+            .clone()
+            .try_deserialize()
             .map_err(|_| invalid_config())?;
-        let config = Self {
-            public_origin: required("APP_PUBLIC_ORIGIN")?,
-            host: required("SMTP_HOST")?,
-            port: required("SMTP_PORT")?
-                .parse()
-                .map_err(|_| invalid_config())?,
-            tls_mode: match required("SMTP_TLS_MODE")?.as_str() {
-                "starttls" => SmtpTlsMode::StartTls,
-                "implicit" => SmtpTlsMode::Implicit,
-                _ => return Err(invalid_config()),
-            },
-            username: required("SMTP_USERNAME")?,
-            password: required("SMTP_PASSWORD")?,
-            from: required("SMTP_FROM")?,
-            encryption_key,
-            #[cfg(feature = "test-failpoints")]
-            fixture_transport: Self::fixture_from_values(&value)?,
+        #[cfg(feature = "test-failpoints")]
+        let config = {
+            let mut config = config;
+            config.fixture_transport = Self::fixture_from_settings(settings)?;
+            config
         };
         config.validate()?;
 
         Ok(Some(config))
+    }
+
+    #[cfg(test)]
+    fn from_values(value: impl Fn(&str) -> Option<String>) -> Result<Option<Self>, AppError> {
+        Self::from_settings(&environment::load(value).map_err(|_| invalid_config())?)
     }
 
     pub(crate) fn validate(&self) -> Result<(), AppError> {
@@ -134,13 +131,20 @@ impl MailConfig {
     }
 
     #[cfg(feature = "test-failpoints")]
-    fn fixture_from_values(
-        value: &impl Fn(&str) -> Option<String>,
+    fn fixture_from_settings(
+        settings: &config::Config,
     ) -> Result<Option<FixtureMailTransport>, AppError> {
-        if value("CHAT_TEST_SMTP_CAPTURE").as_deref() == Some("true") {
+        if settings
+            .get_string("chat_test_smtp_capture")
+            .ok()
+            .as_deref()
+            == Some("true")
+        {
             return Ok(Some(FixtureMailTransport::PlaintextCapture));
         }
-        value("CHAT_TEST_SMTP_CA_FILE")
+        settings
+            .get_string("chat_test_smtp_ca_file")
+            .ok()
             .map(|path| {
                 let certificate = std::fs::read(path).map_err(|_| invalid_config())?;
                 if certificate.is_empty() || certificate.len() > 65536 {
@@ -150,6 +154,14 @@ impl MailConfig {
             })
             .transpose()
     }
+}
+
+fn queue_key<'de, D: Deserializer<'de>>(deserializer: D) -> Result<[u8; 32], D::Error> {
+    STANDARD
+        .decode(String::deserialize(deserializer)?)
+        .ok()
+        .and_then(|bytes| bytes.try_into().ok())
+        .ok_or_else(|| de::Error::custom("invalid queue encryption key"))
 }
 
 fn invalid_config() -> AppError {
@@ -186,6 +198,62 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
+    }
+
+    #[test]
+    fn disabled_mail_ignores_malformed_provider_values() {
+        let mut values = settings();
+        values.insert("MAIL_ENABLED", "false".into());
+        values.insert("SMTP_PORT", "invalid-port".into());
+        values.insert("MAIL_QUEUE_ENCRYPTION_KEY", "invalid-key".into());
+
+        assert!(
+            MailConfig::from_values(|name| values.get(name).cloned())
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn credentials_preserve_numeric_and_boolean_looking_strings() {
+        let mut values = settings();
+        values.insert("SMTP_USERNAME", "000123".into());
+        values.insert("SMTP_PASSWORD", "false".into());
+
+        let config = MailConfig::from_values(|name| values.get(name).cloned())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(config.username, "000123");
+        assert_eq!(config.password, "false");
+    }
+
+    #[test]
+    fn smtp_port_preserves_unsigned_integer_grammar() {
+        for port in ["true", "false", "on", "587.0", " 587", "65536", "0"] {
+            let mut values = settings();
+            values.insert("SMTP_PORT", port.into());
+
+            assert!(MailConfig::from_values(|name| values.get(name).cloned()).is_err());
+        }
+        let mut values = settings();
+        values.insert("SMTP_PORT", "+00587".into());
+
+        let config = MailConfig::from_values(|name| values.get(name).cloned())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(config.port, 587);
+    }
+
+    #[test]
+    fn mail_enable_flag_requires_exact_lowercase_boolean() {
+        for enabled in ["TRUE", "False", "1", "", " true"] {
+            let mut values = settings();
+            values.insert("MAIL_ENABLED", enabled.into());
+
+            assert!(MailConfig::from_values(|name| values.get(name).cloned()).is_err());
+        }
     }
 
     #[test]

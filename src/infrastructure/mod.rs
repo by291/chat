@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod db;
+pub(crate) mod environment;
 pub mod mail;
 pub(crate) mod mail_config;
 pub mod object_storage;

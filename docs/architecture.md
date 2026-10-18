@@ -124,6 +124,11 @@ and presence. Library-owned reconnection preserves the two-second operation dead
 startup does not require a live Valkey connection, and failed commands are not
 automatically retried because an uncertain increment may already have committed.
 
+`infrastructure::environment` uses `config` and Serde for environment sources and
+typed settings. Feature configuration retains enabled-service gates, strict scalar
+parsing, validation and redacted errors. Existing variable names, defaults and
+process-over-dotenv precedence remain unchanged; opaque secrets stay strings.
+
 The realtime repository owns `LeasedJob` because it maps the claimed database row.
 Delivery and orchestration consume that record; persistence does not import either
 workflow. `outbox` re-exports the type to keep its existing public API compatible.

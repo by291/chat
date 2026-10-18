@@ -4,18 +4,25 @@
 use std::net::SocketAddr;
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use serde::Deserialize;
 use web_push_native::p256::{SecretKey, elliptic_curve::sec1::ToEncodedPoint};
 
-use crate::error::AppError;
+use crate::{error::AppError, infrastructure::environment};
 
 /// Debug is absent: signing keys, endpoint capabilities and provider payloads are private.
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub struct WebPushConfig {
+    #[serde(rename = "web_push_private_key")]
     pub private_key: String,
+    #[serde(rename = "web_push_public_key")]
     pub public_key: String,
+    #[serde(rename = "web_push_contact")]
     pub contact: String,
+    #[serde(rename = "web_push_allowed_hosts")]
+    #[serde(deserialize_with = "environment::comma_separated")]
     pub allowed_hosts: Vec<String>,
     #[cfg(feature = "test-failpoints")]
+    #[serde(skip)]
     pub fixture_transport: Option<FixturePushTransport>,
 }
 
@@ -51,47 +58,48 @@ impl WebPushConfig {
         Ok(config)
     }
 
-    pub(crate) fn from_env() -> Result<Option<Self>, AppError> {
-        Self::from_values(|name| std::env::var(name).ok())
-    }
-
-    pub(super) fn from_values(
-        value: impl Fn(&str) -> Option<String>,
-    ) -> Result<Option<Self>, AppError> {
-        match value("WEB_PUSH_ENABLED").as_deref() {
-            None | Some("false") => return Ok(None),
-            Some("true") => {}
-            _ => return Err(invalid_config()),
+    pub(crate) fn from_settings(settings: &config::Config) -> Result<Option<Self>, AppError> {
+        if !environment::enabled(settings, "web_push_enabled").map_err(|_| invalid_config())? {
+            return Ok(None);
         }
-        let required = |name| {
-            value(name)
-                .filter(|value| !value.is_empty())
-                .ok_or_else(invalid_config)
-        };
+        let input: Self = settings
+            .clone()
+            .try_deserialize()
+            .map_err(|_| invalid_config())?;
         let config = Self::new(
-            required("WEB_PUSH_PRIVATE_KEY")?,
-            required("WEB_PUSH_PUBLIC_KEY")?,
-            required("WEB_PUSH_CONTACT")?,
-            required("WEB_PUSH_ALLOWED_HOSTS")?
-                .split(',')
-                .map(str::to_owned)
-                .collect(),
+            input.private_key,
+            input.public_key,
+            input.contact,
+            input.allowed_hosts,
         )?;
         #[cfg(feature = "test-failpoints")]
         let config = {
             let mut config = config;
-            if let Some(address) = value("CHAT_TEST_PUSH_ADDRESS") {
+            if let Ok(address) = settings.get_string("chat_test_push_address") {
                 config.fixture_transport = Some(FixturePushTransport {
-                    host: required("CHAT_TEST_PUSH_HOST")?,
-                    address: address.parse().map_err(|_| invalid_config())?,
-                    certificate: std::fs::read(required("CHAT_TEST_PUSH_CA_FILE")?)
+                    host: settings
+                        .get_string("chat_test_push_host")
                         .map_err(|_| invalid_config())?,
+                    address: address.parse().map_err(|_| invalid_config())?,
+                    certificate: std::fs::read(
+                        settings
+                            .get_string("chat_test_push_ca_file")
+                            .map_err(|_| invalid_config())?,
+                    )
+                    .map_err(|_| invalid_config())?,
                 });
                 config.validate()?;
             }
             config
         };
         Ok(Some(config))
+    }
+
+    #[cfg(test)]
+    pub(super) fn from_values(
+        value: impl Fn(&str) -> Option<String>,
+    ) -> Result<Option<Self>, AppError> {
+        Self::from_settings(&environment::load(value).map_err(|_| invalid_config())?)
     }
 
     pub(crate) fn validate(&self) -> Result<(), AppError> {
@@ -170,4 +178,79 @@ fn valid_provider_host(host: &str) -> bool {
 
 fn invalid_config() -> AppError {
     AppError::invalid("后台推送配置无效")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+    use web_push_native::p256::elliptic_curve::sec1::ToEncodedPoint;
+
+    use super::WebPushConfig;
+
+    #[test]
+    fn enabled_push_deserializes_keys_and_normalizes_exact_provider_hosts() {
+        let key = web_push_native::p256::SecretKey::from_slice(&[7; 32]).unwrap();
+        let values = HashMap::from([
+            ("WEB_PUSH_ENABLED", "true".to_owned()),
+            (
+                "WEB_PUSH_PRIVATE_KEY",
+                URL_SAFE_NO_PAD.encode(key.to_bytes()),
+            ),
+            (
+                "WEB_PUSH_PUBLIC_KEY",
+                URL_SAFE_NO_PAD.encode(key.public_key().to_encoded_point(false).as_bytes()),
+            ),
+            (
+                "WEB_PUSH_CONTACT",
+                "mailto:operator@example.test".to_owned(),
+            ),
+            (
+                "WEB_PUSH_ALLOWED_HOSTS",
+                " Push.Example.Test, other.example.test ".to_owned(),
+            ),
+        ]);
+
+        let config = WebPushConfig::from_values(|name| values.get(name).cloned())
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            config.private_key,
+            "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"
+        );
+        assert_eq!(
+            config.allowed_hosts,
+            ["push.example.test", "other.example.test"]
+        );
+    }
+
+    #[test]
+    fn disabled_push_ignores_malformed_provider_values() {
+        let values = HashMap::from([
+            ("WEB_PUSH_ENABLED", "false"),
+            ("WEB_PUSH_PRIVATE_KEY", "invalid-key"),
+            ("WEB_PUSH_ALLOWED_HOSTS", "*"),
+            ("CHAT_TEST_PUSH_ADDRESS", "invalid-address"),
+        ]);
+
+        assert!(
+            WebPushConfig::from_values(|name| values.get(name).map(|value| (*value).into()))
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn push_enable_flag_requires_exact_lowercase_boolean() {
+        for enabled in ["TRUE", "False", "1", "", " true"] {
+            assert!(
+                WebPushConfig::from_values(
+                    |name| (name == "WEB_PUSH_ENABLED").then(|| enabled.into())
+                )
+                .is_err()
+            );
+        }
+    }
 }
