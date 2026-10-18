@@ -56,7 +56,7 @@
       if (registering) {
         await auth.register({
           username,
-          display_name: displayName,
+          display_name: displayName.trim() || username.trim(),
           password,
           invitation,
         });
@@ -162,8 +162,7 @@
             name="display_name"
             bind:value={displayName}
             autocomplete="nickname"
-            required
-            placeholder="朋友怎么称呼你"
+            placeholder="选填，不填则使用用户名"
           />
         {/if}
         <div class="auth-password-field">

@@ -91,10 +91,12 @@ Passwords accept 6–128 Unicode scalar values. Operator prompts use ASCII Engli
 for compatibility with legacy Windows console code pages.
 
 ```sh
-cargo run --bin admin -- bootstrap --username alice --display-name Alice
+cargo run --bin admin -- bootstrap --username alice
 cargo run --bin admin -- invite
 cargo run --bin admin -- reset-password --username alice
 ```
+
+The display name defaults to the username; add `--display-name Alice` to override it.
 
 Enter an invitation token on the registration page, or use `/register?invite=<token>`.
 Invitations are single-use and expire after seven days. Password reset revokes all

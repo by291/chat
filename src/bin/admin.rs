@@ -24,8 +24,9 @@ enum Command {
     Bootstrap {
         #[arg(long)]
         username: String,
+        /// Display name for the initial account; defaults to the username.
         #[arg(long)]
-        display_name: String,
+        display_name: Option<String>,
     },
     Invite,
     ResetPassword {
@@ -76,8 +77,9 @@ async fn main() -> anyhow::Result<()> {
             username,
             display_name,
         } => {
+            let display_name = display_name.as_deref().unwrap_or(&username);
             let password = password()?;
-            let user = service::bootstrap(&state, &username, &display_name, &password).await?;
+            let user = service::bootstrap(&state, &username, display_name, &password).await?;
             println!("Created initial user @{}", user.username);
         }
         Command::Invite => {

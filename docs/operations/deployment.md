@@ -92,9 +92,11 @@ the first account. Passwords are entered interactively, never as arguments.
 
 ```sh
 ./admin media-init
-./admin bootstrap --username alice --display-name Alice
+./admin bootstrap --username alice
 ./admin invite
 ```
+
+The display name defaults to the username; add `--display-name Alice` to override it.
 
 ## Realtime, storage and proxy
 
