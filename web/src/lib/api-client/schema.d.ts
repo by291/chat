@@ -201,7 +201,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create an owner-only group with its first durable event. */
+        /** Create a group with its initial members and first durable event. */
         post: operations["create_group"];
         delete?: never;
         options?: never;
@@ -321,7 +321,8 @@ export interface paths {
         /** Read current members and their eligible read cursors. */
         get: operations["group_members"];
         put?: never;
-        post?: never;
+        /** Add accepted friends using the caller's current membership episode. */
+        post: operations["group_add_members"];
         delete?: never;
         options?: never;
         head?: never;
@@ -497,6 +498,76 @@ export interface paths {
         /** Publish a short-lived typing hint after membership authorization. */
         post: operations["typing"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List incoming or outgoing requests belonging to this actor. */
+        get: operations["friends_requests"];
+        put?: never;
+        /** Request friendship without implicitly opening a conversation. */
+        post: operations["friends_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friend-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Accept, decline or cancel subject to participant permissions and current status. */
+        patch: operations["friends_respond"];
+        trace?: never;
+    };
+    "/api/v1/friends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search the actor's accepted friends. */
+        get: operations["friends_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/friends/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the actor's relationship with one public profile. */
+        get: operations["friends_relationship"];
+        put?: never;
+        post?: never;
+        /** Remove a friendship on behalf of either participant. */
+        delete: operations["friends_remove"];
         options?: never;
         head?: never;
         patch?: never;
@@ -759,6 +830,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search public names for an authenticated actor, returning at most 20 matches. */
+        get: operations["users_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{id}/avatar": {
         parameters: {
             query?: never;
@@ -804,6 +892,10 @@ export interface components {
             conversation_id?: null | components["schemas"]["ConversationId"];
             focused: boolean;
             visible: boolean;
+        };
+        AddGroupMembersInput: {
+            member_ids: components["schemas"]["UserId"][];
+            membership_id: components["schemas"]["MembershipId"];
         };
         ApiErrorBody: {
             code: string;
@@ -944,6 +1036,9 @@ export interface components {
             token: string;
         };
         EphemeralEvent: {
+            /** @enum {string} */
+            kind: "contacts.updated";
+        } | {
             conversation_id: components["schemas"]["ConversationId"];
             /** @enum {string} */
             kind: "conversation.preferences.updated";
@@ -982,6 +1077,44 @@ export interface components {
             membership?: null | components["schemas"]["MembershipContext"];
             snapshot_seq: components["schemas"]["Seq"];
         };
+        /** @enum {string} */
+        FriendRequestAction: "accept" | "decline" | "cancel";
+        FriendRequestActionInput: {
+            action: components["schemas"]["FriendRequestAction"];
+        };
+        FriendRequestInput: {
+            user_id: components["schemas"]["UserId"];
+        };
+        /** @enum {string} */
+        FriendRequestStatus: "pending" | "accepted" | "declined" | "cancelled";
+        FriendRequestView: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            recipient: components["schemas"]["UserView"];
+            sender: components["schemas"]["UserView"];
+            status: components["schemas"]["FriendRequestStatus"];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        FriendRequestsPage: {
+            items: components["schemas"]["FriendRequestView"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
+            /** Format: int64 */
+            pending_incoming_count: number;
+        };
+        FriendsPage: {
+            items: components["schemas"]["FriendshipView"][];
+            /** Format: uuid */
+            next_cursor?: string | null;
+        };
+        FriendshipView: {
+            /** Format: date-time */
+            created_at: string;
+            user: components["schemas"]["UserView"];
+        };
         GroupActionInput: {
             membership_id: components["schemas"]["MembershipId"];
         };
@@ -1001,6 +1134,8 @@ export interface components {
             unread_count: number;
         };
         GroupInput: {
+            /** @description Initial members; the creator is always the owner. Omission keeps owner-only creation. */
+            member_ids?: components["schemas"]["UserId"][];
             title: string;
         };
         GroupInvitationView: {
@@ -1145,10 +1280,17 @@ export interface components {
             password: string;
             username: string;
         };
+        RelationshipView: {
+            is_friend: boolean;
+            pending_request?: null | components["schemas"]["FriendRequestView"];
+            user: components["schemas"]["UserView"];
+        };
         RenameGroupInput: {
             membership_id: components["schemas"]["MembershipId"];
             title: string;
         };
+        /** @enum {string} */
+        RequestDirection: "incoming" | "outgoing";
         SendMessageInput: {
             attachment_ids?: components["schemas"]["AttachmentId"][];
             body: string;
@@ -1914,6 +2056,31 @@ export interface operations {
             };
         };
     };
+    group_add_members: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddGroupMembersInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupMemberView"][];
+                };
+            };
+        };
+    };
     remove_group_member: {
         parameters: {
             query?: never;
@@ -2399,6 +2566,139 @@ export interface operations {
             };
         };
     };
+    friends_requests: {
+        parameters: {
+            query: {
+                direction: components["schemas"]["RequestDirection"];
+                status?: null | components["schemas"]["FriendRequestStatus"];
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendRequestsPage"];
+                };
+            };
+        };
+    };
+    friends_request: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FriendRequestInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendRequestView"];
+                };
+            };
+        };
+    };
+    friends_respond: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FriendRequestActionInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendRequestView"];
+                };
+            };
+        };
+    };
+    friends_list: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FriendsPage"];
+                };
+            };
+        };
+    };
+    friends_relationship: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelationshipView"];
+                };
+            };
+        };
+    };
+    friends_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     accept_group_invitation: {
         parameters: {
             query?: never;
@@ -2811,6 +3111,36 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    users_search: {
+        parameters: {
+            query: {
+                /** @description Literal username or display-name fragment, up to 64 characters */
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserView"][];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorBody"];
+                };
             };
         };
     };

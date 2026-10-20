@@ -326,6 +326,7 @@ async fn ready_original_survives_old_put_and_unassigned_download_is_denied() {
     let (app, _storage) = support::media::setup(1_073_741_824).await;
     let (client, user) = support::register_user(&app, "immutable_owner").await;
     let (peer, peer_user) = support::register_user(&app, "immutable_peer").await;
+    support::befriend(&app, &client, peer_user.id).await;
     let direct = client
         .post(format!("{}/api/v1/conversations/direct", app.base_url))
         .header("Origin", &app.origin)
@@ -534,6 +535,7 @@ async fn overwritten_sealed_attempt_never_publishes_the_replacement_bytes() {
     let (app, _storage) = support::media::setup(1_073_741_824).await;
     let (client, user) = support::register_user(&app, "sealed_owner").await;
     let (_, peer) = support::register_user(&app, "sealed_peer").await;
+    support::befriend(&app, &client, peer.id).await;
     let direct = client
         .post(format!("{}/api/v1/conversations/direct", app.base_url))
         .header("Origin", &app.origin)
@@ -1396,6 +1398,7 @@ async fn silent_storage_times_out_without_blocking_realtime_delivery() {
     let (app, _storage) = support::media::setup(1_073_741_824).await;
     let (client, _) = support::register_user(&app, "outage_owner").await;
     let (_, peer_user) = support::register_user(&app, "outage_peer").await;
+    support::befriend(&app, &client, peer_user.id).await;
     let direct = client
         .post(format!("{}/api/v1/conversations/direct", app.base_url))
         .header("Origin", &app.origin)

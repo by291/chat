@@ -4,6 +4,35 @@ use sqlx::PgPool;
 
 use crate::types::{UserId, UserView};
 
+pub async fn search(
+    pool: &PgPool,
+    actor_id: UserId,
+    query: &str,
+    limit: i64,
+) -> Result<Vec<UserView>, sqlx::Error> {
+    sqlx::query_as(
+        r#"
+        SELECT id, username, display_name
+        FROM users
+        WHERE id != $1
+          AND (strpos(username, $2) > 0 OR strpos(lower(display_name), $2) > 0)
+        ORDER BY CASE
+            WHEN username = $2 THEN 0
+            WHEN lower(display_name) = $2 THEN 1
+            WHEN strpos(username, $2) = 1 THEN 2
+            WHEN strpos(lower(display_name), $2) = 1 THEN 3
+            ELSE 4
+        END, username, id
+        LIMIT $3
+        "#,
+    )
+    .bind(actor_id)
+    .bind(query)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+}
+
 pub async fn by_username(pool: &PgPool, username: &str) -> Result<Option<UserView>, sqlx::Error> {
     sqlx::query_as(
         r#"

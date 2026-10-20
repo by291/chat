@@ -1,3 +1,4 @@
+import { befriend } from './support';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import {
   account,
@@ -22,6 +23,7 @@ afterAll(async () => {
 test('committed messages survive a stopped worker and duplicate publication does not duplicate storage', async () => {
   const a = await account(stack);
   const b = await account(stack);
+  await befriend(stack, a.cookie, b.cookie);
   const client = sdk(stack, b.cookie);
   const notifications: Record<string, unknown>[] = [];
   try {
@@ -101,6 +103,21 @@ test('a real worker crash after publish replays the leased head before later mes
   await stack.stopWorker();
   const a = await account(stack);
   const b = await account(stack);
+  await befriend(stack, a.cookie, b.cookie);
+  // Drain consent hints before targeting a crash at the conversation stream head.
+  await startWorker(stack);
+  await eventually(
+    async () =>
+      Number(
+        (
+          await stack.db.query(
+            'SELECT count(*) FROM outbox WHERE completed_at IS NULL',
+          )
+        ).rows[0].count,
+      ) === 0,
+  );
+  await stack.stopWorker();
+
   const client = sdk(stack, b.cookie);
   const seen: Record<string, unknown>[] = [];
   try {

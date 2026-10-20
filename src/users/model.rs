@@ -22,6 +22,11 @@ pub struct AvatarInput {
     pub attachment_id: AttachmentId,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UserSearchQuery {
+    pub q: String,
+}
+
 #[derive(Debug, Serialize, ToSchema)]
 pub struct UserStatus {
     pub online: bool,

@@ -1,4 +1,4 @@
-//! Profile and avatar operations with the established presence compatibility facade.
+//! User discovery, profile and avatar operations with the established presence facade.
 
 use super::{model::AvatarInput, repository};
 use crate::{
@@ -59,6 +59,36 @@ pub async fn get_user_by_username(
     repository::by_username(&state.pool, &username(name)?)
         .await?
         .ok_or_else(AppError::not_found)
+}
+
+/// Search a literal name fragment, excluding the caller and limiting discovery to 20 users.
+/// Blank queries return no users; more than 64 Unicode scalar values returns invalid-input.
+pub async fn search_users(
+    state: &AppState,
+    actor: Actor,
+    query: &str,
+) -> Result<Vec<UserView>, AppError> {
+    const SEARCH_RESULT_LIMIT: i64 = 20;
+
+    let query = query
+        .trim()
+        .strip_prefix('@')
+        .unwrap_or(query.trim())
+        .trim();
+    if query.chars().count() > 64 {
+        return Err(AppError::invalid("搜索内容不能超过 64 个字符"));
+    }
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    Ok(repository::search(
+        &state.pool,
+        actor.user_id,
+        &query.to_lowercase(),
+        SEARCH_RESULT_LIMIT,
+    )
+    .await?)
 }
 
 /// Validate and update the authenticated user's display name.

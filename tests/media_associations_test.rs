@@ -173,6 +173,7 @@ async fn direct(
     client: &reqwest::Client,
     peer: chat_server::types::UserId,
 ) -> Value {
+    support::befriend(app, client, peer).await;
     let response = request(
         app,
         client,

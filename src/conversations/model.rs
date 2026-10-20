@@ -234,6 +234,9 @@ pub struct GroupMemberView {
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct GroupInput {
     pub title: String,
+    /// Initial members; the creator is always the owner. Omission keeps owner-only creation.
+    #[serde(default)]
+    pub member_ids: Vec<UserId>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
@@ -473,4 +476,10 @@ pub struct ReadResult {
 pub struct TypingInput {
     pub is_typing: bool,
     pub membership_id: Option<MembershipId>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct AddGroupMembersInput {
+    pub membership_id: MembershipId,
+    pub member_ids: Vec<UserId>,
 }

@@ -20,6 +20,12 @@ use utoipa::OpenApi;
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        chat_server::friends::http::friends,
+        chat_server::friends::http::relationship,
+        chat_server::friends::http::remove,
+        chat_server::friends::http::requests,
+        chat_server::friends::http::request,
+        chat_server::friends::http::respond,
         chat_server::notifications::http::config,
         chat_server::notifications::http::register,
         chat_server::notifications::http::remove,
@@ -37,6 +43,7 @@ use utoipa::OpenApi;
         chat_server::auth::http::sessions,
         chat_server::auth::http::revoke,
         chat_server::users::http::lookup,
+        chat_server::users::http::search,
         chat_server::users::http::update,
         chat_server::users::http::status,
         chat_server::users::http::set_avatar,
@@ -60,6 +67,7 @@ use utoipa::OpenApi;
         chat_server::conversations::group_http::create,
         chat_server::conversations::group_http::rename,
         chat_server::conversations::group_http::members,
+        chat_server::conversations::group_http::add_members,
         chat_server::conversations::group_http::role,
         chat_server::conversations::group_http::remove,
         chat_server::conversations::group_http::leave,
@@ -75,6 +83,7 @@ use utoipa::OpenApi;
         chat_server::media::http::download
     ),
     components(schemas(
+        chat_server::friends::model::RequestDirection,
         chat_server::notifications::model::PushConfigView,
         chat_server::notifications::model::SubscriptionInput,
         chat_server::notifications::model::SubscriptionBinding,

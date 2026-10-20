@@ -80,6 +80,19 @@ pub fn build_router(state: AppState) -> Router {
     use crate::media::http as media;
 
     let api = Router::new()
+        .route("/friends", get(crate::friends::http::friends))
+        .route(
+            "/friends/{user_id}",
+            get(crate::friends::http::relationship).delete(crate::friends::http::remove),
+        )
+        .route(
+            "/friend-requests",
+            get(crate::friends::http::requests).post(crate::friends::http::request),
+        )
+        .route(
+            "/friend-requests/{id}",
+            axum::routing::patch(crate::friends::http::respond),
+        )
         .route(
             "/notifications/config",
             get(crate::notifications::http::config),
@@ -126,6 +139,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/users/{id}/avatar", get(users::avatar))
         .route("/users/by-username/{username}", get(users::lookup))
+        .route("/users/search", get(users::search))
         .route("/users/{id}/status", get(users::status))
         .route("/media/uploads", axum::routing::post(media::create))
         .route("/media/{id}", get(media::get).delete(media::cancel))
@@ -142,7 +156,10 @@ pub fn build_router(state: AppState) -> Router {
             "/conversations/{id}/group",
             axum::routing::patch(groups::rename),
         )
-        .route("/conversations/{id}/members", get(groups::members))
+        .route(
+            "/conversations/{id}/members",
+            get(groups::members).post(groups::add_members),
+        )
         .route(
             "/conversations/{id}/members/{user_id}",
             axum::routing::patch(groups::role).delete(groups::remove),

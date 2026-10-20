@@ -17,6 +17,7 @@ async fn fixture() -> Fixture {
     let (author, _) = support::register_user(&app, "reaction_author").await;
     let (peer, user) = support::register_user(&app, "reaction_peer").await;
     let (outsider, _) = support::register_user(&app, "reaction_outsider").await;
+    support::befriend(&app, &author, user.id).await;
     let conversation = author
         .post(format!("{}/api/v1/conversations/direct", app.base_url))
         .header("Origin", &app.origin)

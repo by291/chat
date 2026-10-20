@@ -81,17 +81,31 @@ async fn summary(
     }
 }
 
-/// Create an owner-only group; membership, initial event and outbox commit together.
+/// Create a group; all initial memberships, the first event and outbox commit together.
 pub async fn create(
     state: &AppState,
     actor: Actor,
     input: &str,
+    member_ids: &[UserId],
 ) -> Result<GroupConversationView, AppError> {
     let title = title(input)?;
+    let mut members = member_ids.to_vec();
+    members.retain(|member| *member != actor.user_id);
+    members.sort_unstable();
+    members.dedup();
+    if members.len() + 1 > usize::from(state.config.group_max_members) {
+        return Err(AppError::conflict("群成员人数已满"));
+    }
     let id = ConversationId::new();
 
     let mut transaction = state.pool.begin().await?;
+    if !persistence::initial_users_exist(&mut transaction, &members).await? {
+        return Err(AppError::invalid("所选用户不存在，请重新选择"));
+    }
 
+    for peer in &members {
+        crate::friends::service::require_friend(&mut transaction, actor.user_id, *peer).await?;
+    }
     persistence::insert_group(&mut transaction, id, title).await?;
     persistence::insert_member(
         &mut transaction,
@@ -102,6 +116,19 @@ pub async fn create(
         Seq(1),
     )
     .await?;
+    // All initial members start at the creation event, so its fanout discovers
+    // the complete group only after the same transaction commits.
+    for user_id in members {
+        persistence::insert_member(
+            &mut transaction,
+            id,
+            user_id,
+            MembershipId::new(),
+            GroupRole::Member,
+            Seq(1),
+        )
+        .await?;
+    }
     events::append(
         &mut transaction,
         id,
@@ -420,4 +447,70 @@ pub async fn accept(
     transaction.commit().await?;
 
     summary(state, actor, id).await
+}
+
+/// Add the actor's friends atomically under the group lock; ordinary members may invite.
+/// Rejoining creates a fresh episode and never exposes earlier history.
+pub async fn add_members(
+    state: &AppState,
+    actor: Actor,
+    id: ConversationId,
+    expected: MembershipId,
+    member_ids: &[UserId],
+) -> Result<Vec<GroupMemberView>, AppError> {
+    if member_ids.len() > usize::from(state.config.group_max_members) {
+        return Err(AppError::invalid("所选人数超过群成员上限"));
+    }
+    let mut candidates = member_ids.to_vec();
+    candidates.sort_unstable();
+    candidates.dedup();
+    let mut tx = state.pool.begin().await?;
+    lock_group(&mut tx, actor, id, expected).await?;
+    let mut additions = Vec::new();
+    for peer in candidates {
+        if repository::member(&mut tx, peer, id).await?.is_none() {
+            crate::friends::service::require_friend(&mut tx, actor.user_id, peer).await?;
+            additions.push(peer);
+        }
+    }
+    if persistence::count_members(&mut tx, id).await? + additions.len() as i64
+        > i64::from(state.config.group_max_members)
+    {
+        return Err(AppError::conflict("群成员人数已满"));
+    }
+    if !additions.is_empty() {
+        let latest = repository::lock_version(&mut tx, id)
+            .await?
+            .ok_or_else(AppError::not_found)?;
+        let joined_seq = Seq(latest.checked_add(1).ok_or_else(AppError::unavailable)?);
+        let mut changes = Vec::new();
+        for user_id in additions {
+            let membership_id = MembershipId::new();
+            persistence::insert_member(
+                &mut tx,
+                id,
+                user_id,
+                membership_id,
+                GroupRole::Member,
+                joined_seq,
+            )
+            .await?;
+            changes.push(MembershipChange {
+                user_id,
+                membership_id,
+                role: GroupRole::Member,
+                joined_seq,
+                active: true,
+            });
+        }
+        events::append(
+            &mut tx,
+            id,
+            ConversationEventKind::MembershipUpdated,
+            ConversationEventPayload::MembershipUpdated(changes),
+        )
+        .await?;
+    }
+    tx.commit().await?;
+    members(state, actor, id).await
 }

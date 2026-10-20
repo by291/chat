@@ -1,3 +1,4 @@
+import { befriend } from './support';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import {
   account,
@@ -21,6 +22,7 @@ afterAll(async () => {
 test('typing expires without durable events and presence combines multiple devices with peer-only access', async () => {
   const a = await account(stack);
   const b = await account(stack);
+  await befriend(stack, a.cookie, b.cookie);
   const c = await account(stack);
   const conv = await (
     await api(stack, a.cookie, '/conversations/direct', 'POST', {

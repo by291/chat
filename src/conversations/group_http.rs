@@ -31,7 +31,7 @@ use crate::{
     tag = "groups",
     operation_id = "create_group"
 )]
-/// Create an owner-only group with its first durable event.
+/// Create a group with its initial members and first durable event.
 pub async fn create(
     State(state): State<AppState>,
     actor: Actor,
@@ -39,7 +39,7 @@ pub async fn create(
 ) -> Result<(StatusCode, Json<GroupConversationView>), AppError> {
     Ok((
         StatusCode::CREATED,
-        Json(groups::create(&state, actor, &input.title).await?),
+        Json(groups::create(&state, actor, &input.title, &input.member_ids).await?),
     ))
 }
 
@@ -271,5 +271,20 @@ pub async fn accept(
     Ok((
         StatusCode::CREATED,
         Json(groups::accept(&state, actor, &input.token).await?),
+    ))
+}
+
+/// Add accepted friends using the caller's current membership episode.
+#[utoipa::path(post, path="/api/v1/conversations/{id}/members", operation_id="group_add_members",
+    params(("id"=ConversationId, Path)), request_body=super::model::AddGroupMembersInput,
+    responses((status=200, body=Vec<GroupMemberView>)), tag="groups")]
+pub async fn add_members(
+    State(state): State<AppState>,
+    actor: Actor,
+    Path(id): Path<ConversationId>,
+    Json(input): Json<super::model::AddGroupMembersInput>,
+) -> Result<Json<Vec<GroupMemberView>>, AppError> {
+    Ok(Json(
+        groups::add_members(&state, actor, id, input.membership_id, &input.member_ids).await?,
     ))
 }

@@ -1,3 +1,4 @@
+import { befriend } from './support';
 import { test, expect } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -21,6 +22,7 @@ test('coordinated backup restores media bytes, avatars, queued uploads and revok
   try {
     const a = await account(stack),
       b = await account(stack);
+    await befriend(stack, a.cookie, b.cookie);
     const conversation = await (
       await api(stack, a.cookie, '/conversations/direct', 'POST', {
         peer_id: b.user.id,

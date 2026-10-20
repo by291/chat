@@ -412,6 +412,7 @@ async fn mixed_summary_pagination_has_no_duplicates_or_fake_peer() {
     let (owner, _) = support::register_user(&app, "owner").await;
     let (second, peer) = support::register_user(&app, "second").await;
     let (third, _) = support::register_user(&app, "third").await;
+    support::befriend(&app, &owner, peer.id).await;
     let direct = request(
         &app,
         &owner,
@@ -601,4 +602,65 @@ async fn group_message_keeps_sender_name_after_rename_and_departure() {
         .await
         .unwrap();
     assert_eq!(history["items"][0]["sender_name"], "member");
+}
+
+#[tokio::test]
+async fn group_creation_includes_selected_members_atomically() {
+    let mut config = chat_server::infrastructure::config::Config::from_env().unwrap();
+    config.group_max_members = 3;
+    let app = support::spawn_test_app_with_config(config).await;
+    let (owner, actor) = support::register_user(&app, "creator").await;
+    let (peer, user) = support::register_user(&app, "selected").await;
+    support::befriend(&app, &owner, user.id).await;
+    let response = request(
+        &app,
+        &owner,
+        Method::POST,
+        "/conversations/groups",
+        json!({"title":"Selected group", "member_ids":[user.id, user.id, actor.id]}),
+    )
+    .await;
+    assert_eq!(response.status(), 201);
+    let group: Value = response.json().await.unwrap();
+    let id = group["id"].as_str().unwrap();
+
+    let members = peer
+        .get(format!(
+            "{}/api/v1/conversations/{id}/members",
+            app.base_url
+        ))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(members.status(), 200);
+    let roster: Vec<Value> = members.json().await.unwrap();
+    assert_eq!(roster.len(), 2);
+    assert!(
+        roster
+            .iter()
+            .any(|member| member["user"]["id"] == json!(user.id)
+                && member["role"] == "member"
+                && member["joined_seq"] == "1")
+    );
+
+    let invalid = request(
+        &app,
+        &owner,
+        Method::POST,
+        "/conversations/groups",
+        json!({"title":"Must roll back", "member_ids":[user.id, uuid::Uuid::new_v4()]}),
+    )
+    .await;
+    assert_eq!(invalid.status(), 400);
+    let capacity = request(
+        &app, &owner, Method::POST, "/conversations/groups",
+        json!({"title":"Over capacity", "member_ids":[user.id, uuid::Uuid::new_v4(), uuid::Uuid::new_v4()]}),
+    ).await;
+    assert_eq!(capacity.status(), 409);
+
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations")
+        .fetch_one(&app.pool)
+        .await
+        .unwrap();
+    assert_eq!(count, 1);
 }

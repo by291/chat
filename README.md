@@ -3,7 +3,7 @@
 A self-hosted chat application for individuals and small teams. The Rust package
 lives at the repository root; the SvelteKit frontend lives in `web/`.
 
-The application provides invitation-based registration, device sessions, exact
+The application provides open registration and mutual friendships, device sessions, exact
 username lookup, direct and private group conversations, durable messages,
 idempotent retries, reconnect replay, read receipts, typing/presence, images/files,
 profile avatars, message replies/edits/withdrawal, Chinese substring search,

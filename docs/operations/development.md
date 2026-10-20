@@ -86,25 +86,33 @@ and [UI components](../development/ui-components.md) for shadcn-svelte tooling.
 
 ## Accounts
 
-Create the first user. The terminal asks for the password twice without echo.
+Anyone can create an account at `/register`. Optionally create the first user
+with the CLI; the terminal asks for the password twice without echo.
 Passwords accept 6–128 Unicode scalar values. Operator prompts use ASCII English
 for compatibility with legacy Windows console code pages.
 
 ```sh
 cargo run --bin admin -- bootstrap --username alice
-cargo run --bin admin -- invite
 cargo run --bin admin -- reset-password --username alice
 ```
 
 The display name defaults to the username; add `--display-name Alice` to override it.
 
-Enter an invitation token on the registration page, or use `/register?invite=<token>`.
-Invitations are single-use and expire after seven days. Password reset revokes all
+Registration requires no invitation; a blank nickname uses the username.
+Friend requests require acceptance before direct chat or friend-based group additions.
+Group invitation links remain a separate joining mechanism. Password reset revokes all
 sessions for the account. The device settings page can revoke an individual session.
 The CLI requires database access; there is no separate web administration. Settings
 support authenticated password changes. Optional verified email enrollment and
 recovery require the [account mail configuration](account-security.md); mail and
 [background push](pwa-notifications.md) remain disabled by default.
+
+The friendship release changes the fresh-install identity migration. Pre-change
+local databases must be recreated because their migration checksums differ; no
+legacy conversation-to-friendship backfill is supported. Stop this project's
+processes and recreate only its explicitly identified disposable development
+database. Preserve source, environment files and unrelated Compose resources.
+The test runner provisions its own fresh databases automatically.
 
 ## Checks and targeted tests
 

@@ -42,6 +42,7 @@ async fn fixture() -> Fixture {
     let app = support::spawn_test_app_with_config(config).await;
     let (sender, _) = support::register_user(&app, "sender").await;
     let (recipient, user) = support::register_user(&app, "recipient").await;
+    support::befriend(&app, &sender, user.id).await;
     let conversation = sender
         .post(format!("{}/api/v1/conversations/direct", app.base_url))
         .header("Origin", &app.origin)

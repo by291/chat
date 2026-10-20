@@ -4,6 +4,7 @@ pub mod app;
 pub mod auth;
 pub mod conversations;
 pub mod error;
+pub mod friends;
 pub mod infrastructure;
 pub mod media;
 pub mod notifications;

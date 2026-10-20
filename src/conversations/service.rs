@@ -98,14 +98,18 @@ pub async fn ensure_direct(
         return Err(AppError::not_found());
     }
 
-    // Canonical ordering and the unique constraint arbitrate simultaneous requests.
-    let (low, high) = if actor.user_id < peer {
-        (actor.user_id, peer)
+    crate::friends::service::require_friend(&mut transaction, actor.user_id, peer).await?;
+
+    // The pair lock serializes creation. Read first: ON CONFLICT would wait on
+    // an existing aggregate update while holding the pair needed by that sender.
+    let low = actor.user_id.min(peer);
+    let high = actor.user_id.max(peer);
+    let existing = repository::direct_id(&mut transaction, low, high).await?;
+    let is_new = existing.is_none();
+    let id = if let Some(id) = existing {
+        id
     } else {
-        (peer, actor.user_id)
-    };
-    let new_id = repository::insert_direct(&mut transaction, low, high).await?;
-    let id = if let Some(id) = new_id {
+        let id = repository::insert_direct(&mut transaction, low, high).await?;
         repository::insert_direct_members(&mut transaction, id, low, high).await?;
         events::append(
             &mut transaction,
@@ -117,8 +121,6 @@ pub async fn ensure_direct(
         )
         .await?;
         id
-    } else {
-        repository::direct_id(&mut transaction, low, high).await?
     };
 
     transaction.commit().await?;
@@ -126,10 +128,7 @@ pub async fn ensure_direct(
         return Err(AppError::unavailable());
     };
 
-    Ok(Created {
-        value,
-        is_new: new_id.is_some(),
-    })
+    Ok(Created { value, is_new })
 }
 
 /// Return an authorized summary, including its latest message and unread count.

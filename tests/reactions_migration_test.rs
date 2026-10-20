@@ -18,17 +18,24 @@ async fn populated_upgrade_preserves_creation_receipts_retry_identity_and_legacy
     .await;
     let (author, user) = support::register_user(&app, "reaction_upgrade_author").await;
     let (_, peer) = support::register_user(&app, "reaction_upgrade_peer").await;
-    let conversation: Value = author
-        .post(format!("{}/api/v1/conversations/direct", app.base_url))
-        .header("Origin", &app.origin)
-        .json(&json!({"peer_id":peer.id}))
-        .send()
-        .await
-        .unwrap()
-        .json()
+    // Seed the historical conversation using its schema, not today's friendship policy.
+    let id = uuid::Uuid::now_v7();
+    sqlx::query("INSERT INTO conversations(id, min_user_id, max_user_id) VALUES ($1, $2, $3)")
+        .bind(id)
+        .bind(user.id.min(peer.id))
+        .bind(user.id.max(peer.id))
+        .execute(&app.pool)
         .await
         .unwrap();
-    let id: uuid::Uuid = conversation["id"].as_str().unwrap().parse().unwrap();
+    sqlx::query(
+        "INSERT INTO conversation_members(conversation_id, user_id) VALUES ($1, $2), ($1, $3)",
+    )
+    .bind(id)
+    .bind(user.id)
+    .bind(peer.id)
+    .execute(&app.pool)
+    .await
+    .unwrap();
     let message_id = uuid::Uuid::now_v7();
     let client_id = uuid::Uuid::new_v4();
     let hash = hex::encode(Sha256::digest(b"Legacy message"));

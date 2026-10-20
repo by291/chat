@@ -88,12 +88,12 @@ worker. Use graceful process shutdown, allow up to 90 seconds for draining, and
 configure restart on failure in the chosen process manager.
 
 Run the installed `admin` with the same environment to initialize storage and create
-the first account. Passwords are entered interactively, never as arguments.
+an optional first account. Public registration is available without tokens.
+Passwords are entered interactively, never as arguments.
 
 ```sh
 ./admin media-init
 ./admin bootstrap --username alice
-./admin invite
 ```
 
 The display name defaults to the username; add `--display-name Alice` to override it.
@@ -152,17 +152,15 @@ access or provisioning a Docker stack:
 ```powershell
 $env:CHAT_DEPLOYMENT_ORIGIN='https://staging.example.com'
 $env:CHAT_DEPLOYMENT_MEDIA_ORIGIN='https://media-staging.example.com'
-$env:CHAT_DEPLOYMENT_INVITE_1='<first-fresh-staging-invitation>'
-$env:CHAT_DEPLOYMENT_INVITE_2='<second-fresh-staging-invitation>'
 pnpm -C web test:deployment
 ```
 
-On POSIX shells, use `export NAME='value'` for the same four environment variables.
+On POSIX shells, use `export NAME='value'` for the same two environment variables.
 The test command is identical on Windows, Linux and macOS. Its first scenario checks
 `/health/ready` before exercising HTTPS routing and authentication.
 
-Generate the two invitations with the deployed staging `admin invite`; each run
-consumes them and creates two fixture accounts, a conversation and media objects.
+Each run publicly registers two fixture accounts, establishes friendship through
+recipient acceptance, and creates a conversation and media objects.
 Use a disposable staging database/bucket, and clean it through that environment's
 normal lifecycle. `CHAT_DEPLOYMENT_BUCKET` defaults to `chat-media`; set it when the
 staging bucket differs. Certificate validation stays enabled. Only a local staging

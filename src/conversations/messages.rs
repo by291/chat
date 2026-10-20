@@ -81,6 +81,11 @@ pub async fn send_message(
         });
     }
 
+    if member.kind == "direct" {
+        let peer = repository::direct_peer(&mut transaction, id, actor.user_id).await?;
+        crate::friends::service::require_friend(&mut transaction, actor.user_id, peer).await?;
+    }
+
     if let Some(reply_id) = input.reply_to_message_id {
         message_repository::message(&mut transaction, id, reply_id, member.joined_seq)
             .await?

@@ -68,6 +68,17 @@ pub async fn deliver(state: &AppState, job: &LeasedJob) -> Result<(), AppError> 
                 )
                 .await?;
         }
+        Some("contacts.updated") => {
+            let user: UserId = serde_json::from_value(job.payload["user_id"].clone())
+                .map_err(|_| AppError::unavailable())?;
+            state
+                .centrifugo
+                .publish(
+                    &format!("personal:#{user}"),
+                    &RealtimeEvent::Ephemeral(EphemeralEvent::ContactsUpdated),
+                )
+                .await?;
+        }
         Some("session.revoked") => {
             let session: SessionId = serde_json::from_value(job.payload["session_id"].clone())
                 .map_err(|_| AppError::unavailable())?;

@@ -5,6 +5,7 @@ async fn concurrent_direct_creation_is_unique() {
     let app = support::spawn_test_app().await;
     let (a, au) = support::register_user(&app, "alice").await;
     let (b, bu) = support::register_user(&app, "bob").await;
+    support::befriend(&app, &a, bu.id).await;
     let url = format!("{}/api/v1/conversations/direct", app.base_url);
     let (ra, rb) = tokio::join!(
         a.post(&url)
@@ -62,6 +63,7 @@ async fn third_user_cannot_read_conversation() {
     let (a, _) = support::register_user(&app, "alice").await;
     let (_, b) = support::register_user(&app, "bob").await;
     let (c, _) = support::register_user(&app, "charlie").await;
+    support::befriend(&app, &a, b.id).await;
     let r = a
         .post(format!("{}/api/v1/conversations/direct", app.base_url))
         .header("Origin", &app.origin)

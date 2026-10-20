@@ -28,6 +28,7 @@ async fn summary_reads_use_repeatable_snapshots_on_connections_without_a_stateme
         user_id: owner.id,
         session_id,
     };
+    support::befriend_users(&app, owner.id, peer.id).await;
     let conversation = service::ensure_direct(&app.state, actor, peer.id)
         .await
         .unwrap()
@@ -74,6 +75,7 @@ async fn cancelled_begin_does_not_poison_later_conversation_snapshots() {
         user_id: owner.id,
         session_id,
     };
+    support::befriend_users(&app, owner.id, peer.id).await;
     let conversation = service::ensure_direct(&app.state, actor, peer.id)
         .await
         .unwrap()

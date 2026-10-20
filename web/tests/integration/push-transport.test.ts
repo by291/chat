@@ -1,3 +1,4 @@
+import { befriend } from './support';
 import { expect, test } from 'vitest';
 import { randomUUID } from 'node:crypto';
 
@@ -13,6 +14,7 @@ test('native worker sends an independently decrypted notification after a restar
     stack = await TestRuntime.start({ push: provider.environment() });
     const recipient = await account(stack);
     const sender = await account(stack);
+    await befriend(stack, sender.cookie, recipient.cookie);
     const configuration = await (
       await api(stack, recipient.cookie, '/notifications/config')
     ).json();
@@ -101,6 +103,7 @@ test('recovered pending push rechecks a revoked binding before provider dispatch
     stack = await TestRuntime.start({ push: provider.environment() });
     const recipient = await account(stack);
     const sender = await account(stack);
+    await befriend(stack, sender.cookie, recipient.cookie);
     const binding = await (
       await api(
         stack,

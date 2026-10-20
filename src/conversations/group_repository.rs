@@ -31,6 +31,27 @@ struct RosterRow {
     last_read_message_seq: i64,
 }
 
+/// Lock users in ID order so initial membership cannot race a user deletion.
+pub async fn initial_users_exist(
+    tx: &mut Transaction<'_, Postgres>,
+    members: &[UserId],
+) -> Result<bool, sqlx::Error> {
+    let users: Vec<UserId> = sqlx::query_scalar(
+        r#"
+        SELECT id
+        FROM users
+        WHERE id = ANY($1)
+        ORDER BY id
+        FOR KEY SHARE
+        "#,
+    )
+    .bind(members)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    Ok(users.len() == members.len())
+}
+
 pub async fn insert_group(
     tx: &mut Transaction<'_, Postgres>,
     id: ConversationId,

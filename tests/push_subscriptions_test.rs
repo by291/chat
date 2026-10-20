@@ -359,6 +359,7 @@ async fn malformed_keys_and_unapproved_endpoints_never_create_a_binding() {
 async fn activity_uses_server_expiry_validates_membership_and_never_advances_reads() {
     let fixture = PushFixture::start().await;
     let (peer, peer_user) = support::register_user(&fixture.app, "push_peer").await;
+    support::befriend(&fixture.app, &fixture.owner, peer_user.id).await;
     let actor = fixture
         .owner
         .post(format!(

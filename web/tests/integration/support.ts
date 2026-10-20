@@ -123,3 +123,32 @@ export async function eventually(
 
   throw new Error('Expected condition did not become true');
 }
+
+/** Explicitly establish test friendship through both authenticated consent operations. */
+export async function befriend(
+  stack: IntegrationStack,
+  senderCookie: string,
+  recipientCookie: string,
+) {
+  const recipientResponse = await api(stack, recipientCookie, '/auth/me');
+  if (!recipientResponse.ok)
+    throw new Error('Expected authenticated recipient');
+  const recipient = await recipientResponse.json();
+  const response = await api(stack, senderCookie, '/friend-requests', 'POST', {
+    user_id: recipient.id,
+  });
+  if (!response.ok)
+    throw new Error(
+      `Friend request failed: ${response.status} ${await response.text()}`,
+    );
+  const request = await response.json();
+  const accepted = await api(
+    stack,
+    recipientCookie,
+    `/friend-requests/${request.id}`,
+    'PATCH',
+    { action: 'accept' },
+  );
+  if (!accepted.ok)
+    throw new Error(`Friend acceptance failed: ${accepted.status}`);
+}

@@ -1,13 +1,13 @@
-//! REST adapters for exact lookup, profile changes and presence.
+//! REST adapters for user discovery, profile changes and presence.
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderValue, StatusCode, header::CACHE_CONTROL},
     response::{IntoResponse, Response},
 };
 
-use super::model::AvatarInput;
+use super::model::{AvatarInput, UserSearchQuery};
 use crate::{
     AppState,
     error::AppError,
@@ -99,6 +99,28 @@ pub async fn lookup(
 ) -> Result<Json<UserView>, AppError> {
     Ok(Json(
         super::service::get_user_by_username(&state, actor, &name).await?,
+    ))
+}
+
+/// Search public names for an authenticated actor, returning at most 20 matches.
+#[utoipa::path(
+    get,
+    path = "/api/v1/users/search",
+    operation_id = "users_search",
+    params(("q" = String, Query, description = "Literal username or display-name fragment, up to 64 characters")),
+    responses(
+        (status = 200, body = Vec<UserView>),
+        (status = 400, body = crate::error::ApiErrorBody)
+    ),
+    tag = "users"
+)]
+pub async fn search(
+    State(state): State<AppState>,
+    actor: Actor,
+    Query(query): Query<UserSearchQuery>,
+) -> Result<Json<Vec<UserView>>, AppError> {
+    Ok(Json(
+        super::service::search_users(&state, actor, &query.q).await?,
     ))
 }
 

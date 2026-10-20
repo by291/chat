@@ -153,3 +153,52 @@ pub async fn register_user(
 
     (client, user)
 }
+
+/// Establish an explicit fixture relationship through the application workflow.
+/// Test-owned actors avoid creating extra device sessions in session-count assertions.
+pub async fn befriend(app: &TestApp, client: &reqwest::Client, peer: chat_server::types::UserId) {
+    let user: chat_server::types::UserView = client
+        .get(format!("{}/api/v1/auth/me", app.base_url))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    befriend_users(app, user.id, peer).await;
+}
+
+pub async fn befriend_users(
+    app: &TestApp,
+    first: chat_server::types::UserId,
+    second: chat_server::types::UserId,
+) {
+    use chat_server::{
+        friends::{model::FriendRequestAction, service},
+        types::{Actor, SessionId},
+    };
+    let sender = Actor {
+        user_id: first,
+        session_id: SessionId::new(),
+    };
+    let recipient = Actor {
+        user_id: second,
+        session_id: SessionId::new(),
+    };
+    if service::relationship(&app.state, sender, second)
+        .await
+        .unwrap()
+        .is_friend
+    {
+        return;
+    }
+    let pending = service::request(&app.state, sender, second).await.unwrap();
+    service::respond(
+        &app.state,
+        recipient,
+        pending.id,
+        FriendRequestAction::Accept,
+    )
+    .await
+    .unwrap();
+}

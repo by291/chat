@@ -4,6 +4,7 @@ async fn fixture() -> (support::TestApp, reqwest::Client, reqwest::Client, Strin
     let app = support::spawn_test_app().await;
     let (a, _) = support::register_user(&app, "alice").await;
     let (b, bu) = support::register_user(&app, "bob").await;
+    support::befriend(&app, &a, bu.id).await;
     let r = a
         .post(format!("{}/api/v1/conversations/direct", app.base_url))
         .header("Origin", &app.origin)

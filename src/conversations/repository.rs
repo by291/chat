@@ -103,19 +103,18 @@ pub async fn insert_direct(
     tx: &mut Transaction<'_, Postgres>,
     low: UserId,
     high: UserId,
-) -> Result<Option<ConversationId>, sqlx::Error> {
+) -> Result<ConversationId, sqlx::Error> {
     sqlx::query_scalar(
         r#"
         INSERT INTO conversations(id, min_user_id, max_user_id)
         VALUES ($1, $2, $3)
-        ON CONFLICT(min_user_id, max_user_id) DO NOTHING
         RETURNING id
         "#,
     )
     .bind(ConversationId::new())
     .bind(low)
     .bind(high)
-    .fetch_optional(&mut **tx)
+    .fetch_one(&mut **tx)
     .await
 }
 
@@ -146,7 +145,7 @@ pub async fn direct_id(
     tx: &mut Transaction<'_, Postgres>,
     low: UserId,
     high: UserId,
-) -> Result<ConversationId, sqlx::Error> {
+) -> Result<Option<ConversationId>, sqlx::Error> {
     sqlx::query_scalar(
         r#"
         SELECT id
@@ -156,7 +155,7 @@ pub async fn direct_id(
     )
     .bind(low)
     .bind(high)
-    .fetch_one(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await
 }
 
@@ -463,4 +462,23 @@ pub async fn insert_event_job(
     .await?;
 
     Ok(())
+}
+
+/// Resolve the other direct participant without acquiring a new aggregate lock.
+pub async fn direct_peer(
+    tx: &mut Transaction<'_, Postgres>,
+    id: ConversationId,
+    actor: UserId,
+) -> Result<UserId, sqlx::Error> {
+    sqlx::query_scalar(
+        r#"
+        SELECT CASE WHEN min_user_id = $2 THEN max_user_id ELSE min_user_id END
+        FROM conversations
+        WHERE id = $1 AND kind = 'direct'
+    "#,
+    )
+    .bind(id)
+    .bind(actor)
+    .fetch_one(&mut **tx)
+    .await
 }

@@ -23,6 +23,7 @@ async fn direct_fixture() -> (support::TestApp, Client, Client, String) {
     let app = support::spawn_test_app().await;
     let (author, _) = support::register_user(&app, "author").await;
     let (reader, user) = support::register_user(&app, "reader").await;
+    support::befriend(&app, &author, user.id).await;
     let response = request(
         &app,
         &author,
@@ -426,6 +427,7 @@ async fn replies_refresh_previews_and_context_includes_unloaded_history() {
     );
 
     let (foreign, foreign_user) = support::register_user(&app, "foreign").await;
+    support::befriend(&app, &author, foreign_user.id).await;
     let conversation = request(
         &app,
         &author,
@@ -512,6 +514,7 @@ async fn chinese_search_uses_literal_substrings_and_seek_pages_without_tombstone
 async fn preferences_are_private_durable_and_do_not_reset_when_messages_arrive() {
     let (app, author, reader, id) = direct_fixture().await;
     let (other, user) = support::register_user(&app, "another").await;
+    support::befriend(&app, &author, user.id).await;
     let newer = request(
         &app,
         &author,
