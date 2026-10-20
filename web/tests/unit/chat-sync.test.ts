@@ -49,8 +49,13 @@ function deferred<T>() {
 }
 class Transport implements RealtimeTransport {
   receive: (event: RealtimeEvent) => void = () => {};
-  async subscribe(receive: (event: RealtimeEvent) => void) {
+  reconnect: () => void = () => {};
+  async subscribe(
+    receive: (event: RealtimeEvent) => void,
+    reconnect: () => void,
+  ) {
     this.receive = receive;
+    this.reconnect = reconnect;
   }
   close() {}
 }
@@ -59,7 +64,10 @@ afterEach(() => {
   for (const sync of running) sync.stop();
   running.length = 0;
 });
-function fixture(overrides: Partial<ChatApi> = {}) {
+function fixture(
+  overrides: Partial<ChatApi> = {},
+  callbacks: { onContactsChanged?: () => void; onReconnect?: () => void } = {},
+) {
   const api: ChatApi = {
     list: async () => ({ items: [], next_cursor: null }),
     conversation: async () => {
@@ -104,7 +112,13 @@ function fixture(overrides: Partial<ChatApi> = {}) {
   };
   const transport = new Transport();
   const queryClient = createQueryClient();
-  const sync = createChatSync({ api, transport, queryClient, userId: 'alice' });
+  const sync = createChatSync({
+    api,
+    transport,
+    queryClient,
+    userId: 'alice',
+    ...callbacks,
+  });
   running.push(sync);
   return { api, sync, transport, queryClient };
 }
@@ -343,4 +357,24 @@ test('completion of an earlier receipt only acknowledges the last rendered curso
   expect(reads).toEqual(['2']); // Replay completed; the visibility callback has not confirmed the new DOM.
   sync.setVisible(true);
   await expect.poll(() => reads).toEqual(['2', '3']);
+});
+
+test('contacts hints and reconnect refresh contacts without changing conversation cursors', async () => {
+  let hints = 0;
+  let reconnects = 0;
+  const { sync, transport } = fixture(
+    {},
+    { onContactsChanged: () => hints++, onReconnect: () => reconnects++ },
+  );
+  await sync.start();
+  await sync.select('a');
+  const applied = sync.appliedSeq;
+  transport.receive({ kind: 'contacts.updated' });
+  expect(hints).toBe(1);
+  expect(sync.appliedSeq).toBe(applied);
+  transport.reconnect();
+  expect(reconnects).toBe(1);
+  sync.stop();
+  transport.receive({ kind: 'contacts.updated' });
+  expect(hints).toBe(1);
 });

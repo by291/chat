@@ -11,6 +11,7 @@ const MAX_EVENT_SEQUENCE = 9_223_372_036_854_775_807n;
 const realtimeEventSchema: z.ZodType<RealtimeEvent> = z.discriminatedUnion(
   'kind',
   [
+    z.looseObject({ kind: z.literal('contacts.updated') }),
     z.looseObject({
       kind: z.enum([
         'conversation.created',

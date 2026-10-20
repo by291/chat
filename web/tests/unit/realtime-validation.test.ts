@@ -46,6 +46,7 @@ test('realtime dispatch preserves canonical i64 strings, supported event kinds a
     () => undefined,
   );
   const inputs = [
+    { kind: 'contacts.updated' },
     ...[
       'conversation.created',
       'message.created',

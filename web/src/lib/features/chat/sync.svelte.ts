@@ -62,6 +62,8 @@ export class ChatSync {
       transport: RealtimeTransport;
       queryClient: QueryClient;
       userId: string;
+      onContactsChanged?: () => void;
+      onReconnect?: () => void;
     },
   ) {
     this.notifications = new ChatNotifications({
@@ -314,6 +316,7 @@ export class ChatSync {
         await this.options.transport.subscribe(
           (event) => this.receive(event),
           () => {
+            this.options.onReconnect?.();
             void this.restoreConnection();
           },
           (status) => {
@@ -444,6 +447,10 @@ export class ChatSync {
           event.kind === 'message.created',
       );
       void this.refreshSummaries();
+      return;
+    }
+    if (event.kind === 'contacts.updated') {
+      this.options.onContactsChanged?.();
       return;
     }
     if (event.kind === 'conversation.preferences.updated') {
