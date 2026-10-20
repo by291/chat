@@ -1,3 +1,6 @@
+import { startChatWith } from './fixtures';
+import { befriend } from '../tests/integration/support';
+import { sessionCookie } from './fixtures';
 import { randomUUID } from 'node:crypto';
 
 import type { Browser, Page } from '@playwright/test';
@@ -41,6 +44,7 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   try {
     const author = await signup(page, stack);
     const partner = await signup(peer, stack);
+    await befriend(stack, await sessionCookie(page), await sessionCookie(peer));
     await startWorker(stack);
     await expect(page.locator('.chat-shell')).toHaveAttribute(
       'data-connection',
@@ -50,21 +54,16 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
       'data-connection',
       'online',
     );
-    await page.getByRole('button', { name: '发起聊天', exact: true }).click();
-    await page
-      .getByLabel('对方的用户名', { exact: true })
-      .fill(partner.username);
-    await page.getByRole('button', { name: '查找用户', exact: true }).click();
-    await page.getByRole('button', { name: '开始聊天', exact: true }).click();
+    await startChatWith(page, partner.username);
     await expect(page).toHaveURL(/\/app\/chats\//);
     const id = page.url().split('/').at(-1)!;
-    await expect(
-      peer.getByRole('navigation', { name: '会话列表' }).getByRole('link'),
-    ).toHaveCount(1);
-    await peer
+    const peerConversation = peer
       .getByRole('navigation', { name: '会话列表' })
       .getByRole('link')
-      .click();
+      .filter({ hasText: author.username });
+    await expect(peerConversation).toBeVisible();
+    await peerConversation.click();
+    await expect(peer).toHaveURL(/\/app\/chats\//);
     return { context, peer, author, id };
   } catch (reason) {
     await context.close();
@@ -315,6 +314,7 @@ test('personal pin mute and archive synchronize through the worker to another ac
   const device = await browser.newContext();
   try {
     const other = await account(stack);
+    await befriend(stack, await sessionCookie(page), other.cookie);
     await json<Conversation>(
       await api(stack, await cookie(page), '/conversations/direct', 'POST', {
         peer_id: other.user.id,
@@ -505,7 +505,7 @@ test('open-page alerts request permission only on click omit private bodies open
     await closeDialog(page);
     await page.getByRole('link', { name: '设置', exact: true }).click();
     await expect(
-      page.getByRole('heading', { name: '个人设置', exact: true }),
+      page.getByRole('heading', { name: '设置', exact: true }),
     ).toBeVisible();
 
     const incoming = await json<Message>(
@@ -553,7 +553,7 @@ test('open-page alerts request permission only on click omit private bodies open
     expect((await state()).shown).toHaveLength(1);
     await page.getByRole('link', { name: '设置', exact: true }).click();
     await expect(
-      page.getByRole('heading', { name: '个人设置', exact: true }),
+      page.getByRole('heading', { name: '设置', exact: true }),
     ).toBeVisible();
     const fromSettings = await json<Message>(
       await api(
@@ -570,7 +570,8 @@ test('open-page alerts request permission only on click omit private bodies open
     await expect(
       page.locator(`[data-message-id="${fromSettings.id}"]`),
     ).toBeVisible();
-    await page.getByRole('button', { name: '退出登录', exact: true }).click();
+    await page.getByRole('button', { name: '我的账号', exact: true }).click();
+    await page.getByRole('menuitem', { name: '退出登录', exact: true }).click();
     await expect(page).toHaveURL(/\/login/);
     expect((await state()).audioCloses).toBe(1);
     await expect(page.locator('.in-app-alert')).toHaveCount(0);

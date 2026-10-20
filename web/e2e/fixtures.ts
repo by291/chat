@@ -42,3 +42,34 @@ export async function signup(
 
   return { username, password };
 }
+
+export async function sessionCookie(page: Page) {
+  const session = (await page.context().cookies()).find(
+    (cookie) => cookie.name === 'chat_session',
+  );
+  if (!session) throw new Error('Expected authenticated browser');
+  return `${session.name}=${session.value}`;
+}
+
+/** Follow the contact-to-conversation workflow instead of bypassing its selection. */
+export async function startChatWith(page: Page, username: string) {
+  await page
+    .getByRole('navigation', { name: '主导航' })
+    .getByRole('link', { name: /^通讯录/ })
+    .click();
+  await page.getByRole('button', { name: '好友', exact: true }).click();
+  await page.getByRole('textbox', { name: '搜索通讯录' }).fill(username);
+  const row = page
+    .getByRole('list', { name: '好友', exact: true })
+    .getByRole('button')
+    .filter({ hasText: '@' + username });
+  await row.click();
+  await page.getByRole('button', { name: '发消息', exact: true }).click();
+  await base.expect(page).toHaveURL(/\/app\/chats\//);
+}
+
+export async function editOwnProfile(page: Page) {
+  await page.getByRole('button', { name: '我的账号', exact: true }).click();
+  await page.getByRole('menuitem', { name: '个人资料', exact: true }).click();
+  await page.getByRole('button', { name: '编辑资料', exact: true }).click();
+}

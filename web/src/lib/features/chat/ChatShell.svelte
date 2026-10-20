@@ -1,10 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
-  import { ArrowLeft, MessageCircle, WifiOff } from '@lucide/svelte';
+  import { ArrowLeft, MessageCircle, WifiOff, Users } from '@lucide/svelte';
 
   import * as Avatar from '#lib/components/ui/avatar/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
+  import { avatarTone } from '#lib/utils.js';
 
   import ProfileAvatar from '#lib/features/settings/ProfileAvatar.svelte';
 
@@ -15,7 +16,8 @@
   import GroupDetails from './GroupDetails.svelte';
   import ConversationTools from './ConversationTools.svelte';
   import MessageDialogs from './MessageDialogs.svelte';
-  import { isGroup, conversationName } from './models';
+  import PeerDetails from './PeerDetails.svelte';
+  import { isGroup, conversationName, membershipId } from './models';
 
   let {
     id = null,
@@ -25,6 +27,7 @@
 
   const chat = useChat();
   let connectedBefore = $state(false);
+  let selectionPending = $state(false);
 
   // Only the notice copy needs this history; connection ownership stays in ChatSync.
   $effect(() => {
@@ -34,18 +37,24 @@
   $effect(() => {
     const sync = chat.sync;
     const selected = id;
+    let cancelled = false;
     if (sync) {
       // Route selection drives this effect; cache changes inside select must not
       // trigger another selection and invalidate its in-flight snapshot.
       untrack(() => {
         if (selected) {
-          void sync.select(selected);
+          selectionPending = true;
+          void sync.select(selected).finally(() => {
+            if (!cancelled) selectionPending = false;
+          });
         } else {
+          selectionPending = false;
           sync.clearSelection();
         }
       });
     }
     return () => {
+      cancelled = true;
       if (sync && selected) {
         sync.setVisible(false);
         void sync.setTyping(selected, false);
@@ -82,11 +91,11 @@
         </div>
       {/if}
     </div>
-    <div class="chat-columns">
+    <div class="chat-columns workspace-columns">
       <ConversationList {sync} />
       <section class="chat-panel">
         {#if id}
-          {@const current = sync.current}
+          {@const current = sync.selectedId === id ? sync.current : undefined}
           <header class="chat-heading">
             <Button
               variant="ghost"
@@ -103,7 +112,7 @@
                 name={current.peer.display_name}
               />
             {:else}
-              <Avatar.Root>
+              <Avatar.Root data-tone={avatarTone(current?.id ?? '')}>
                 <Avatar.Fallback>
                   {Array.from(conversationName(current))[0] ?? '…'}
                 </Avatar.Fallback>
@@ -134,6 +143,8 @@
             </div>
             {#if isGroup(current)}
               <GroupDetails {sync} />
+            {:else if current}
+              {#key current.peer.id}<PeerDetails user={current.peer} />{/key}
             {/if}
             {#if current}
               <ConversationTools {sync} />
@@ -147,29 +158,33 @@
               </Button>
             </div>
           {/if}
-          {#key id}
+          {#key `${id}:${membershipId(current) ?? ''}`}
             {#if current}
               <MessageList {sync} {id} userId={sync.userId} />
               <Composer {sync} {id} />
+            {:else if selectionPending || sync.loading || sync.selectedId !== id}
+              <div class="conversation-state" role="status">
+                <span class="loading-pulse"></span>
+                <p>正在打开会话…</p>
+              </div>
             {:else}
-              <p class="message-placeholder">会话暂不可用，请返回会话列表。</p>
+              <div class="conversation-state">
+                <p>会话暂不可用</p>
+                <Button variant="secondary" href="/app">返回会话列表</Button>
+              </div>
             {/if}
           {/key}
         {:else}
           <div class="welcome-layout">
             <div class="welcome-chat">
-              <span class="welcome-icon"><MessageCircle size={38} /></span>
-              <span class="eyebrow">ROOM FOR YOUR PEOPLE</span>
-              <h2>
-                让日常的联系
-                <br />
-                多一点温度。
-              </h2>
-              <p>
-                选一个聊天，或找到新的伙伴。
-                <br />
-                你们的对话，从这里开始。
-              </p>
+              <span class="welcome-icon"><MessageCircle size={32} /></span>
+              <h2>开始一段对话</h2>
+              <p>从左侧选择聊天，或与朋友开启新的对话。</p>
+              <div class="welcome-actions">
+                <Button variant="outline" href="/app/contacts">
+                  <Users size={17} />查看通讯录
+                </Button>
+              </div>
             </div>
           </div>
         {/if}

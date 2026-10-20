@@ -1,3 +1,5 @@
+import { editOwnProfile } from './fixtures';
+import { befriend } from '../tests/integration/support';
 import { test as base, expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
@@ -42,6 +44,7 @@ test('a second production build waits for consent while a draft and signed uploa
   const cookie = (await context.cookies()).find(
     (entry) => entry.name === 'chat_session',
   )!;
+  await befriend(stack, `${cookie.name}=${cookie.value}`, peer.cookie);
   const conversation = await (
     await api(
       stack,
@@ -175,9 +178,10 @@ test('production worker caches public assets only and offline navigation shows g
   }
   await page.goto('/app/settings');
   await expect(
-    page.getByRole('heading', { name: '个人设置', exact: true }),
+    page.getByRole('heading', { name: '设置', exact: true }),
   ).toBeVisible();
   await stack.startWorker();
+  await editOwnProfile(page);
   await page
     .getByLabel('选择头像', { exact: true })
     .setInputFiles(

@@ -26,14 +26,19 @@ src/
     http.rs               cookies, Origin guard, extraction and HTTP results
     model.rs              request/response DTOs and authenticated session result
     validation.rs         username and display-name rules
-    service.rs            invite, login, bootstrap, reset and revocation workflows
+    service.rs            public registration, login, bootstrap, reset and revocation workflows
     security.rs           password changes, verified mailbox enrollment and encrypted intents
     recovery.rs           anonymous verified-mailbox recovery and atomic token resets
     security_repository.rs credential/email version fences and challenge SQL
     mail_repository.rs    encrypted queue persistence and leased completion
     mail_worker.rs        independent bounded delivery and retry lifecycle
-    repository.rs         users/invitations/sessions SQL and locking
+    repository.rs         users/sessions SQL and locking
     password.rs           bounded Argon2 work
+  friends/
+    http.rs               authenticated friend/request REST adapters
+    model.rs              paginated contacts and per-person relationship contracts
+    service.rs            consent transitions, friendship policy and transactions
+    repository.rs         canonical pair locks, requests, friendships and refresh jobs
   conversations/
     http.rs               REST adapters
     group_http.rs         private group REST adapters
@@ -50,7 +55,7 @@ src/
     reactions_repository.rs reader-specific counts and single-choice persistence
     events.rs             transaction-composed event/outbox append
     repository.rs         conversation/member/message/event SQL
-    groups.rs             roles, membership episodes and single-use invitations
+    groups.rs             atomic initial membership, roles, episodes and invitations
     group_repository.rs   group/member/invitation SQL and locking
   notifications/
     http.rs               authenticated subscription/config/activity adapters
@@ -63,7 +68,7 @@ src/
   users/
     http.rs               profile/search/status REST adapters
     model.rs              user/profile/status DTOs
-    service.rs            profile rules and compatibility presence exports
+    service.rs            bounded public-profile search, profile rules and presence exports
     presence.rs           relationship-authorized presence and transition maintenance
     repository.rs         profile and relationship authorization SQL
   media/
@@ -149,6 +154,7 @@ web/src/
     styles/                     shared foundation/layout/responsive/theme cascade
     features/
       auth/                     auth API, session lifetime, identity form and styles
+      contacts/                 session query observers, consent UI and accepted-friend pickers
       settings/                 profile/device API, forms, theme and styles
         sessions.svelte.ts      query/mutation observers and authenticated device-list lifetime
       pwa/                      install/update browser lifecycle and consent controls
@@ -171,6 +177,7 @@ web/src/
         sync.svelte.ts          authenticated chat coordinator and UI state
         realtime.ts             Centrifugo SDK and publication validation
         context.svelte.ts       application-tree chat context
+        ConversationActions.svelte sidebar menu, dialog visibility and return focus
         *.svelte                readable, cohesive UI components
         chat.css                feature styling
   service-worker/              static cache composition and generic push/click presentation
@@ -261,6 +268,25 @@ lifetime. Stable attachment metadata belongs to the query cache. New membership
 episodes discard related drafts and fence late transfers. Signed URLs are ephemeral
 capabilities; they never become message fields or persistent cache records.
 
+Friendship changes serialize on a canonical pair advisory lock, including absent
+rows. Request transitions and two private `contacts.updated` outbox jobs commit
+atomically. Existing conversation operations lock their aggregate before pair
+locks; friendship-only operations never lock conversations. Sorted group candidate
+IDs establish deterministic ordering across multiple pairs. Direct creation locks
+its pair before inserting a new aggregate; its existing-row lookup is a plain read
+and does not lock or mutate that aggregate. It must not use an `ON CONFLICT`
+insertion for existing rows: PostgreSQL can wait for a sender updating that row,
+reversing the aggregate-before-pair lock order.
+
+Contacts use one authenticated `ContactsState` and query-cache observers. The
+existing personal socket prompts canonical refreshes without advancing any
+conversation cursor. Startup, reconnect and foreground reconciliation refresh
+contacts. A per-person relationship query gates the direct composer; a partial
+friend page is never used as an authorization snapshot. Friend-picker search pages
+have active query observers, so relationship invalidation refreshes their results.
+Query text and selected chips remain transient UI. Logout cancels queries,
+mutations and observers.
+
 ## Consistency and lifecycle
 
 - A realtime publication raises a target; only contiguous REST events advance the
@@ -335,3 +361,37 @@ Private group episodes, media limits and deployment configuration are documented
 `docs/operations/groups-and-media.md`. Summary authorization, latest-message metadata
 and unread counts share one repeatable-read transaction, so an old episode cannot
 be paired with content committed after removal or rejoining.
+
+## Workspace navigation
+
+The authenticated layout composes `ChatShell` for both `/app` and
+`/app/chats/:id`, keeping its list mounted when selecting conversations.
+`WorkspaceNavigation` supplies a 64px desktop rail with chat, contacts and settings
+destinations plus an account menu. Shared column widths and `PaneHeader` geometry
+keep page titles aligned. On narrow screens, lists show bottom navigation and an
+account trigger in the list header; details replace the list and expose a top-left
+parent action. Feature panes own scrolling.
+
+`settings/AccountMenu` owns the centered `ProfileDialog`; viewing and editing one's
+own profile never navigates into settings. Settings retains security, notifications,
+appearance and application controls. `PeerDetails` and `GroupDetails` stay local to
+the conversation, using a right-side panel on desktop and a bottom panel on mobile.
+The chat actions menu creates or joins groups; direct chats start from contact details.
+
+Contacts category and selected person are URL query parameters. Context remembers
+that destination for primary navigation and stores the list scroll offset, but
+Back/Forward and deep links derive selection from the URL. Settings retains its
+existing fragment IDs as category destinations and keeps hidden category forms
+mounted until the settings route is left; password drafts remain local.
+Contacts deep links load canonical pages until the selected record is found.
+Friend search observes server-filtered cache pages; request search loads remaining
+request pages because that endpoint has no query filter. Route cancellation stops
+pagination without cancelling shared cache reads. Incoming and outgoing requests
+share the same person-row list, with outgoing requests selected through its filter.
+
+`ChatContext.readingPositions` contains DOM anchors and offsets only, keyed by
+conversation and checked against membership identity. `MessageList` restores the
+anchor after history is ready; it still independently confirms rendered visibility
+before read acknowledgement. Membership changes remount the timeline, and identity
+teardown clears remembered positions. Settings return resumes the selected chat;
+explicit conversation Back opens `/app` and clears the selection.

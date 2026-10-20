@@ -1,5 +1,38 @@
 # Messages, history and personal conversation preferences
 
+## Finding people and starting conversations
+
+The Add friend dialog searches authenticated public profiles through
+`GET /api/v1/users/search?q=...`. It matches literal username and display-name
+fragments without case sensitivity, excludes the caller, and returns at most 20
+profiles. Exact matches precede prefixes and other substrings. Empty queries return
+no profiles; queries longer than 64 Unicode characters are rejected. The existing
+exact-username lookup remains available.
+
+Requests require the recipient's acceptance. Contacts at `/app/contacts` lists
+accepted friends and pending incoming/outgoing requests, with accept, decline,
+cancel and remove actions. A pending request creates no conversation. Crossed
+requests preserve the original recipient's explicit consent. Private
+`contacts.updated` hints refresh these lists and the incoming count; reconnect
+recovers missed hints. Reads are bounded to 50 rows with UUID keyset cursors.
+
+Direct chats open from a friend's contact detail and reuse the existing conversation.
+The group-creation picker uses `GET /api/v1/friends?q=...`, with pagination,
+to select accepted friends only. Users can select and remove up to 20 chips before
+submitting. Creation produces a group containing the caller as owner and selected
+users as members, including when only one friend is selected. The optional
+group name defaults to the selected display names, capped at 100 Unicode characters.
+Creation opens the resulting conversation. Errors retain the selection for retry;
+a successful creation is retained if a subsequent refresh/navigation fails.
+Search requests are debounced and aborted on query changes or dialog closure.
+
+Removing friendship preserves existing history and shared groups. Direct creation
+and new message writes require current friendship in the same transaction as the
+write. Already committed message retries still return the original acknowledgement.
+The composer retains drafts but disables sending and attachment selection when
+permission is absent or unresolved, offering Add friend or a failed-read retry.
+A new accepted request permits sending in the existing direct conversation again.
+
 ## Replies, edits and withdrawal
 
 Replies point to an authorized message in the same conversation. The preview follows
@@ -94,3 +127,27 @@ the API and worker together: the worker must understand the new message events a
 personal preference jobs. Keep a matching database/storage backup when upgrading;
 confirm schema compatibility before restoring older application binaries. The
 development Compose remains independent of the production process manager.
+
+## Workspace and return navigation
+
+Desktop presents a narrow icon rail beside a feature list and content pane.
+The shared rail, list width and header height remain stable between pages.
+Mobile shows primary destinations below each list, then replaces the list with
+details and a top-left Back action. Settings follows this same hierarchy.
+Settings categories show one panel at a time using
+`#settings-security`, `#settings-preferences` and
+`#settings-application` links. Category changes preserve form drafts while the
+settings route remains open; leaving it discards local password input.
+
+Contacts uses `/app/contacts?category=friends|incoming|outgoing` and optional
+`person=<id>` selection. Browser history and direct links follow those parameters.
+The primary Chat link resumes the selected conversation. The account menu exposes
+a centered personal-profile dialog and logout. Profile editing is available inside
+that dialog; settings has no duplicate profile entry. Conversation info opens
+locally in a right-side panel (bottom panel on mobile), preserving the chat draft.
+Contacts retains a search field across Friends and New friends. Each request is a
+person row, with accept/decline actions in its detail; a filter exposes sent requests
+and cancellation. Request details show actual account and timestamp fields.
+Returning to a previously read timeline restores its message anchor and draft;
+new messages follow automatically only when the reader was already at the bottom.
+Reading-position restoration does not itself mark any message read.

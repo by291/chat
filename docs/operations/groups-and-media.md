@@ -1,10 +1,25 @@
 # Private groups and SeaweedFS media
 
-Create or join a private group from the chat sidebar. Owners/admins can rename it
-and issue single-use invitations that expire after seven days. Owners can manage
+Start a private group from the chat list's group-actions menu and select accepted friends.
+The same menu offers joining through an invitation link or token. Add friends from
+Contacts; start direct chats from a friend's detail. Owners/admins
+can rename groups and issue single-use invitations that expire after seven days. Owners can manage
 admins, transfer ownership and remove members; members can leave. The owner must
 transfer ownership before leaving. Removing or demoting an issuer permanently
 revokes their outstanding invitations.
+
+Initial membership creation uses the existing group endpoint.
+`POST /api/v1/conversations/groups` accepts optional `member_ids`; omission preserves
+owner-only creation. Duplicate IDs and the caller's ID are removed. All selected
+users must be accepted friends of the creator, and the configured capacity includes the owner. The group, initial
+membership episodes (starting at sequence 1), creation event and outbox commit in
+one transaction. A validation failure creates none of them. Any current member may add their accepted friends through
+`POST /api/v1/conversations/{id}/members`, passing their current `membership_id`
+and `member_ids`. Active members and duplicate IDs are ignored. Friendships,
+capacity, new episodes, one membership event and its outbox commit atomically.
+Invalid additions leave the group unchanged. Group settings exposes this action
+to ordinary members as well as managers. Single-use invitations remain available
+for explicit-consent joins, including people who are not friends.
 
 Each join creates a membership episode. History starts at that join, and rejoining
 does not reveal messages from an earlier episode or the interval outside the group.
@@ -21,7 +36,7 @@ change an already running process.
 The composer accepts images and generic files, including file-only messages.
 Upload progress, cancel and retry share the authenticated session lifetime. A send
 freezes the ordered ready attachment IDs alongside its client message ID; retries
-must match that content. Settings uses the same upload flow for profile avatars.
+must match that content. The account profile dialog uses the same upload flow for avatars.
 
 ## Storage configuration
 

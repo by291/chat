@@ -1,13 +1,15 @@
 /* Final theme and mobile-navigation overrides; cascade order is intentional. */
 
 [data-theme='dark'] {
-  --surface: #182622;
-  --background: #101c18;
-  --line: #2c3c34;
-  --subtle-text: #91a89b;
-  --text: #dce9e1;
-  --soft: #243a30;
-  --brand: #67c4a6;
+  --surface: #202a2c;
+  --background: #172123;
+  --line: #344345;
+  --subtle-text: #9eb2ac;
+  --text: #e6f0ed;
+  --soft: #29493f;
+  --brand: #83d6bb;
+  --outgoing: #286956;
+  --shadow: #0003;
   --brand-hover: #4ab08f;
   --danger: #ed9da1;
   --warning-surface: #433625;

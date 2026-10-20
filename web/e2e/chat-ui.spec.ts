@@ -1,3 +1,6 @@
+import { startChatWith } from './fixtures';
+import { befriend } from '../tests/integration/support';
+import { sessionCookie } from './fixtures';
 import { test, expect, signup } from './fixtures';
 import { api, startWorker } from '../tests/integration/support';
 import type { Page, Browser } from '@playwright/test';
@@ -8,6 +11,7 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   const peer = await context.newPage();
   const a = await signup(page, stack);
   const b = await signup(peer, stack);
+  await befriend(stack, await sessionCookie(page), await sessionCookie(peer));
   await startWorker(stack);
   await expect(page.locator('.chat-shell')).toHaveAttribute(
     'data-connection',
@@ -17,20 +21,7 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
     'data-connection',
     'online',
   );
-  await page.getByRole('button', { name: '发起聊天', exact: true }).click();
-  await page.getByLabel('对方的用户名', { exact: true }).fill(b.username);
-  await page.getByRole('button', { name: '查找用户', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: '开始聊天', exact: true }),
-  ).toBeVisible();
-  const avatarBounds = await page
-    .getByRole('dialog')
-    .locator('[data-slot="avatar"]')
-    .boundingBox();
-  expect(avatarBounds).not.toBeNull();
-  expect(avatarBounds!.width).toBeCloseTo(avatarBounds!.height, 0);
-
-  await page.getByRole('button', { name: '开始聊天', exact: true }).click();
+  await startChatWith(page, b.username);
   await expect(page).toHaveURL(/\/app\/chats\//);
   const link = peer
     .getByRole('navigation', { name: '会话列表' })
@@ -197,7 +188,7 @@ test('HTML is displayed as plain text and the local theme survives reload', asyn
       peer.getByRole('log').getByText(text, { exact: true }),
     ).toBeVisible();
     await expect(peer.getByRole('log').locator('img')).toHaveCount(0);
-    await page.goto('/app/settings');
+    await page.goto('/app/settings#settings-preferences');
     await page.getByLabel('外观', { exact: true }).selectOption('dark');
     await page.reload();
     expect(

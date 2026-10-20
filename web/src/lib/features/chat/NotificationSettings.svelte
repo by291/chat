@@ -13,7 +13,7 @@
   <Dialog.Trigger aria-label="通知设置">
     {#snippet child({ props })}
       <Button variant="ghost" size="icon" class="size-9" {...props}>
-        <Bell size={17} />
+        <Bell class="size-5" />
       </Button>
     {/snippet}
   </Dialog.Trigger>

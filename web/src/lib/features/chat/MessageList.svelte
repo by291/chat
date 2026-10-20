@@ -1,8 +1,12 @@
 <script lang="ts">
   import { onMount, tick, untrack } from 'svelte';
+  import { beforeNavigate, afterNavigate } from '$app/navigation';
   import { ArrowDown, RotateCcw } from '@lucide/svelte';
 
   import { Button } from '#lib/components/ui/button/index.js';
+
+  import { useChat } from './context.svelte';
+  import { membershipId } from './models';
 
   import type { ChatSync } from './sync.svelte';
   import MessageBubble from './MessageBubble.svelte';
@@ -20,12 +24,25 @@
     userId: string;
   } = $props();
 
+  const chat = useChat();
+  const episode = untrack(() => membershipId(sync.current));
   let scroller: HTMLDivElement;
   let bottom: HTMLDivElement;
   let following = $state(true);
   let renderGeneration = 0;
   let renderedId = '';
   let renderedTarget: string | null = null;
+  let navigating = false;
+
+  // SvelteKit resets scrolling during navigation. Capture before that reset and
+  // ignore teardown scroll events, which no longer represent the reader's place.
+  beforeNavigate(() => {
+    rememberPosition();
+    navigating = true;
+  });
+  afterNavigate(() => {
+    navigating = false;
+  });
 
   // A received/cached message is not read until its rendered bottom is inside
   // the focused visible viewport. Every DOM update invalidates this confirmation.
@@ -49,10 +66,53 @@
     );
   }
 
+  function rememberPosition() {
+    if (
+      !scroller ||
+      !scroller.isConnected ||
+      navigating ||
+      sync.loading ||
+      sync.selectedId !== id ||
+      sync.history.contextual
+    )
+      return;
+    const top = scroller.getBoundingClientRect().top;
+    const anchor = Array.from(
+      scroller.querySelectorAll<HTMLElement>('[data-message-id]'),
+    ).find((element) => element.getBoundingClientRect().bottom > top);
+    chat.readingPositions.set(id, {
+      membershipId: episode,
+      anchorId: anchor?.dataset.messageId,
+      offset: anchor ? anchor.getBoundingClientRect().top - top : 0,
+      scrollTop: scroller.scrollTop,
+      following,
+    });
+  }
+
+  function restorePosition() {
+    const saved = chat.readingPositions.get(id);
+    if (!saved || saved.membershipId !== episode || saved.following) {
+      following = true;
+      scroller.scrollTop = scroller.scrollHeight;
+      return;
+    }
+    following = false;
+    const anchor = saved.anchorId
+      ? document.getElementById(`message-${saved.anchorId}`)
+      : null;
+    scroller.scrollTop = anchor
+      ? scroller.scrollTop +
+        anchor.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top -
+        saved.offset
+      : saved.scrollTop;
+  }
+
   function handleScroll() {
     following =
       scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight <
       FOLLOW_LATEST_TOLERANCE_PX;
+    rememberPosition();
     confirmRenderedVisibility();
   }
 
@@ -103,12 +163,12 @@
     // Scrolling alone must not schedule another render/auto-scroll cycle.
     const wasFollowing = untrack(() => following);
     const changed = renderedId !== conversation;
-    renderedId = conversation;
     void tick().then(() => {
       if (
         generation !== renderGeneration ||
         sync.selectedId !== conversation ||
-        !scroller
+        !scroller ||
+        sync.loading
       ) {
         return;
       }
@@ -119,16 +179,21 @@
           element?.scrollIntoView({ block: 'center' });
           element?.focus({ preventScroll: true });
         }
-      } else if (changed || wasFollowing) {
+      } else if (changed) {
+        // Restore only after the canonical history is ready. An anchor keeps the
+        // same message visible even if new records arrived while this route slept.
+        untrack(restorePosition);
+      } else if (wasFollowing) {
         scroller.scrollTop = scroller.scrollHeight;
       }
+      renderedId = conversation;
       confirmRenderedVisibility();
     });
   });
 
   onMount(() => {
     const observer = new ResizeObserver(() => {
-      if (following && !sync.history.contextual) {
+      if (renderedId && following && !sync.history.contextual) {
         scroller.scrollTop = scroller.scrollHeight;
       }
       confirmRenderedVisibility();

@@ -41,7 +41,7 @@ test('captured recovery mail resets once, ignores scanner visits and disconnects
   await page.getByLabel('密码', { exact: true }).fill('correct horse battery');
   await page.getByRole('button', { name: '创建账号', exact: true }).click();
   await expect(page).toHaveURL(/\/app/);
-  await page.goto('/app/settings');
+  await page.goto('/app/settings#settings-security');
   await page
     .getByRole('textbox', { name: '恢复邮箱', exact: true })
     .fill('recover@example.test');

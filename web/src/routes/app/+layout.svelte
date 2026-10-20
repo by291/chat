@@ -2,12 +2,12 @@
   import { onMount, untrack, type Snippet } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { MessageCircle, Settings2, LogOut } from '@lucide/svelte';
   import { QueryClientProvider } from '@tanstack/svelte-query';
 
-  import * as Avatar from '#lib/components/ui/avatar/index.js';
-  import { Button } from '#lib/components/ui/button/index.js';
   import { api } from '#lib/api-client';
+
+  import { provideContacts } from '#lib/features/contacts/context.svelte.ts';
+  import { ContactsState } from '#lib/features/contacts/contacts.svelte.ts';
 
   import { auth } from '#lib/features/auth/session.svelte.ts';
   import { createQueryClient } from '#lib/features/chat/cache.ts';
@@ -15,6 +15,8 @@
   import { createChatSync } from '#lib/features/chat/sync.svelte.ts';
   import { createRealtimeTransport } from '#lib/features/chat/realtime.ts';
   import { provideChat } from '#lib/features/chat/context.svelte.ts';
+  import ChatShell from '#lib/features/chat/ChatShell.svelte';
+  import WorkspaceNavigation from '#lib/features/chat/WorkspaceNavigation.svelte';
   import NotificationCenter from '#lib/features/chat/NotificationCenter.svelte';
   import UpdateNotice from '#lib/features/pwa/UpdateNotice.svelte';
   import { provideBackgroundPush } from '#lib/features/notifications/context.svelte.ts';
@@ -31,13 +33,15 @@
 
   const queryClient = createQueryClient();
   const chat = provideChat();
+  const contacts = provideContacts();
   const backgroundPush = provideBackgroundPush();
-
-  let error = $state('');
 
   // Profile revalidation replaces the user object. Only an identity change may
   // recreate the coordinator, otherwise the same user's unsent drafts are lost.
   const authenticatedId = $derived(auth.user?.id);
+  const isChatRoute = $derived(
+    page.url.pathname === '/app' || page.url.pathname.startsWith('/app/chats/'),
+  );
   const hasDraft = $derived(
     Object.values(chat.sync?.drafts ?? {}).some((text) => !!text) ||
       !!chat.sync?.actions.editingId,
@@ -50,16 +54,6 @@
       false,
   );
 
-  async function logout() {
-    try {
-      await backgroundPush.owner?.disable();
-      await auth.logout();
-      await goto('/login');
-    } catch (reason) {
-      error = reason instanceof Error ? reason.message : '退出失败';
-    }
-  }
-
   onMount(() => {
     void auth.restore();
 
@@ -70,6 +64,7 @@
       await auth.restore();
       if (document.visibilityState === 'visible') {
         await chat.sync?.refresh();
+        await contacts.owner?.refresh();
       }
     };
     const interval = setInterval(restore, SESSION_REFRESH_INTERVAL_MS);
@@ -139,11 +134,16 @@
       return;
     }
 
+    const contactOwner = new ContactsState({ queryClient, userId });
+    contacts.owner = contactOwner;
+    untrack(() => void contactOwner.start());
     const sync = createChatSync({
       api: createChatApi(api),
       transport: createRealtimeTransport(userId, () => auth.reset()),
       queryClient,
       userId,
+      onContactsChanged: () => void contactOwner.refresh(),
+      onReconnect: () => void contactOwner.refresh(),
     });
     chat.sync = sync;
     // Starting reads reactive coordination fields; these must not become effect
@@ -151,8 +151,13 @@
     untrack(() => void sync.start());
 
     return () => {
+      contactOwner.stop();
+      contacts.owner = null;
+      contacts.view = { category: 'friends', selectedId: null, scrollTop: 0 };
       sync.stop();
       chat.sync = null;
+      chat.listView = { filter: '', archived: false, scrollTop: 0 };
+      chat.readingPositions.clear();
     };
   });
 </script>
@@ -160,40 +165,12 @@
 {#if auth.user}
   <QueryClientProvider client={queryClient}>
     <div class="app-frame">
-      <nav class="app-rail" aria-label="主导航">
-        <a class="brand-mark" href="/app" aria-label="聊天">
-          <MessageCircle size={24} />
-        </a>
-        <div class="rail-bottom">
-          <Button
-            variant="ghost"
-            size="icon"
-            href="/app/settings"
-            aria-label="设置"
-          >
-            <Settings2 size={22} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="退出登录"
-            onclick={logout}
-          >
-            <LogOut size={21} />
-          </Button>
-          <Avatar.Root size="sm" title={auth.user.display_name}>
-            <Avatar.Fallback>
-              {auth.user.display_name.slice(0, 1)}
-            </Avatar.Fallback>
-          </Avatar.Root>
-        </div>
-      </nav>
+      <WorkspaceNavigation />
       <div class="app-content">
-        {@render children()}
-        {#if error}
-          <p class="toast error" role="alert">
-            {error}
-          </p>
+        {#if isChatRoute}
+          <ChatShell id={page.params.id ?? null} />
+        {:else}
+          {@render children()}
         {/if}
       </div>
       {#if chat.sync}

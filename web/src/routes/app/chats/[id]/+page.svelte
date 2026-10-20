@@ -1,7 +1,1 @@
-<script lang="ts">
-  import { page } from '$app/state';
-
-  import ChatShell from '#lib/features/chat/ChatShell.svelte';
-</script>
-
-<ChatShell id={page.params.id} />
+<!-- The authenticated layout composes the selected chat from the route parameter. -->

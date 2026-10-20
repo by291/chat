@@ -64,15 +64,51 @@ test('three browsers manage a private group and rejoining hides the old episode'
       'online',
     );
 
-    await page.getByRole('button', { name: '创建或加入群聊' }).click();
-    await page.getByLabel('群名称', { exact: true }).fill('三人项目组');
-    await page.getByRole('button', { name: '创建群聊', exact: true }).click();
-    await expect(page).toHaveURL(/\/app\/chats\//);
-    const id = page.url().split('/').at(-1)!;
+    // This history-isolation scenario needs an initially owner-only fixture.
+    // The group picker separately covers creating populated groups.
+    const created = await api(
+      stack,
+      await cookie(page),
+      '/conversations/groups',
+      'POST',
+      { title: '三人项目组' },
+    );
+    expect(created.status).toBe(201);
+    const { id } = await created.json();
+    await page.goto(`/app/chats/${id}`);
     await send(page, '加入之前的私人消息');
 
-    await join(member, await invite(page));
-    await join(guest, await invite(page));
+    const firstInvite = new URL(await invite(page)).searchParams.get('invite')!;
+    await member.getByRole('button', { name: '群聊操作', exact: true }).click();
+    await member
+      .getByRole('menuitem', { name: '加入群聊', exact: true })
+      .click();
+    const joinDialog = member.getByRole('dialog');
+    await expect(
+      joinDialog.getByRole('button', { name: '加入群聊', exact: true }),
+    ).toBeDisabled();
+    await joinDialog
+      .getByLabel('邀请链接或口令', { exact: true })
+      .fill(firstInvite);
+    await joinDialog
+      .getByRole('button', { name: '加入群聊', exact: true })
+      .click();
+    await expect(joinDialog).not.toBeVisible();
+    await expect(member).toHaveURL(new RegExp(`/app/chats/${id}$`));
+    const secondInvite = await invite(page);
+    await guest.getByRole('button', { name: '群聊操作', exact: true }).click();
+    await guest
+      .getByRole('menuitem', { name: '加入群聊', exact: true })
+      .click();
+    const guestDialog = guest.getByRole('dialog');
+    await guestDialog
+      .getByLabel('邀请链接或口令', { exact: true })
+      .fill(secondInvite);
+    await guestDialog
+      .getByRole('button', { name: '加入群聊', exact: true })
+      .click();
+    await expect(guestDialog).not.toBeVisible();
+    await expect(guest).toHaveURL(new RegExp(`/app/chats/${id}$`));
     await expect(
       member.getByRole('log').getByText('加入之前的私人消息'),
     ).toHaveCount(0);

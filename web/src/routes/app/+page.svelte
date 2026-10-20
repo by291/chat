@@ -1,5 +1,1 @@
-<script lang="ts">
-  import ChatShell from '#lib/features/chat/ChatShell.svelte';
-</script>
-
-<ChatShell />
+<!-- The authenticated layout keeps the chat workspace stable across chat routes. -->

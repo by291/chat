@@ -1,3 +1,4 @@
+import { befriend } from '../tests/integration/support';
 import { test, expect, signup } from './fixtures';
 import { account, api } from '../tests/integration/support';
 
@@ -16,6 +17,7 @@ test('a reaction changes neither the edited label nor unread order and converges
   const authorCookie = `${cookie.name}=${cookie.value}`;
   const author = await (await api(stack, authorCookie, '/auth/me')).json();
   const peer = await account(stack);
+  await befriend(stack, authorCookie, peer.cookie);
   const conversation = await (
     await api(stack, authorCookie, '/conversations/direct', 'POST', {
       peer_id: peer.user.id,

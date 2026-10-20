@@ -1,3 +1,5 @@
+import { befriend } from '../tests/integration/support';
+import { sessionCookie } from './fixtures';
 import { randomUUID } from 'node:crypto';
 
 import type { Page } from '@playwright/test';
@@ -42,6 +44,11 @@ for (const kind of ['direct', 'group'] as const) {
     try {
       await signup(page, stack);
       const recipientAccount = await signup(recipient, stack);
+      await befriend(
+        stack,
+        await sessionCookie(page),
+        await sessionCookie(recipient),
+      );
       await startWorker(stack);
       const publications: string[] = [];
       second.on('websocket', (socket) =>
@@ -81,7 +88,7 @@ for (const kind of ['direct', 'group'] as const) {
       );
       await second.getByRole('link', { name: '设置', exact: true }).click();
       await expect(
-        second.getByRole('heading', { name: '个人设置', exact: true }),
+        second.getByRole('heading', { name: '设置', exact: true }),
       ).toBeVisible();
 
       const gate = new Promise<void>((resolve) => {

@@ -1,3 +1,6 @@
+import { startChatWith } from './fixtures';
+import { befriend } from '../tests/integration/support';
+import { sessionCookie } from './fixtures';
 import { test, expect, signup } from './fixtures';
 import {
   api,
@@ -17,6 +20,7 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
   const peer = await context.newPage();
   const a = await signup(page, stack),
     b = await signup(peer, stack);
+  await befriend(stack, await sessionCookie(page), await sessionCookie(peer));
   await startWorker(stack);
   await expect(page.locator('.chat-shell')).toHaveAttribute(
     'data-connection',
@@ -26,18 +30,15 @@ async function pair(page: Page, browser: Browser, stack: IntegrationStack) {
     'data-connection',
     'online',
   );
-  await page.getByRole('button', { name: '发起聊天', exact: true }).click();
-  await page.getByLabel('对方的用户名', { exact: true }).fill(b.username);
-  await page.getByRole('button', { name: '查找用户', exact: true }).click();
-  await page.getByRole('button', { name: '开始聊天', exact: true }).click();
+  await startChatWith(page, b.username);
   await expect(page).toHaveURL(/\/app\/chats\//);
-  await expect(
-    peer.getByRole('navigation', { name: '会话列表' }).getByRole('link'),
-  ).toHaveCount(1);
-  await peer
+  const peerConversation = peer
     .getByRole('navigation', { name: '会话列表' })
     .getByRole('link')
-    .click();
+    .filter({ hasText: a.username });
+  await expect(peerConversation).toBeVisible();
+  await peerConversation.click();
+  await expect(peer).toHaveURL(/\/app\/chats\//);
   const id = page.url().split('/').at(-1)!;
   return { context, peer, a, b, id };
 }
@@ -51,6 +52,7 @@ async function cookie(page: Page) {
 
 async function send(page: Page, body: string) {
   await page.getByRole('textbox', { name: '输入消息' }).fill(body);
+  await expect(page.getByRole('button', { name: '发送消息' })).toBeEnabled();
   await page.getByRole('textbox', { name: '输入消息' }).press('Enter');
 }
 

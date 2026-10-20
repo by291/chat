@@ -87,24 +87,15 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
   test.setTimeout(
     process.env.CHAT_DEPLOYMENT_MAIL_CAPTURE_ORIGIN ? 180000 : 90000,
   );
-  const invitations = [
-    process.env.CHAT_DEPLOYMENT_INVITE_1,
-    process.env.CHAT_DEPLOYMENT_INVITE_2,
-  ];
-  if (invitations.some((token) => !token)) {
-    throw new Error(
-      'Provide two fresh staging invitation tokens; deployment tests do not access a database',
-    );
-  }
   const other = await browser.newContext({
     ignoreHTTPSErrors: process.env.CHAT_DEPLOYMENT_INSECURE_TLS === 'true',
     baseURL: appOrigin,
   });
   const peer = await other.newPage();
 
-  async function signup(target: typeof page, invitation: string) {
+  async function signup(target: typeof page) {
     const username = `p${randomBytes(5).toString('hex')}`;
-    await target.goto(`/register?invite=${encodeURIComponent(invitation)}`);
+    await target.goto('/register');
     await target.getByLabel('用户名', { exact: true }).fill(username);
     await target.getByLabel('昵称', { exact: true }).fill('HTTPS 用户');
     await target.getByLabel('密码', { exact: true }).fill('abc123');
@@ -114,8 +105,8 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
   }
 
   try {
-    const ownerUsername = await signup(page, invitations[0]!);
-    const username = await signup(peer, invitations[1]!);
+    const ownerUsername = await signup(page);
+    const username = await signup(peer);
     await expect(page.locator('.chat-shell')).toHaveAttribute(
       'data-connection',
       'online',
@@ -132,18 +123,49 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
     expect(cookie.sameSite).toBe('Lax');
     expect(cookie.path).toBe('/');
 
-    await page.getByRole('button', { name: '发起聊天', exact: true }).click();
-    await page.getByLabel('对方的用户名', { exact: true }).fill(username);
-    await page.getByRole('button', { name: '查找用户', exact: true }).click();
-    await page.getByRole('button', { name: '开始聊天', exact: true }).click();
-    await expect(page).toHaveURL(/\/app\/chats\//);
-    await expect(
-      peer.getByRole('navigation', { name: '会话列表' }).getByRole('link'),
-    ).toHaveCount(1);
+    await page.getByRole('link', { name: '通讯录', exact: true }).click();
+    await page
+      .getByRole('complementary', { name: '通讯录列表' })
+      .getByRole('button', { name: '添加好友', exact: true })
+      .click();
+    await page.getByLabel('用户名或昵称').fill(username);
+    await page
+      .getByRole('button')
+      .filter({ hasText: '@' + username })
+      .click();
+    await page
+      .getByRole('button', { name: '发送好友申请', exact: true })
+      .click();
+    await page.getByRole('button', { name: '关闭', exact: true }).click();
+    await peer.getByRole('link', { name: '通讯录，1 条好友申请' }).click();
     await peer
+      .getByRole('button', { name: '新的朋友（1）', exact: true })
+      .click();
+    await peer
+      .getByRole('list', { name: '新的朋友' })
+      .getByRole('button')
+      .click();
+    await peer.getByRole('button', { name: '接受', exact: true }).click();
+    await peer
+      .getByRole('navigation', { name: '主导航' })
+      .getByRole('link', { name: '聊天', exact: true })
+      .click();
+
+    await page.getByRole('button', { name: '好友', exact: true }).click();
+    await page
+      .getByRole('list', { name: '好友' })
+      .getByRole('button')
+      .filter({ hasText: '@' + username })
+      .click();
+    await page.getByRole('button', { name: '发消息', exact: true }).click();
+    await expect(page).toHaveURL(/\/app\/chats\//);
+    const peerConversation = peer
       .getByRole('navigation', { name: '会话列表' })
       .getByRole('link')
-      .click();
+      .filter({ hasText: ownerUsername });
+    await expect(peerConversation).toBeVisible();
+    await peerConversation.click();
+    await expect(peer).toHaveURL(/\/app\/chats\//);
     await page
       .getByRole('textbox', { name: '输入消息' })
       .fill('经过 HTTPS 的真实消息');
@@ -225,6 +247,9 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
     expect(policy).toContain(mediaOrigin);
     expect(policy).toContain('blob:');
     await page.goto('/app/settings');
+    await page.getByRole('button', { name: '我的账号', exact: true }).click();
+    await page.getByRole('menuitem', { name: '个人资料', exact: true }).click();
+    await page.getByRole('button', { name: '编辑资料', exact: true }).click();
     await page.getByLabel('选择头像', { exact: true }).setInputFiles(sample);
     await expect(page.getByText('已就绪', { exact: true })).toBeVisible({
       timeout: 15000,
@@ -233,6 +258,10 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
     await expect(
       page.getByRole('img', { name: 'HTTPS 用户的头像', exact: true }),
     ).toBeVisible();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: '关闭', exact: true })
+      .click();
     let currentPassword = 'abc123';
     const mailbox = process.env.CHAT_DEPLOYMENT_MAILBOX;
     const captureOrigin = process.env.CHAT_DEPLOYMENT_MAIL_CAPTURE_ORIGIN;
@@ -241,6 +270,10 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
         'Configure both consenting mailbox and HTTPS mail capture origin, or neither',
       );
     if (mailbox && captureOrigin) {
+      await page
+        .getByRole('navigation', { name: '设置分类' })
+        .getByRole('link', { name: '账号安全' })
+        .click();
       const capture = new URL(captureOrigin);
       if (
         capture.protocol !== 'https:' ||
@@ -334,6 +367,10 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
       await expect(page).toHaveURL(/\/app/);
       await page.goto('/app/settings');
     }
+    await page
+      .getByRole('navigation', { name: '设置分类' })
+      .getByRole('link', { name: '账号安全' })
+      .click();
     await page.getByLabel('当前密码', { exact: true }).fill(currentPassword);
     await page
       .getByLabel('新密码', { exact: true })

@@ -133,8 +133,26 @@ export function createChatApi(api: ApiClient): ChatApi {
 /** Group mutations carry the caller's current episode; stale dialogs cannot use a rejoin. */
 export function createGroupApi(api: ApiClient = sharedApi) {
   return {
-    create: (title: string) =>
-      unwrap(api.POST('/api/v1/conversations/groups', { body: { title } })),
+    create: (title: string, member_ids: string[] = [], signal?: AbortSignal) =>
+      unwrap(
+        api.POST('/api/v1/conversations/groups', {
+          body: { title, member_ids },
+          signal,
+        }),
+      ),
+    addMembers: (
+      id: string,
+      membership_id: string,
+      member_ids: string[],
+      signal?: AbortSignal,
+    ) =>
+      unwrap(
+        api.POST('/api/v1/conversations/{id}/members', {
+          params: { path: { id } },
+          body: { membership_id, member_ids },
+          signal,
+        }),
+      ),
     rename: (id: string, membership_id: string, title: string) =>
       unwrap(
         api.PATCH('/api/v1/conversations/{id}/group', {
@@ -189,24 +207,32 @@ export function createGroupApi(api: ApiClient = sharedApi) {
           body: { membership_id },
         }),
       ),
-    accept: (token: string) =>
-      unwrap(api.POST('/api/v1/group-invitations/accept', { body: { token } })),
+    accept: (invitation: string, signal?: AbortSignal) => {
+      let token = invitation.trim();
+      try {
+        token = new URL(token).searchParams.get('invite') ?? token;
+      } catch {
+        // Plain invitation tokens are not URLs and are sent unchanged.
+      }
+      return unwrap(
+        api.POST('/api/v1/group-invitations/accept', {
+          body: { token },
+          signal,
+        }),
+      );
+    },
   };
-}
-
-export function findUser(username: string, api: ApiClient = sharedApi) {
-  return unwrap(
-    api.GET('/api/v1/users/by-username/{username}', {
-      params: { path: { username } },
-    }),
-  );
 }
 
 export function startDirectConversation(
   peerId: string,
   api: ApiClient = sharedApi,
+  signal?: AbortSignal,
 ) {
   return unwrap(
-    api.POST('/api/v1/conversations/direct', { body: { peer_id: peerId } }),
+    api.POST('/api/v1/conversations/direct', {
+      body: { peer_id: peerId },
+      signal,
+    }),
   );
 }

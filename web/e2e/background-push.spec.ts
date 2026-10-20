@@ -1,3 +1,4 @@
+import { befriend } from '../tests/integration/support';
 import { test as base, expect, type BrowserContext } from '@playwright/test';
 
 import { TestPushProvider } from '../tests/integration/push-support';
@@ -77,7 +78,9 @@ test('push controls recover after a delayed first service-worker registration wi
 
   try {
     const configured = page.waitForResponse('**/api/v1/notifications/config');
-    await page.goto('/app/settings', { waitUntil: 'domcontentloaded' });
+    await page.goto('/app/settings#settings-preferences', {
+      waitUntil: 'domcontentloaded',
+    });
     await requesting;
     await configured;
     await expect(
@@ -120,6 +123,7 @@ test('an enabled device survives a same-session SPA trip out of the application 
   await page.goto('/login');
   await expect(page).toHaveURL(/\/app/);
   await page.getByRole('link', { name: '设置', exact: true }).click();
+  await page.getByRole('link', { name: '通知外观', exact: true }).click();
   await page.getByRole('button', { name: '启用后台推送' }).click();
   await expect(
     page.getByRole('button', { name: '关闭后台推送' }),
@@ -135,6 +139,7 @@ test('an enabled device survives a same-session SPA trip out of the application 
   });
   await expect(page).toHaveURL(/\/app$/);
   await page.getByRole('link', { name: '设置', exact: true }).click();
+  await page.getByRole('link', { name: '通知外观', exact: true }).click();
 
   await expect(
     page.getByRole('button', { name: '关闭后台推送' }),
@@ -229,7 +234,7 @@ test('controlled browser enrollment uses real REST, encrypted TLS delivery and a
       ),
     )
     .toBe('activated');
-  await page.goto('/app/settings');
+  await page.goto('/app/settings#settings-preferences');
   expect(await page.evaluate(() => Notification.permission)).toBe('granted');
   await expect(
     page.getByRole('button', { name: '启用后台推送' }),
@@ -252,6 +257,7 @@ test('controlled browser enrollment uses real REST, encrypted TLS delivery and a
   )!;
   const receiver = `${receiverCookie.name}=${receiverCookie.value}`;
   const current = await (await api(stack, receiver, '/auth/me')).json();
+  await befriend(stack, peer.cookie, receiver);
   const conversation = await (
     await api(stack, peer.cookie, '/conversations/direct', 'POST', {
       peer_id: current.id,
@@ -346,7 +352,8 @@ test('controlled browser enrollment uses real REST, encrypted TLS delivery and a
   });
   expect(privateCaches).toEqual([]);
 
-  await page.getByRole('button', { name: '退出登录' }).click();
+  await page.getByRole('button', { name: '我的账号', exact: true }).click();
+  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click();
   await expect(page).toHaveURL('/login');
   await expect
     .poll(() =>
@@ -363,7 +370,7 @@ test('controlled browser enrollment uses real REST, encrypted TLS delivery and a
   );
   expect(old.rows[0].revoked_at).not.toBeNull();
   await signup(page, stack);
-  await page.goto('/app/settings');
+  await page.goto('/app/settings#settings-preferences');
   await page.getByRole('button', { name: '启用后台推送' }).click();
   await expect(
     page.getByRole('button', { name: '关闭后台推送' }),

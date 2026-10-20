@@ -1,4 +1,4 @@
-import { test, expect, signup } from './fixtures';
+import { test, expect, signup, editOwnProfile } from './fixtures';
 import { api } from '../tests/integration/support';
 
 test('login keyboard navigation reaches password before recovery and submit', async ({
@@ -34,7 +34,7 @@ test('six-character password registers, logs in and restores identity', async ({
   const credentials = await signup(page, stack, 'abc123');
   await page.reload();
   await expect(
-    page.getByRole('button', { name: '退出登录', exact: true }),
+    page.getByRole('button', { name: '我的账号', exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(() => localStorage.getItem('session_token')),
@@ -42,12 +42,13 @@ test('six-character password registers, logs in and restores identity', async ({
   expect(await page.evaluate(() => document.cookie)).not.toContain(
     'chat_session',
   );
-  await page.goto('/app/settings');
+  await page.goto('/app/settings#settings-security');
   await expect(page.getByRole('heading', { name: '登录设备' })).toBeVisible();
   await expect(page.getByText('当前设备', { exact: true })).toBeVisible();
   expect(await page.locator('body').innerText()).not.toContain('token_hash');
 
-  await page.getByRole('button', { name: '退出登录', exact: true }).click();
+  await page.getByRole('button', { name: '我的账号', exact: true }).click();
+  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click();
   await expect(page).toHaveURL(/\/login/);
   await page.getByLabel('用户名', { exact: true }).fill(credentials.username);
   await page.getByLabel('密码', { exact: true }).fill(credentials.password);
@@ -55,7 +56,7 @@ test('six-character password registers, logs in and restores identity', async ({
 
   await expect(page).toHaveURL(/\/app/);
   await expect(
-    page.getByRole('button', { name: '退出登录', exact: true }),
+    page.getByRole('button', { name: '我的账号', exact: true }),
   ).toBeVisible();
 });
 
@@ -94,11 +95,12 @@ test('profile keeps Unicode and unauthenticated app visits redirect', async ({
   await page.goto('/app');
   await expect(page).toHaveURL(/\/login/);
   await signup(page, stack);
-  await page.goto('/app/settings');
+  await editOwnProfile(page);
   await page.getByLabel('昵称', { exact: true }).fill('中文昵称 🪁');
   await page.getByRole('button', { name: '保存资料', exact: true }).click();
   await expect(page.getByText('资料已保存', { exact: true })).toBeVisible();
   await page.reload();
+  await editOwnProfile(page);
   await expect(page.getByLabel('昵称', { exact: true })).toHaveValue(
     '中文昵称 🪁',
   );

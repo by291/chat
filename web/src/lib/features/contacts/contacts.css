@@ -1,0 +1,255 @@
+/* Contacts share the workspace columns; this feature owns its list and detail views. */
+.contacts-shell {
+  height: 100%;
+}
+
+.contacts-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+.contacts-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 26px 20px 20px;
+}
+
+.contacts-heading p {
+  margin-top: 5px;
+  font-size: var(--font-caption);
+}
+
+.contacts-heading h1 {
+  font-size: 23px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.contact-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr 28px;
+  gap: 4px;
+  margin: 10px var(--workspace-list-inset);
+  padding: 4px;
+  background: var(--background);
+  border-radius: 10px;
+}
+
+.contact-tabs [data-slot='button'] {
+  height: 32px;
+  min-height: 32px;
+  padding: 4px;
+  font-size: 13px;
+  white-space: normal;
+}
+
+.contacts-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 16px;
+}
+
+.contact-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.contacts-sidebar .contact-entry {
+  width: 100%;
+  height: auto;
+  min-height: 76px;
+  padding: 12px 8px;
+  gap: 12px;
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+}
+
+.contact-entry[aria-pressed='true'] {
+  box-shadow: inset 3px 0 var(--brand);
+  background: var(--soft);
+}
+
+.contact-copy {
+  min-width: 0;
+}
+
+.contact-copy strong,
+.contact-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-copy strong {
+  font-size: 14px;
+}
+
+.contact-copy small {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--subtle-text);
+}
+
+.contact-empty {
+  padding: 48px 16px;
+  color: var(--subtle-text);
+  text-align: center;
+}
+
+.contacts-feedback {
+  padding: 8px 24px;
+}
+
+.contacts-load-more {
+  margin: 16px 12px 0;
+}
+
+.contact-detail-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.contact-detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 80px;
+  padding: 20px 32px;
+}
+
+.contact-detail-heading h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.contact-profile {
+  margin: 32px auto;
+  width: calc(100% - 48px);
+  max-width: 620px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.contact-identity {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.contact-identity h3 {
+  font-size: 24px;
+  font-weight: 650;
+}
+.contact-identity p {
+  margin-top: 6px;
+}
+.contact-facts {
+  padding: 8px 28px;
+}
+.contact-facts > div {
+  display: flex;
+  gap: 24px;
+  padding: 16px 0;
+}
+.contact-facts dt {
+  flex: 0 0 80px;
+  color: var(--subtle-text);
+}
+.contact-facts dd {
+  min-width: 0;
+}
+.contact-profile > p {
+  margin: 12px 28px;
+}
+.contact-request-status {
+  color: var(--subtle-text);
+}
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 28px 28px;
+}
+
+.contacts-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+  color: var(--subtle-text);
+}
+
+.contacts-placeholder h2 {
+  font-size: 23px;
+  color: var(--text);
+}
+
+.contacts-back {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .contacts-sidebar {
+    border-right: 0;
+  }
+
+  .contacts-heading {
+    padding: 20px 16px;
+  }
+
+  .contacts-heading p {
+    margin-top: 5px;
+    font-size: var(--font-caption);
+  }
+
+  .contacts-heading h1 {
+    font-size: 23px;
+  }
+
+  .contact-detail-panel {
+    display: none;
+  }
+
+  .has-contact .contacts-sidebar {
+    display: none;
+  }
+
+  .has-contact .contact-detail-panel {
+    display: flex;
+  }
+
+  .contact-detail-heading {
+    padding: 16px;
+    min-height: 76px;
+  }
+
+  .contacts-back {
+    display: inline-flex;
+  }
+}
+
+.contact-tabs [aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--brand);
+  box-shadow: 0 1px 4px var(--shadow);
+}

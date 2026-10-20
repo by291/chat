@@ -6,6 +6,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Keep fallback avatar colors stable across lists, profiles and chat headers. */
+export function avatarTone(identity: string): number {
+  return (
+    Array.from(identity).reduce(
+      (hash, character) => (hash * 31 + character.charCodeAt(0)) >>> 0,
+      0,
+    ) % 4
+  );
+}
+
 export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & {
   ref?: U | null;
 };

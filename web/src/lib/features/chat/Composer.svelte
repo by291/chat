@@ -1,4 +1,9 @@
 <script lang="ts">
+  import type { QueryObserverResult } from '@tanstack/svelte-query';
+  import { useContacts } from '#lib/features/contacts/context.svelte.ts';
+  import type { Relationship } from '#lib/features/contacts/api.ts';
+  import AddFriendDialog from '#lib/features/contacts/AddFriendDialog.svelte';
+
   import { Send, Paperclip, X } from '@lucide/svelte';
 
   import { Button } from '#lib/components/ui/button/index.js';
@@ -8,7 +13,7 @@
   import UploadList from '#lib/features/media/UploadList.svelte';
 
   import type { ChatSync } from './sync.svelte';
-  import { membershipId } from './models';
+  import { membershipId, isGroup } from './models';
 
   const MAX_MESSAGE_CHARACTERS = 4_096;
   const CHARACTER_WARNING_THRESHOLD = 3_500;
@@ -21,6 +26,27 @@
     sync: ChatSync;
     id: string;
   } = $props();
+
+  const contacts = useContacts();
+  let relationship = $state.raw<QueryObserverResult<Relationship>>();
+  let addOpen = $state(false);
+  const peer = $derived(
+    sync.current && !isGroup(sync.current) ? sync.current.peer : undefined,
+  );
+  const allowed = $derived(
+    isGroup(sync.current) ||
+      (relationship?.data?.is_friend === true &&
+        !relationship.isError &&
+        !relationship.isFetching),
+  );
+
+  $effect(() => {
+    const owner = contacts.owner;
+    const userId = peer?.id;
+    relationship = undefined;
+    if (owner && userId)
+      return owner.watchRelationship(userId, (value) => (relationship = value));
+  });
 
   let composing = false;
   // Component refs are bindable props; their assignment participates in Svelte's
@@ -35,7 +61,8 @@
   const attachmentIds = $derived(sync.uploads.readyIds(id));
   const attachmentsReady = $derived(entries.length === attachmentIds.length);
   const canSend = $derived(
-    (!!draft.trim() || !!attachmentIds.length) &&
+    allowed &&
+      (!!draft.trim() || !!attachmentIds.length) &&
       attachmentsReady &&
       characterCount <= MAX_MESSAGE_CHARACTERS &&
       !sync.loading,
@@ -47,7 +74,7 @@
     input.style.height = 'auto';
     input.style.height = `${Math.min(MAX_COMPOSER_HEIGHT_PX, input.scrollHeight)}px`;
 
-    void sync.setTyping(id, !!input.value.trim());
+    if (allowed) void sync.setTyping(id, !!input.value.trim());
   }
 
   function sendDraft() {
@@ -79,6 +106,28 @@
 </script>
 
 <div class="composer-wrap">
+  {#if peer && !allowed}
+    <div class="composer-hint" role="status">
+      {#if relationship?.isError}
+        <span>无法确认好友状态，暂时不能发送消息。</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onclick={() => contacts.owner?.refresh()}
+        >
+          重试
+        </Button>
+      {:else if !relationship?.data || relationship.isFetching}
+        <span>正在确认好友状态…</span>
+      {:else}
+        <span>你们还不是好友，添加后即可发送消息。</span>
+        <Button variant="ghost" size="sm" onclick={() => (addOpen = true)}>
+          添加好友
+        </Button>
+      {/if}
+    </div>
+    <AddFriendDialog bind:open={addOpen} user={peer} />
+  {/if}
   {#if sync.replyTarget}
     <div class="composer-reply" role="status">
       <div>
@@ -139,6 +188,7 @@
       variant="ghost"
       size="icon"
       aria-label="添加附件"
+      disabled={!allowed}
       onclick={() => files.click()}
     >
       <Paperclip size={19} />
@@ -171,8 +221,6 @@
       <span class:too-long={characterCount > MAX_MESSAGE_CHARACTERS}>
         {characterCount} / 4096
       </span>
-    {:else}
-      <span>好好说话，慢慢联系。</span>
     {/if}
   </div>
 </div>

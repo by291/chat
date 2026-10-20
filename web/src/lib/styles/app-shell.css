@@ -1,37 +1,132 @@
-/* Authenticated application frame and navigation rail. */
-
+/* One rail and consistent master/detail panes across workflows. */
 .app-frame {
+  --workspace-sidebar-width: 360px;
+  --workspace-header-height: 60px;
+  --workspace-list-inset: 16px;
   display: flex;
   height: 100dvh;
   overflow: hidden;
 }
-
-.app-rail {
-  width: 76px;
-  border-right: 1px solid var(--line);
+.workspace-rail {
   display: flex;
-  align-items: center;
   flex-direction: column;
-  background: var(--surface);
-  padding: 24px 0;
+  align-items: center;
   flex-shrink: 0;
+  gap: 20px;
+  width: 64px;
+  padding: 16px 6px;
+  background: color-mix(in srgb, var(--soft) 45%, var(--surface));
+  border-right: 1px solid var(--line);
 }
-
-.rail-bottom {
-  margin-top: auto;
+.workspace-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: var(--brand);
+  color: var(--primary-foreground);
+}
+.workspace-navigation {
   display: flex;
-  align-items: center;
-  gap: 16px;
   flex-direction: column;
+  align-items: center;
+  flex: 1;
+  gap: 10px;
+  width: 100%;
 }
-
+.workspace-navigation .workspace-link {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border-radius: 12px;
+  color: var(--subtle-text);
+}
+.workspace-navigation .workspace-link:last-child {
+  margin-top: auto;
+}
+.workspace-label {
+  display: none;
+}
+.workspace-navigation .workspace-link[aria-current='page'] {
+  color: var(--brand);
+  background: var(--soft);
+}
+.workspace-account {
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  color: var(--brand);
+  background: var(--soft);
+}
+.mobile-account {
+  display: none;
+}
+.workspace-badge {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 10px;
+  background: var(--brand);
+  color: var(--primary-foreground);
+  font-size: 10px;
+}
+.workspace-columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
 .app-content {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   position: relative;
   overflow: auto;
 }
-
+.pane-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--workspace-header-height);
+  flex-shrink: 0;
+  padding: 0 var(--workspace-list-inset);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.pane-title {
+  flex: 1;
+  min-width: 0;
+}
+.pane-title h1,
+.pane-title h2 {
+  font-size: 17px;
+  line-height: 1.4;
+  letter-spacing: -0.3px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pane-leading,
+.pane-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pane-leading:has(.mobile-back),
+.pane-leading:has(.contacts-back) {
+  display: none;
+}
+.pane-subtitle {
+  color: var(--subtle-text);
+  font-size: var(--font-caption);
+  margin-top: 3px;
+}
 .empty-page {
   height: 100%;
   display: flex;
@@ -42,18 +137,79 @@
   padding: 30px;
   text-align: center;
 }
-
 .empty-page h1 {
   font-size: 28px;
 }
-
 .empty-page p {
   font-size: 14px;
 }
-
 @media (max-width: 700px) {
-  .has-conversation ~ .app-rail,
-  .app-frame:has(.has-conversation) .app-rail {
+  .app-frame {
+    flex-direction: column;
+  }
+  .workspace-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace-rail {
+    order: 2;
+    width: 100%;
+    padding: 4px 12px max(4px, env(safe-area-inset-bottom));
+    border-right: 0;
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .workspace-brand,
+  .rail-account {
     display: none;
   }
+  .mobile-account {
+    display: block;
+  }
+  .workspace-navigation {
+    flex-direction: row;
+    gap: 8px;
+  }
+  .workspace-navigation .workspace-link {
+    flex: 1;
+    height: 52px;
+    width: auto;
+    flex-direction: column;
+    gap: 3px;
+    padding: 5px;
+    margin: 0;
+    font-size: 11px;
+  }
+  .workspace-label {
+    display: inline;
+  }
+  .workspace-badge {
+    right: calc(50% - 25px);
+  }
+  .pane-heading {
+    padding: 0 16px;
+  }
+  .pane-leading:has(.mobile-back),
+  .pane-leading:has(.contacts-back) {
+    display: flex;
+  }
+  .app-frame:has(.has-conversation) .workspace-rail,
+  .app-frame:has(.has-contact) .workspace-rail,
+  .app-frame:has(.settings-detail) .workspace-rail {
+    display: none;
+  }
+}
+
+.workspace-search {
+  position: relative;
+  margin: 12px var(--workspace-list-inset) 0;
+  color: var(--subtle-text);
+}
+
+.workspace-search > svg {
+  position: absolute;
+  z-index: 1;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
 }

@@ -1,8 +1,10 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
+  import { ArrowLeft } from '@lucide/svelte';
 
   import { Button } from '#lib/components/ui/button/index.js';
+  import PaneHeader from '#lib/components/PaneHeader.svelte';
 
   import { auth } from '#lib/features/auth/session.svelte.ts';
 
@@ -40,6 +42,13 @@
 <svelte:head>
   <title>加入群聊 · Chat</title>
 </svelte:head>
+<PaneHeader title="加入群聊">
+  {#snippet leading()}
+    <Button variant="ghost" size="icon" href="/app" aria-label="返回聊天">
+      <ArrowLeft size={20} />
+    </Button>
+  {/snippet}
+</PaneHeader>
 <section class="group-join-page">
   <h1>加入私人群聊</h1>
   <p class="muted">
@@ -48,7 +57,6 @@
   <Button disabled={busy || !token || !chat.sync?.alive} onclick={join}>
     {busy ? '正在加入…' : '确认加入'}
   </Button>
-  <Button variant="secondary" href="/app">返回聊天</Button>
   {#if error}
     <p class="form-error" role="alert">{error}</p>
   {/if}

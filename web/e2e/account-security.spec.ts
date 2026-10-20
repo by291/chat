@@ -21,7 +21,7 @@ test('a delayed password-change response preserves a newer shared-browser login'
   });
 
   try {
-    await page.goto('/app/settings');
+    await page.goto('/app/settings#settings-security');
     await page
       .getByLabel('当前密码', { exact: true })
       .fill(credentials.password);
@@ -48,13 +48,18 @@ test('a delayed password-change response preserves a newer shared-browser login'
     const acknowledged = page.waitForResponse('**/api/v1/auth/password');
     release();
     await acknowledged;
-    await expect(page).toHaveURL(/\/login/);
+    // The login route restores the newer shared cookie immediately. Assert its
+    // stable destination rather than racing that intermediate redirect.
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(page.getByLabel('当前密码', { exact: true })).toHaveCount(0);
 
     expect(
       (await context.cookies()).find((cookie) => cookie.name === 'chat_session')
         ?.value,
     ).toBe(fresh.value);
     expect((await other.request.get('/api/v1/auth/me')).status()).toBe(200);
+    await page.goto('/app/settings#settings-security');
+    await expect(page.getByLabel('当前密码', { exact: true })).toHaveValue('');
     await other.reload();
     await expect(other).toHaveURL(/\/app/);
   } finally {
@@ -90,7 +95,7 @@ test('changing a password signs out all devices while an incorrect password pres
     );
     await socket.connect();
     await stack.startWorker();
-    await page.goto('/app/settings');
+    await page.goto('/app/settings#settings-security');
     await page
       .getByLabel('当前密码', { exact: true })
       .fill('incorrect password');

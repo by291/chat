@@ -1,3 +1,6 @@
+import { startChatWith } from './fixtures';
+import { befriend } from '../tests/integration/support';
+import { sessionCookie } from './fixtures';
 import { test, expect, signup } from './fixtures';
 import { account } from '../tests/integration/support';
 
@@ -7,17 +10,13 @@ test('connection notice shares one top position and disappears after recovery', 
 }) => {
   const partner = await account(stack);
   await signup(page, stack);
+  await befriend(stack, await sessionCookie(page), partner.cookie);
   const shell = page.locator('.chat-shell');
   const notice = page.getByRole('status', { name: '连接状态' });
   await expect(shell).toHaveAttribute('data-connection', 'online');
   await expect(page.getByText('已连接', { exact: true })).toHaveCount(0);
 
-  await page.getByRole('button', { name: '发起聊天', exact: true }).click();
-  await page
-    .getByLabel('对方的用户名', { exact: true })
-    .fill(partner.user.username);
-  await page.getByRole('button', { name: '查找用户', exact: true }).click();
-  await page.getByRole('button', { name: '开始聊天', exact: true }).click();
+  await startChatWith(page, partner.user.username);
   await expect(page).toHaveURL(/\/app\/chats\//);
   const conversationUrl = page.url();
 

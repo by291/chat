@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { Search, MessageCircle, Pin, BellOff } from '@lucide/svelte';
 
   import * as Avatar from '#lib/components/ui/avatar/index.js';
@@ -6,12 +7,17 @@
   import { Input } from '#lib/components/ui/input/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
 
+  import PaneHeader from '#lib/components/PaneHeader.svelte';
+  import { avatarTone } from '#lib/utils.js';
+
   import ProfileAvatar from '#lib/features/settings/ProfileAvatar.svelte';
 
+  import AccountMenu from '#lib/features/settings/AccountMenu.svelte';
+
   import NotificationSettings from './NotificationSettings.svelte';
-  import StartConversationDialog from './StartConversationDialog.svelte';
-  import GroupDialog from './GroupDialog.svelte';
+  import ConversationActions from './ConversationActions.svelte';
   import { isGroup, conversationName, type Conversation } from './models';
+  import { useChat } from './context.svelte';
   import type { ChatSync } from './sync.svelte';
 
   let {
@@ -20,8 +26,14 @@
     sync: ChatSync;
   } = $props();
 
-  let filter = $state('');
-  let archived = $state(false);
+  const chat = useChat();
+  let list: HTMLElement;
+  const filter = $derived(chat.listView.filter);
+  const archived = $derived(chat.listView.archived);
+
+  onMount(() => {
+    list.scrollTop = chat.listView.scrollTop;
+  });
 
   const archivedCount = $derived(
     sync.conversations.filter(
@@ -55,24 +67,17 @@
 </script>
 
 <aside class="conversation-sidebar">
-  <header class="sidebar-heading">
-    <span class="eyebrow">YOUR EVERYDAY SPACE</span>
-    <h1>
-      聊天
-      <span class="heading-dot">.</span>
-    </h1>
-    <div class="sidebar-actions">
-      <StartConversationDialog {sync} />
-      <GroupDialog {sync} />
-      <NotificationSettings {sync} />
-    </div>
-  </header>
-  <div class="search-field">
+  <PaneHeader title="聊天" level={1}>
+    {#snippet actions()}<ConversationActions {sync} /><NotificationSettings
+        {sync}
+      /><AccountMenu mobile />{/snippet}
+  </PaneHeader>
+  <div class="workspace-search">
     <Search size={16} aria-hidden="true" />
     <Input
       class="h-11 bg-background pl-10 text-base md:text-base dark:bg-background"
       aria-label="筛选会话"
-      bind:value={filter}
+      bind:value={chat.listView.filter}
       placeholder="搜索你的聊天"
     />
   </div>
@@ -81,7 +86,7 @@
       type="button"
       variant={archived ? 'ghost' : 'secondary'}
       aria-pressed={!archived}
-      onclick={() => (archived = false)}
+      onclick={() => (chat.listView.archived = false)}
     >
       聊天
     </Button>
@@ -89,12 +94,17 @@
       type="button"
       variant={archived ? 'secondary' : 'ghost'}
       aria-pressed={archived}
-      onclick={() => (archived = true)}
+      onclick={() => (chat.listView.archived = true)}
     >
       归档 ({archivedCount})
     </Button>
   </div>
-  <nav class="conversation-nav" aria-label="会话列表">
+  <nav
+    class="conversation-nav"
+    aria-label="会话列表"
+    bind:this={list}
+    onscroll={() => (chat.listView.scrollTop = list.scrollTop)}
+  >
     {#each conversations as conversation (conversation.id)}
       <a
         class="conversation-row"
@@ -103,7 +113,7 @@
         aria-current={sync.selectedId === conversation.id ? 'page' : undefined}
       >
         {#if isGroup(conversation)}
-          <Avatar.Root>
+          <Avatar.Root data-tone={avatarTone(conversation.id)}>
             <Avatar.Fallback>
               {Array.from(conversationName(conversation))[0]}
             </Avatar.Fallback>
@@ -166,8 +176,14 @@
               : '还没有聊天'}
         </p>
         <span>
-          {filter ? '试试另一位伙伴的名字' : '点击右上角，找到你的伙伴'}
+          {filter ? '试试另一位伙伴的名字' : '从通讯录选择好友开始聊天'}
         </span>
+        {#if !filter && !archived}<Button
+            variant="secondary"
+            href="/app/contacts"
+          >
+            去添加好友
+          </Button>{/if}
       </div>
     {/if}
   </nav>

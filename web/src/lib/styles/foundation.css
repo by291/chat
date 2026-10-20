@@ -2,20 +2,22 @@
 
 :root {
   font-family: Inter, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  color: #263b3b;
-  background: #f6f8f7;
+  color: #263330;
+  background: #f5f7f6;
   font-synthesis: none;
   --font-body: 1rem;
   --font-secondary: 0.875rem;
   --font-caption: 0.75rem;
-  --brand: #18816f;
+  --brand: #147c66;
+  --outgoing: #187e68;
+  --shadow: #264c3814;
   --brand-hover: #126a5c;
   --surface: #fff;
-  --background: #f6f8f7;
-  --line: #e5eeea;
-  --subtle-text: #7b8d86;
-  --text: #263b3b;
-  --soft: #edf5f1;
+  --background: #f1f5f2;
+  --line: #dfe9e3;
+  --subtle-text: #67766e;
+  --text: #263330;
+  --soft: #e1f1e9;
   --danger: #bd484b;
   --warning-surface: #fff4df;
   --warning-text: #805b21;
@@ -175,4 +177,22 @@ h2 {
   justify-content: center;
   font-size: 14px;
   color: var(--subtle-text);
+}
+
+/* Four stable identity tones keep empty avatars recognizable across surfaces. */
+[data-tone] [data-slot='avatar-fallback'] {
+  background: color-mix(in srgb, var(--avatar-color) 35%, var(--surface));
+  color: var(--text);
+}
+[data-tone='0'] {
+  --avatar-color: #c57f71;
+}
+[data-tone='1'] {
+  --avatar-color: #72a47f;
+}
+[data-tone='2'] {
+  --avatar-color: #7e9ac7;
+}
+[data-tone='3'] {
+  --avatar-color: #c6a15c;
 }

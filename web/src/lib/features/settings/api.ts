@@ -2,9 +2,12 @@ import { api, unwrap, ApiFailure } from '#lib/api-client';
 
 /** Settings persistence is shared by forms, without coupling them to HTTP paths. */
 export const settingsApi = {
-  updateProfile: (displayName: string) =>
+  updateProfile: (displayName: string, signal?: AbortSignal) =>
     unwrap(
-      api.PATCH('/api/v1/users/me', { body: { display_name: displayName } }),
+      api.PATCH('/api/v1/users/me', {
+        body: { display_name: displayName },
+        signal,
+      }),
     ),
   sessions: (signal?: AbortSignal) =>
     unwrap(api.GET('/api/v1/sessions', { signal })),

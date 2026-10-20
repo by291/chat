@@ -1,3 +1,7 @@
+import { editOwnProfile } from './fixtures';
+import { startChatWith } from './fixtures';
+import { befriend } from '../tests/integration/support';
+import { sessionCookie } from './fixtures';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -20,13 +24,9 @@ test('real signed uploads report progress, retry and send image/files with avata
   try {
     await signup(page, stack);
     const account = await signup(peer, stack);
+    await befriend(stack, await sessionCookie(page), await sessionCookie(peer));
     await startWorker(stack);
-    await page.getByRole('button', { name: '发起聊天', exact: true }).click();
-    await page
-      .getByLabel('对方的用户名', { exact: true })
-      .fill(account.username);
-    await page.getByRole('button', { name: '查找用户', exact: true }).click();
-    await page.getByRole('button', { name: '开始聊天', exact: true }).click();
+    await startChatWith(page, account.username);
     await expect(page).toHaveURL(/\/app\/chats\//);
     await peer.goto(new URL(page.url()).pathname);
     await page.evaluate(() => {
@@ -98,6 +98,7 @@ test('real signed uploads report progress, retry and send image/files with avata
     ).toBe(createHash('sha256').update(bytes).digest('hex'));
 
     await page.goto('/app/settings');
+    await editOwnProfile(page);
     await page.getByLabel('选择头像', { exact: true }).setInputFiles(sample);
     await expect(page.getByText('已就绪', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '保存头像', exact: true }).click();

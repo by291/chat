@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
 
   import * as Card from '#lib/components/ui/card/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
@@ -12,9 +12,11 @@
   let {
     user,
     onSaved,
+    onCancel,
   }: {
     user: components['schemas']['UserView'];
     onSaved: (user: components['schemas']['UserView']) => void;
+    onCancel?: () => void;
   } = $props();
 
   // Initialize the editable draft once; same-user profile revalidation must not
@@ -23,6 +25,9 @@
   let pending = $state(false);
   let error = $state('');
   let saved = $state(false);
+  const lifetime = new AbortController();
+
+  onDestroy(() => lifetime.abort());
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
@@ -34,10 +39,17 @@
     saved = false;
 
     try {
-      onSaved(await settingsApi.updateProfile(displayName));
+      const updated = await settingsApi.updateProfile(
+        displayName.trim() || user.username,
+        lifetime.signal,
+      );
+      // Closing and reopening the dialog starts a new draft; late saves cannot replace it.
+      if (lifetime.signal.aborted) return;
+      onSaved(updated);
       saved = true;
     } catch (reason) {
-      error = reason instanceof Error ? reason.message : '保存失败';
+      if (!lifetime.signal.aborted)
+        error = reason instanceof Error ? reason.message : '保存失败';
     } finally {
       pending = false;
     }
@@ -53,11 +65,19 @@
     <Input id="profile-username" value={`@${user.username}`} readonly />
     <p class="field-help">用户名是你的唯一标识。</p>
     <Label class="form-label" for="profile-name">昵称</Label>
-    <Input id="profile-name" bind:value={displayName} required />
+    <Input id="profile-name" bind:value={displayName} maxlength={100} />
+    <p class="field-help">选填，留空时显示用户名。</p>
     <div class="form-actions">
       <Button type="submit" disabled={pending}>
         {pending ? '保存中…' : '保存资料'}
       </Button>
+      {#if onCancel}<Button
+          variant="secondary"
+          disabled={pending}
+          onclick={onCancel}
+        >
+          取消
+        </Button>{/if}
       {#if saved}
         <span class="success" role="status">资料已保存</span>
       {/if}

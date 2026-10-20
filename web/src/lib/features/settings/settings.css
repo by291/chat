@@ -1,88 +1,100 @@
 /* Profile, device sessions and preferences. */
 
 .settings-page {
-  padding-block: 38px 28px;
+  height: 100%;
 }
-
-.settings-container {
-  padding-inline: 52px;
-  max-width: 960px;
-  margin: auto;
-}
-
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font-size: var(--font-secondary);
-  color: var(--subtle-text);
-}
-
-.page-heading {
-  margin: 38px 0 30px;
-}
-
-.page-heading h1 {
-  font-size: 30px;
-  margin: 0 0 12px;
-}
-
-.page-heading .muted {
-  font-size: var(--font-body);
-}
-
-.settings-content {
-  min-width: 0;
-}
-
-/* The sticky surface covers the viewport; the inner container aligns its links. */
-.settings-navigation-bar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding-bottom: 24px;
-  background: var(--background);
-}
-
-.settings-navigation {
+.settings-sidebar {
+  min-height: 0;
   display: flex;
-  align-items: center;
-  gap: 28px;
-  border-bottom: 1px solid var(--line);
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0 0 20px;
 }
-
+.settings-heading {
+  padding: 28px 12px 24px;
+}
+.settings-heading h1 {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+}
+.settings-heading p {
+  margin-top: 6px;
+  font-size: var(--font-secondary);
+}
+.settings-navigation {
+  padding: 16px 12px;
+  display: grid;
+  gap: 6px;
+}
 .settings-navigation a {
   display: flex;
   align-items: center;
-  min-height: 40px;
-  border-bottom: 2px solid transparent;
-  font-size: var(--font-secondary);
-  font-weight: 600;
-  white-space: nowrap;
+  min-height: 48px;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
   color: var(--subtle-text);
+  font-size: var(--font-secondary);
+  font-weight: 550;
 }
-
-.settings-navigation a:hover,
-.settings-navigation a[aria-current='location'] {
+.settings-navigation a:hover {
+  background: var(--background);
+}
+.settings-navigation a[aria-current='page'] {
   color: var(--brand);
+  background: var(--soft);
 }
-
-.settings-navigation a[aria-current='location'] {
-  border-bottom-color: var(--brand);
+.settings-sidebar .back-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 12px 0;
+  color: var(--subtle-text);
+  font-size: var(--font-secondary);
 }
-
+.settings-signout {
+  display: none;
+}
+.settings-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.settings-panel-heading {
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+.settings-panel-heading h2 {
+  font-size: 19px;
+}
+.settings-panel-heading p {
+  margin-top: 5px;
+  font-size: var(--font-secondary);
+}
+.settings-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 28px 32px;
+}
 .settings-group {
   display: grid;
-  gap: 14px;
+  gap: 20px;
+  max-width: 620px;
+  margin-inline: auto;
 }
-
-.settings-group + .settings-group {
-  margin-top: 24px;
+.settings-group[hidden] {
+  display: none;
 }
-
-.settings-group-heading h2 {
-  scroll-margin-top: var(--settings-navigation-height, 0px);
-  font-size: 20px;
+.settings-group-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 
 .settings-card .form-actions {
@@ -169,17 +181,93 @@
   color: var(--danger);
 }
 
+/* Categories use the same list-to-detail navigation as chats and contacts. */
+.settings-navigation svg {
+  box-sizing: content-box;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--background);
+  color: var(--brand);
+}
+.settings-navigation a[aria-current='page'] svg {
+  background: var(--surface);
+}
+.settings-card {
+  border-radius: 16px;
+  box-shadow: 0 4px 18px var(--shadow);
+}
+.settings-card .section-heading {
+  margin: -24px -24px 20px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 15px 15px 0 0;
+  background: var(--surface);
+}
 @media (max-width: 700px) {
-  .settings-navigation {
-    justify-content: space-between;
-    gap: 8px;
+  .settings-sidebar {
+    border-right: 0;
   }
+  .settings-main {
+    display: none;
+  }
+  .settings-detail .settings-sidebar {
+    display: none;
+  }
+  .settings-detail .settings-main {
+    display: flex;
+  }
+  .settings-content {
+    padding: 16px 12px;
+  }
+  .settings-card .form-actions {
+    gap: 10px;
+  }
+}
 
-  .settings-navigation a {
-    font-size: 0.8125rem;
-  }
-
-  .settings-page select {
-    font-size: 14px;
-  }
+.own-profile-dialog {
+  max-width: min(440px, calc(100% - 32px));
+}
+.own-profile-identity {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 0;
+  overflow-wrap: anywhere;
+}
+.own-profile-identity [data-slot='avatar'] {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  font-size: 24px;
+}
+.profile-facts {
+  margin: 0;
+}
+.profile-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.profile-facts dt {
+  color: var(--subtle-text);
+}
+.profile-facts dd {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.own-profile-dialog .settings-card {
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  border-radius: 0;
+}
+.own-profile-dialog .settings-card .section-heading {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }

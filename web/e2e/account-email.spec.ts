@@ -40,7 +40,7 @@ test('captured verification link stays in the fragment through inline login and 
   await page.getByLabel('密码', { exact: true }).fill('correct horse battery');
   await page.getByRole('button', { name: '创建账号', exact: true }).click();
   await expect(page).toHaveURL(/\/app/);
-  await page.goto('/app/settings');
+  await page.goto('/app/settings#settings-security');
   await page
     .getByRole('textbox', { name: '恢复邮箱', exact: true })
     .fill('owned@example.test');
@@ -57,7 +57,8 @@ test('captured verification link stays in the fragment through inline login and 
   const link = mail.messages()[0].link!;
   const target = new URL(link);
   const path = target.pathname + target.hash;
-  await page.getByRole('button', { name: '退出登录', exact: true }).click();
+  await page.getByRole('button', { name: '我的账号', exact: true }).click();
+  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click();
   await expect(page).toHaveURL(/\/login/);
   const scanner = await page.request.get(target.origin + target.pathname);
   expect(scanner.status()).toBe(200);

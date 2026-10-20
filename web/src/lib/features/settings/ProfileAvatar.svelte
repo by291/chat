@@ -1,5 +1,6 @@
 <script lang="ts">
   import * as Avatar from '#lib/components/ui/avatar/index.js';
+  import { avatarTone } from '#lib/utils.js';
 
   import { downloadBlob } from '#lib/features/media/api.ts';
 
@@ -57,7 +58,7 @@
 
 <!-- Bits UI retains loaded status on Root; reset it when the image disappears. -->
 {#key !!url}
-  <Avatar.Root>
+  <Avatar.Root data-tone={avatarTone(userId)}>
     {#if url}
       <Avatar.Image src={url} alt={`${name}的头像`} />
     {/if}

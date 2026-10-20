@@ -9,6 +9,8 @@
   import { Label } from '#lib/components/ui/label/index.js';
   import * as Dialog from '#lib/components/ui/dialog/index.js';
 
+  import AddGroupMembersDialog from '#lib/features/contacts/AddGroupMembersDialog.svelte';
+
   import {
     GroupActions,
     canManageMemberRole,
@@ -22,6 +24,7 @@
   let { sync }: { sync: ChatSync } = $props();
 
   let open = $state(false);
+  let addOpen = $state(false);
   let title = $state('');
   let lastIdentity: string | undefined;
 
@@ -73,6 +76,7 @@
     untrack(() => {
       if (identity !== lastIdentity) {
         open = false;
+        addOpen = false;
         actions.resetPresentation();
         lastIdentity = identity;
       }
@@ -96,7 +100,10 @@
         </Button>
       {/snippet}
     </Dialog.Trigger>
-    <Dialog.Content class="group-details" closeLabel="关闭">
+    <Dialog.Content
+      class="group-details context-detail-panel"
+      closeLabel="关闭"
+    >
       <Dialog.Title>{group.title}</Dialog.Title>
       <Dialog.Description>
         {group.member_count} 位成员 · 仅当前群成员可访问
@@ -142,6 +149,10 @@
           </div>
         {/if}
       {/if}
+      <Button variant="secondary" onclick={() => (addOpen = true)}>
+        添加成员
+      </Button>
+      <AddGroupMembersDialog {sync} bind:open={addOpen} />
       <ul class="group-members" aria-label="群成员">
         {#each sync.groupMembers as member (member.membership_id)}
           <li>
