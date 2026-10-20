@@ -3,7 +3,6 @@ import { test as base, expect } from '@playwright/test';
 import { TestSmtpServer } from '../tests/integration/mail-support';
 import { TestRuntime } from '../tests/integration/runtime';
 import { api, eventually, sdk } from '../tests/integration/support';
-import { invitation } from './fixtures';
 
 const test = base.extend<{ mail: TestSmtpServer; stack: TestRuntime }>({
   mail: async ({}, use) => {
@@ -36,7 +35,7 @@ test('captured recovery mail resets once, ignores scanner visits and disconnects
   stack,
   mail,
 }) => {
-  await page.goto(`/register?invite=${await invitation(stack)}`);
+  await page.goto('/register');
   await page.getByLabel('用户名', { exact: true }).fill('recoveruser');
   await page.getByLabel('昵称', { exact: true }).fill('找回用户');
   await page.getByLabel('密码', { exact: true }).fill('correct horse battery');

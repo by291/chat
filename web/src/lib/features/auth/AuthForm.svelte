@@ -21,7 +21,6 @@
   let username = $state('');
   let displayName = $state('');
   let password = $state('');
-  let invitation = $state('');
   let error = $state('');
 
   const registering = $derived(mode === 'register');
@@ -58,7 +57,6 @@
           username,
           display_name: displayName.trim() || username.trim(),
           password,
-          invitation,
         });
       } else {
         await auth.login({
@@ -79,7 +77,6 @@
   }
 
   onMount(() => {
-    invitation = page.url.searchParams.get('invite') ?? '';
     void auth.restore().then(() => {
       if (auth.user) {
         if (onAuthenticated) {
@@ -128,21 +125,10 @@
       <h2>{registering ? '加入你的团队' : '开启一段对话'}</h2>
       <p class="muted">
         {registering
-          ? '使用朋友或管理员给你的邀请，创建账号。'
+          ? '创建账号，添加好友，开始聊天。'
           : '登录后，接着聊上次没说完的话。'}
       </p>
       <form onsubmit={submit}>
-        {#if registering}
-          <Label class="form-label" for="invitation">邀请码</Label>
-          <Input
-            id="invitation"
-            name="invitation"
-            bind:value={invitation}
-            autocomplete="off"
-            required
-            placeholder="粘贴你的邀请码"
-          />
-        {/if}
         <Label class="form-label" for="username">用户名</Label>
         <div class="input-prefix">
           <span aria-hidden="true">@</span>
@@ -195,7 +181,7 @@
       <p class="auth-switch">
         {registering ? '已有账号？' : '第一次来到这里？'}
         <a href={registering ? '/login' : '/register'}>
-          {registering ? '去登录' : '使用邀请注册'}
+          {registering ? '去登录' : '注册'}
         </a>
       </p>
     </div>

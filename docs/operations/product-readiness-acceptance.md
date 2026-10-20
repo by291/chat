@@ -118,7 +118,7 @@ Material implementation choices are:
 
 | Check                                 | Status and required input                                                                                               |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| HTTPS staging                         | Pending a configured deployment origin, separate media origin, deployment/source identity and fresh owned invitations   |
+| HTTPS staging                         | Pending a configured deployment origin, separate media origin, deployment/source identity and disposable public-signup accounts   |
 | Real mailbox arrival                  | Pending an operator-controlled staging SMTP configuration and consenting mailbox; SMTP acceptance alone is insufficient |
 | External Web Push/desktop OS delivery | Pending protected VAPID/provider configuration and an available consenting desktop/device observation                   |
 | iPhone/iPad push presentation         | Explicitly deferred by the user; headless WebKit or emulation does not replace the installed-app/user-gesture/OS test   |

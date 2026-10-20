@@ -28,7 +28,6 @@ enum Command {
         #[arg(long)]
         display_name: Option<String>,
     },
-    Invite,
     ResetPassword {
         #[arg(long)]
         username: String,
@@ -81,10 +80,6 @@ async fn main() -> anyhow::Result<()> {
             let password = password()?;
             let user = service::bootstrap(&state, &username, display_name, &password).await?;
             println!("Created initial user @{}", user.username);
-        }
-        Command::Invite => {
-            let token = service::create_invitation(&state).await?;
-            println!("Invitation (single use, expires in 7 days): {token}");
         }
         Command::ResetPassword { username } => {
             let password = password()?;

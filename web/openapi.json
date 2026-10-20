@@ -1476,10 +1476,10 @@
       "RegisterInput": {
         "properties": {
           "display_name": {
-            "type": "string"
-          },
-          "invitation": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "password": {
             "type": "string"
@@ -1489,9 +1489,7 @@
           }
         },
         "required": [
-          "invitation",
           "username",
-          "display_name",
           "password"
         ],
         "type": "object"

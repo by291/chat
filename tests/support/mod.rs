@@ -135,28 +135,11 @@ pub async fn register_user(
     app: &TestApp,
     name: &str,
 ) -> (reqwest::Client, chat_server::types::UserView) {
-    use sha2::{Digest, Sha256};
-
-    let token = uuid::Uuid::new_v4().to_string();
-
-    sqlx::query(
-        r#"
-        INSERT INTO invitations(id, token_hash, expires_at)
-        VALUES ($1, $2, now() + interval '7 days')
-        "#,
-    )
-    .bind(uuid::Uuid::now_v7())
-    .bind(hex::encode(Sha256::digest(token.as_bytes())))
-    .execute(&app.pool)
-    .await
-    .unwrap();
-
     let client = app.client();
     let response = client
         .post(format!("{}/api/v1/auth/register", app.base_url))
         .header("Origin", &app.origin)
         .json(&serde_json::json!({
-            "invitation": token,
             "username": name,
             "display_name": name,
             "password": "correct horse battery"

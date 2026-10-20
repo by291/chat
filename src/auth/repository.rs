@@ -1,4 +1,4 @@
-//! Account, invitation and session persistence. Callers own every transaction.
+//! Account and session persistence. Callers own every transaction.
 
 use sqlx::{PgPool, Postgres, Transaction};
 use time::OffsetDateTime;
@@ -124,43 +124,6 @@ pub async fn insert_session(
     Ok(())
 }
 
-pub async fn lock_invitation(
-    transaction: &mut Transaction<'_, Postgres>,
-    token_hash: &str,
-) -> Result<Option<Uuid>, sqlx::Error> {
-    sqlx::query_scalar(
-        r#"
-        SELECT id
-        FROM invitations
-        WHERE token_hash = $1 AND consumed_at IS NULL AND expires_at > now()
-        FOR UPDATE
-        "#,
-    )
-    .bind(token_hash)
-    .fetch_optional(&mut **transaction)
-    .await
-}
-
-pub async fn consume_invitation(
-    transaction: &mut Transaction<'_, Postgres>,
-    invitation_id: Uuid,
-    user_id: UserId,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        r#"
-        UPDATE invitations
-        SET consumed_at = now(), consumed_by = $2
-        WHERE id = $1
-        "#,
-    )
-    .bind(invitation_id)
-    .bind(user_id)
-    .execute(&mut **transaction)
-    .await?;
-
-    Ok(())
-}
-
 pub async fn lock_credentials(
     transaction: &mut Transaction<'_, Postgres>,
     username: &str,
@@ -268,19 +231,4 @@ pub async fn list_sessions(pool: &PgPool, actor: Actor) -> Result<Vec<SessionVie
     .bind(actor.session_id)
     .fetch_all(pool)
     .await
-}
-
-pub async fn insert_invitation(pool: &PgPool, token_hash: &str) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        r#"
-        INSERT INTO invitations (id, token_hash, expires_at)
-        VALUES ($1, $2, now() + interval '7 days')
-        "#,
-    )
-    .bind(Uuid::now_v7())
-    .bind(token_hash)
-    .execute(pool)
-    .await?;
-
-    Ok(())
 }

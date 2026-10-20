@@ -5,13 +5,6 @@ CREATE TABLE users (
     password_hash text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
-CREATE TABLE invitations (
-    id uuid PRIMARY KEY,
-    token_hash text NOT NULL UNIQUE,
-    expires_at timestamptz NOT NULL,
-    consumed_at timestamptz,
-    consumed_by uuid REFERENCES users(id)
-);
 CREATE TABLE sessions (
     id uuid PRIMARY KEY,
     user_id uuid NOT NULL REFERENCES users(id),

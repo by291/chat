@@ -11,7 +11,7 @@ and Chromium rather than static conversations or a mocked backend.
 
 | Capability | Evidence |
 | --- | --- |
-| Single-use invitations, unique usernames, login/logout, bootstrap/reset | Rust auth/admin integration tests |
+| Open registration, unique usernames, login/logout, bootstrap/reset | Rust auth/admin integration tests |
 | Cookie/Origin authorization, device revocation, 60-second leases | Rust realtime auth and official SDK, including revocation without a worker |
 | Unique direct pair, exact lookup, Unicode display names | Rust conversations and real browsers |
 | Atomic message/event/outbox, idempotency, exact 64-bit sequence | Rust messages, including 9007199254740993 and rollback |

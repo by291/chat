@@ -1,36 +1,15 @@
 mod support;
 
 use serde_json::json;
-use sha2::{Digest, Sha256};
-
-async fn invite(app: &support::TestApp) -> String {
-    let token = uuid::Uuid::new_v4().to_string();
-    sqlx::query(
-        "INSERT INTO invitations (id,token_hash,expires_at) VALUES ($1,$2,now()+interval '7 days')",
-    )
-    .bind(uuid::Uuid::now_v7())
-    .bind(hex::encode(Sha256::digest(token.as_bytes())))
-    .execute(&app.pool)
-    .await
-    .unwrap();
-    token
-}
-
 async fn register(
     app: &support::TestApp,
     client: &reqwest::Client,
-    token: &str,
     username: &str,
 ) -> reqwest::Response {
     client
         .post(format!("{}/api/v1/auth/register", app.base_url))
         .header("Origin", &app.origin)
-        .json(&json!({
-            "invitation": token,
-            "username": username,
-            "display_name": "中文用户 👋",
-            "password": "correct horse battery"
-        }))
+        .json(&json!({"username": username, "password": "correct horse battery"}))
         .send()
         .await
         .unwrap()
@@ -48,7 +27,6 @@ async fn untrusted_origin_cannot_login_or_register() {
             .json(&json!({
                 "username": "alice",
                 "password": "correct horse battery",
-                "invitation": "irrelevant",
                 "display_name": "Alice",
                 "device_label": "Browser"
             }))
@@ -65,48 +43,48 @@ async fn untrusted_origin_cannot_login_or_register() {
 }
 
 #[tokio::test]
-async fn invitation_registration_is_atomic() {
+async fn open_registration_creates_account_and_session() {
     let app = support::spawn_test_app().await;
-    let token = invite(&app).await;
+    let client = app.client();
+
+    let response = register(&app, &client, " Alice ").await;
+
+    assert_eq!(response.status(), 201);
+    let body: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(body["username"], "alice");
+    assert_eq!(body["display_name"], "alice");
+    assert_eq!(
+        client
+            .get(format!("{}/api/v1/auth/me", app.base_url))
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        200
+    );
+}
+
+#[tokio::test]
+async fn duplicate_registration_is_atomic() {
+    let app = support::spawn_test_app().await;
     let a = app.client();
     let b = app.client();
 
-    let (ra, rb) = tokio::join!(
-        register(&app, &a, &token, "alice"),
-        register(&app, &b, &token, "bob")
-    );
+    let (ra, rb) = tokio::join!(register(&app, &a, "alice"), register(&app, &b, " ALICE "));
 
-    assert_eq!(
-        [ra.status().as_u16(), rb.status().as_u16()]
-            .iter()
-            .filter(|&&s| s == 201)
-            .count(),
-        1
-    );
-    assert_eq!(
-        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users")
-            .fetch_one(&app.pool)
-            .await
-            .unwrap(),
-        1
-    );
-
-    let user = sqlx::query_scalar::<_, String>("SELECT username FROM users")
-        .fetch_one(&app.pool)
-        .await
-        .unwrap();
-    let second = invite(&app).await;
-
-    assert_eq!(
-        register(&app, &app.client(), &second, &user).await.status(),
-        409
-    );
-    assert_eq!(
-        register(&app, &app.client(), &second, "charlie")
-            .await
-            .status(),
-        201
-    );
+    let mut statuses = [ra.status().as_u16(), rb.status().as_u16()];
+    statuses.sort();
+    assert_eq!(statuses, [201, 409]);
+    for table in ["users", "sessions"] {
+        let sql = format!("SELECT count(*) FROM {table}");
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(sql.as_str()))
+                .fetch_one(&app.pool)
+                .await
+                .unwrap(),
+            1
+        );
+    }
 }
 
 #[tokio::test]
@@ -114,7 +92,7 @@ async fn username_is_case_insensitive() {
     let app = support::spawn_test_app().await;
     let client = app.client();
 
-    let response = register(&app, &client, &invite(&app).await, " Alice ").await;
+    let response = register(&app, &client, " Alice ").await;
 
     assert_eq!(response.status(), 201);
     let body = response.json::<serde_json::Value>().await.unwrap();
@@ -140,7 +118,7 @@ async fn username_is_case_insensitive() {
 #[tokio::test]
 async fn session_cookies_preserve_header_order_and_opaque_token_values() {
     let app = support::spawn_test_app().await;
-    let response = register(&app, &app.client(), &invite(&app).await, "cookie_user").await;
+    let response = register(&app, &app.client(), "cookie_user").await;
     let issued_cookie = response.headers()["set-cookie"]
         .to_str()
         .unwrap()
@@ -181,12 +159,7 @@ async fn session_cookies_preserve_header_order_and_opaque_token_values() {
 async fn revoked_or_expired_session_is_rejected() {
     let app = support::spawn_test_app().await;
     let client = app.client();
-    assert_eq!(
-        register(&app, &client, &invite(&app).await, "alice")
-            .await
-            .status(),
-        201
-    );
+    assert_eq!(register(&app, &client, "alice").await.status(), 201);
     let sessions = client
         .get(format!("{}/api/v1/sessions", app.base_url))
         .send()
@@ -216,12 +189,7 @@ async fn revoked_or_expired_session_is_rejected() {
         401
     );
     let other = app.client();
-    assert_eq!(
-        register(&app, &other, &invite(&app).await, "bob")
-            .await
-            .status(),
-        201
-    );
+    assert_eq!(register(&app, &other, "bob").await.status(), 201);
     sqlx::query("UPDATE sessions SET expires_at=now()-interval '1 second'")
         .execute(&app.pool)
         .await
@@ -242,18 +210,8 @@ async fn foreign_session_cannot_be_revoked() {
     let app = support::spawn_test_app().await;
     let a = app.client();
     let b = app.client();
-    assert_eq!(
-        register(&app, &a, &invite(&app).await, "alice")
-            .await
-            .status(),
-        201
-    );
-    assert_eq!(
-        register(&app, &b, &invite(&app).await, "bob")
-            .await
-            .status(),
-        201
-    );
+    assert_eq!(register(&app, &a, "alice").await.status(), 201);
+    assert_eq!(register(&app, &b, "bob").await.status(), 201);
     let sessions = b
         .get(format!("{}/api/v1/sessions", app.base_url))
         .send()
@@ -286,7 +244,6 @@ async fn foreign_session_cannot_be_revoked() {
 async fn six_character_passwords_work_for_bootstrap_registration_login_and_reset() {
     let app = support::spawn_test_app().await;
     let client = app.client();
-    let invitation = invite(&app).await;
 
     let user =
         chat_server::auth::service::bootstrap(&app.state, "six_admin", "Six Admin", "abc123")
@@ -296,7 +253,6 @@ async fn six_character_passwords_work_for_bootstrap_registration_login_and_reset
         .post(format!("{}/api/v1/auth/register", app.base_url))
         .header("Origin", &app.origin)
         .json(&json!({
-            "invitation": invitation,
             "username": "six_member",
             "display_name": "Six Member",
             "password": "abc123"

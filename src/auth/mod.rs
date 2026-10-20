@@ -1,4 +1,4 @@
-//! Invitation-based authentication and revocable device sessions.
+//! Open registration, authentication and revocable device sessions.
 
 pub mod http;
 pub(crate) mod mail_repository;

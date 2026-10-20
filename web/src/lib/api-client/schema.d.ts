@@ -1141,8 +1141,7 @@ export interface components {
             user_id: components["schemas"]["UserId"];
         };
         RegisterInput: {
-            display_name: string;
-            invitation: string;
+            display_name?: string | null;
             password: string;
             username: string;
         };

@@ -19,9 +19,8 @@ pub struct SessionView {
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterInput {
-    pub invitation: String,
     pub username: String,
-    pub display_name: String,
+    pub display_name: Option<String>,
     pub password: String,
 }
 

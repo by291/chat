@@ -40,7 +40,7 @@ pub async fn bootstrap(
     repository::lock_bootstrap(&mut transaction).await?;
 
     if repository::users_exist(&mut transaction).await? {
-        return Err(AppError::conflict("已存在账号，请使用邀请注册"));
+        return Err(AppError::conflict("已存在账号，请通过注册页面创建账号"));
     }
 
     repository::insert_user(&mut transaction, &user, &password_hash).await?;
@@ -71,14 +71,6 @@ pub async fn reset_password(state: &AppState, name: &str, password: &str) -> Res
     transaction.commit().await?;
 
     Ok(())
-}
-
-/// Issue a random single-use invitation; the raw value is returned only to its administrator.
-pub async fn create_invitation(state: &AppState) -> Result<String, AppError> {
-    let invitation_token = token();
-    repository::insert_invitation(&state.pool, &token_hash(&invitation_token)).await?;
-
-    Ok(invitation_token)
 }
 
 /// Generate an unguessable 256-bit token; only its digest belongs in persistence.
@@ -123,27 +115,22 @@ pub async fn create_session(
     })
 }
 
-/// Consume an invitation, create an account, and issue its first session atomically.
-///
-/// Invalid/expired invitations and duplicate usernames leave the invitation unconsumed.
+/// Create an account and its first session atomically; duplicate usernames return conflict.
 pub async fn register(
     state: &AppState,
     input: RegisterInput,
 ) -> Result<AuthenticatedUser, AppError> {
     let normalized_username = username(&input.username)?;
-    let normalized_display_name = display_name(&input.display_name)?;
-
-    if input.invitation.len() > 256 {
-        return Err(AppError::invalid("邀请无效或已被使用"));
-    }
+    let display = input.display_name.as_deref().unwrap_or("").trim();
+    let normalized_display_name = display_name(if display.is_empty() {
+        &normalized_username
+    } else {
+        display
+    })?;
 
     let password_hash = state.passwords.hash(&input.password).await?;
 
     let mut transaction = state.pool.begin().await?;
-    let invitation_id =
-        repository::lock_invitation(&mut transaction, &token_hash(&input.invitation))
-            .await?
-            .ok_or_else(|| AppError::invalid("邀请无效或已被使用"))?;
     let user = UserView {
         id: UserId::new(),
         username: normalized_username,
@@ -161,8 +148,7 @@ pub async fn register(
         return Err(error.into());
     }
 
-    // These writes share the invitation lock and commit, so failed account creation is retryable.
-    repository::consume_invitation(&mut transaction, invitation_id, user.id).await?;
+    // Account and first session must both exist or neither may commit.
     let authenticated = create_session(&mut transaction, user, "注册设备").await?;
     transaction.commit().await?;
 

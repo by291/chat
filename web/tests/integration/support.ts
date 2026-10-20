@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
 import { Centrifuge } from 'centrifuge';
 import WS from 'ws';
@@ -12,20 +12,12 @@ export async function startIntegrationStack(): Promise<IntegrationStack> {
 }
 
 export async function account(stack: IntegrationStack) {
-  const token = randomBytes(32).toString('hex');
   const username = `u${randomBytes(8).toString('hex')}`;
-
-  await stack.db.query(
-    `INSERT INTO invitations(id, token_hash, expires_at)
-     VALUES (gen_random_uuid(), $1, now() + interval '7 days')`,
-    [createHash('sha256').update(token).digest('hex')],
-  );
 
   const response = await fetch(`${stack.apiUrl}/api/v1/auth/register`, {
     method: 'POST',
     headers: { Origin: stack.origin, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      invitation: token,
       username,
       display_name: username,
       password: 'correct horse battery',

@@ -2,7 +2,6 @@ import { test as base, expect } from '@playwright/test';
 
 import { TestSmtpServer } from '../tests/integration/mail-support';
 import { TestRuntime } from '../tests/integration/runtime';
-import { invitation } from './fixtures';
 import { eventually } from '../tests/integration/support';
 
 const test = base.extend<{ mail: TestSmtpServer; stack: TestRuntime }>({
@@ -35,7 +34,7 @@ test('captured verification link stays in the fragment through inline login and 
   stack,
   mail,
 }) => {
-  await page.goto(`/register?invite=${await invitation(stack)}`);
+  await page.goto('/register');
   await page.getByLabel('用户名', { exact: true }).fill('emailuser');
   await page.getByLabel('昵称', { exact: true }).fill('邮箱用户');
   await page.getByLabel('密码', { exact: true }).fill('correct horse battery');
