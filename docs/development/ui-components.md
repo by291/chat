@@ -7,8 +7,8 @@ there is no application-level shadcn runtime or second state container.
 
 ## Ownership and usage
 
-Use Button, Input, Textarea, Label, Dialog, Avatar, Badge, Card, NativeSelect and
-Progress for common presentation. Business components remain under `lib/features/`.
+Use Button, Input, Textarea, Label, Dialog, DropdownMenu, Avatar, Badge, Card,
+NativeSelect and Progress for common presentation. Business components remain under `lib/features/`.
 The shared UI layer must not import features, issue HTTP requests or own timers.
 For example, `ProfileAvatar.svelte` still authorizes, downloads and revokes avatar
 blob URLs; Avatar primitives only render the resulting image and fallback.
@@ -85,5 +85,5 @@ Run `node scripts/check.mjs` at the repository root. UI migrations should also r
 existing browser suite, including forms, keyboard composition, dialogs, settings,
 groups and media. For deployed changes, check an already deployed HTTPS staging
 application with
-`pnpm -C web test:deployment`. Configure its origins and invitations using
+`pnpm -C web test:deployment`. Configure its origins using
 [the deployment guide](../operations/deployment.md); the checks do not build images.
