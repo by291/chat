@@ -3,7 +3,7 @@ import type { ContactsState } from './contacts.svelte';
 
 const key = Symbol('contacts');
 
-export type ContactCategory = 'friends' | 'incoming' | 'outgoing';
+export type ContactCategory = 'friends' | 'requests';
 
 /** The authenticated application layout creates and tears down this owner. */
 class ContactsContext {

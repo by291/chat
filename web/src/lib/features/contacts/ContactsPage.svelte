@@ -2,16 +2,9 @@
   import { onDestroy, onMount, tick, untrack } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import {
-    ArrowLeft,
-    ChevronDown,
-    Search,
-    UserPlus,
-    Users,
-  } from '@lucide/svelte';
+  import { ArrowLeft, Search, UserPlus, Users } from '@lucide/svelte';
 
   import { Input } from '#lib/components/ui/input/index.js';
-  import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
   import WorkspaceNavigation from '#lib/features/chat/WorkspaceNavigation.svelte';
   import type { ContactsState } from './contacts.svelte';
 
@@ -32,11 +25,6 @@
   const contacts = useContacts();
   const chat = useChat();
   const lifetime = new AbortController();
-  const tabs = [
-    { id: 'friends', label: '好友' },
-    { id: 'incoming', label: '新的朋友' },
-    { id: 'outgoing', label: '已发送' },
-  ] as const;
 
   let addOpen = $state(false);
   let removing = $state<User>();
@@ -49,9 +37,13 @@
   let search = $state.raw<ReturnType<ContactsState['watchSearch']>>();
   let list: HTMLElement;
   let detailPanel = $state<HTMLElement>();
-  const tab = $derived(
-    (tabs.find((item) => item.id === page.url.searchParams.get('category'))
-      ?.id ?? 'friends') as ContactCategory,
+  // Preserve old request deep links while presenting one combined category.
+  const tab: ContactCategory = $derived(
+    ['requests', 'incoming', 'outgoing'].includes(
+      page.url.searchParams.get('category') ?? '',
+    )
+      ? 'requests'
+      : 'friends',
   );
   const selectedId = $derived(page.url.searchParams.get('person'));
 
@@ -70,9 +62,22 @@
     });
   });
   const requests = $derived(
-    (tab === 'incoming'
-      ? contacts.owner?.incoming
-      : contacts.owner?.outgoing) ?? [],
+    [
+      ...(contacts.owner?.incoming ?? []).map((request) => ({
+        ...request,
+        direction: 'incoming' as const,
+        user: request.sender,
+      })),
+      ...(contacts.owner?.outgoing ?? []).map((request) => ({
+        ...request,
+        direction: 'outgoing' as const,
+        user: request.recipient,
+      })),
+    ].sort(
+      (left, right) =>
+        Date.parse(right.created_at) - Date.parse(left.created_at) ||
+        left.id.localeCompare(right.id),
+    ),
   );
   const selectedRequest = $derived(
     requests.find((request) => request.id === selectedId),
@@ -84,9 +89,7 @@
           search?.result?.data?.pages
             .flatMap((page) => page.items)
             .find((friend) => friend.user.id === selectedId)?.user)
-      : tab === 'incoming'
-        ? selectedRequest?.sender
-        : selectedRequest?.recipient,
+      : selectedRequest?.user,
   );
 
   const term = $derived(query.trim());
@@ -97,7 +100,7 @@
   );
   const filteredRequests = $derived(
     requests.filter((request) => {
-      const user = tab === 'incoming' ? request.sender : request.recipient;
+      const user = request.user;
       return `${user.display_name} ${user.username}`
         .toLocaleLowerCase()
         .includes(term.toLocaleLowerCase());
@@ -114,7 +117,10 @@
   const hasMore = $derived(
     tab === 'friends' && term
       ? search?.result?.hasNextPage
-      : contacts.owner?.hasMore(tab),
+      : tab === 'friends'
+        ? contacts.owner?.hasMore('friends')
+        : contacts.owner?.hasMore('incoming') ||
+          contacts.owner?.hasMore('outgoing'),
   );
 
   $effect(() => {
@@ -127,7 +133,11 @@
     // URL identity owns this read; cache updates must not restart pagination.
     untrack(
       () =>
-        void owner.reveal(category, id, controller.signal).finally(() => {
+        void (
+          category === 'friends'
+            ? owner.reveal('friends', id, controller.signal)
+            : owner.revealRequest(id, controller.signal)
+        ).finally(() => {
           if (!controller.signal.aborted) revealing = false;
         }),
     );
@@ -149,7 +159,10 @@
         observer = owner.watchSearch(value);
         search = observer;
       } else {
-        void owner.loadRequests(category, controller.signal).finally(() => {
+        void Promise.all([
+          owner.loadRequests('incoming', controller.signal),
+          owner.loadRequests('outgoing', controller.signal),
+        ]).finally(() => {
           if (!controller.signal.aborted) searchingRequests = false;
         });
       }
@@ -279,35 +292,13 @@
         好友
       </Button>
       <Button
-        variant={tab !== 'friends' ? 'secondary' : 'ghost'}
-        aria-pressed={tab !== 'friends'}
-        onclick={() =>
-          selectCategory(tab === 'outgoing' ? 'outgoing' : 'incoming')}
+        variant={tab === 'requests' ? 'secondary' : 'ghost'}
+        aria-pressed={tab === 'requests'}
+        onclick={() => selectCategory('requests')}
       >
-        {tab === 'outgoing'
-          ? '已发送'
-          : '新的朋友'}{#if tab !== 'outgoing' && contacts.owner?.pendingCount}（{contacts
-            .owner.pendingCount}）{/if}
+        新的朋友{#if contacts.owner?.pendingCount}（{contacts.owner
+            .pendingCount}）{/if}
       </Button>
-      <DropdownMenu.Root>
-        <DropdownMenu.Trigger aria-label="申请筛选" title="申请筛选">
-          {#snippet child({ props })}<Button
-              {...props}
-              variant="ghost"
-              size="icon"
-            >
-              <ChevronDown size={15} />
-            </Button>{/snippet}
-        </DropdownMenu.Trigger>
-        <DropdownMenu.Content align="end">
-          <DropdownMenu.Item onSelect={() => selectCategory('incoming')}>
-            收到的申请
-          </DropdownMenu.Item>
-          <DropdownMenu.Item onSelect={() => selectCategory('outgoing')}>
-            发出的申请
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu.Root>
     </nav>
     {#if listError}
       <div class="contacts-feedback">
@@ -330,7 +321,7 @@
     >
       <ul
         class="contact-list"
-        aria-label={tabs.find((item) => item.id === tab)?.label}
+        aria-label={tab === 'friends' ? '好友' : '新的朋友'}
       >
         {#if tab === 'friends'}
           {#each friends as friend (friend.user.id)}
@@ -345,9 +336,11 @@
         {:else}
           {#each filteredRequests as request (request.id)}
             {@render contactRow(
-              tab === 'incoming' ? request.sender : request.recipient,
+              request.user,
               request.id,
-              tab === 'incoming' ? '请求添加你为好友' : '等待对方同意',
+              request.direction === 'incoming'
+                ? '请求添加你 · 待你确认'
+                : '你发出的申请 · 等待同意',
             )}
           {:else}
             {#if !contacts.owner?.loading && !searching}<li
@@ -366,7 +359,13 @@
           onclick={() =>
             tab === 'friends' && term
               ? search?.loadMore()
-              : contacts.owner?.loadMore(tab)}
+              : tab === 'friends'
+                ? contacts.owner?.loadMore('friends')
+                : Promise.all(
+                    (['incoming', 'outgoing'] as const)
+                      .filter((direction) => contacts.owner?.hasMore(direction))
+                      .map((direction) => contacts.owner?.loadMore(direction)),
+                  )}
         >
           加载更多
         </Button>
@@ -418,7 +417,7 @@
           </dl>
           {#if tab !== 'friends'}
             <p class="contact-request-status">
-              {tab === 'incoming'
+              {selectedRequest?.direction === 'incoming'
                 ? '对方请求添加你为好友'
                 : '好友申请已发送，等待对方同意'}
             </p>
@@ -445,7 +444,7 @@
                 删除好友
               </Button>
             {:else if selectedRequest}
-              {#if tab === 'incoming'}
+              {#if selectedRequest.direction === 'incoming'}
                 <Button
                   disabled={contacts.owner?.busy}
                   onclick={() =>

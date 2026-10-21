@@ -32,7 +32,7 @@
 
 .contact-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr 28px;
+  grid-template-columns: 1fr 1fr;
   gap: 4px;
   margin: 10px var(--workspace-list-inset);
   padding: 4px;

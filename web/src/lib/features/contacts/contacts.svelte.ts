@@ -151,6 +151,17 @@ export class ContactsState {
     );
   }
 
+  /** Both request directions share one destination and stop when either contains the selection. */
+  async revealRequest(id: string, signal: AbortSignal) {
+    const found = () =>
+      this.incoming.some((request) => request.id === id) ||
+      this.outgoing.some((request) => request.id === id);
+    await Promise.all([
+      this.readUntil('incoming', signal, found),
+      this.readUntil('outgoing', signal, found),
+    ]);
+  }
+
   /** Requests have no server search; finish pagination before declaring no matches. */
   async loadRequests(kind: 'incoming' | 'outgoing', signal: AbortSignal) {
     await this.readUntil(kind, signal, () => false);
