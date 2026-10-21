@@ -205,3 +205,33 @@ pub async fn update_activity(
 
     Ok(())
 }
+
+/// Revoke only the captured generation after the caller locks the live delivery job.
+/// Replacement generations stay active; activity cleanup follows the existing binding lifecycle.
+pub async fn expire_generation(
+    transaction: &mut Transaction<'_, Postgres>,
+    job: &super::jobs::repository::LeasedPushJob,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        UPDATE push_subscriptions
+        SET revoked_at = coalesce(revoked_at, clock_timestamp())
+        WHERE id = $1 AND generation = $2
+        "#,
+    )
+    .bind(job.subscription_id)
+    .bind(job.binding_generation)
+    .execute(&mut **transaction)
+    .await?;
+    sqlx::query(
+        r#"
+        DELETE FROM push_activity
+        WHERE subscription_id = $1
+        "#,
+    )
+    .bind(job.subscription_id)
+    .execute(&mut **transaction)
+    .await?;
+
+    Ok(())
+}

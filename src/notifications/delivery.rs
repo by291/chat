@@ -2,7 +2,7 @@
 
 use time::OffsetDateTime;
 
-use super::job_repository::{self, LeasedPushJob};
+use super::jobs::repository::{self as job_repository, LeasedPushJob};
 use crate::{AppState, error::AppError, infrastructure::web_push::ProviderOutcome};
 
 pub enum PushOutcome {
@@ -53,4 +53,24 @@ pub async fn deliver(state: &AppState, job: &LeasedPushJob) -> Result<PushOutcom
         ProviderOutcome::Accepted => PushOutcome::Accepted,
         other => PushOutcome::Provider(other),
     })
+}
+
+/// Apply provider expiry atomically with job completion under job → binding lock order.
+/// Cancellation or any durable failure rolls back both changes; a stale lease is a no-op.
+pub async fn expire_binding(pool: &sqlx::PgPool, job: &LeasedPushJob) -> Result<(), sqlx::Error> {
+    let mut transaction = pool.begin().await?;
+    if !job_repository::lock_live_lease(&mut transaction, job).await? {
+        return Ok(());
+    }
+
+    super::repository::expire_generation(&mut transaction, job).await?;
+    // The lease can expire while binding/activity locks are contended. A zero-row
+    // completion must roll back those effects just like a SQL failure does.
+    if !job_repository::complete_binding_expiry(&mut transaction, job).await? {
+        transaction.rollback().await?;
+        return Ok(());
+    }
+    transaction.commit().await?;
+
+    Ok(())
 }

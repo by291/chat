@@ -147,7 +147,7 @@ async fn lock_actor(
     actor: Actor,
 ) -> Result<(), AppError> {
     repository::lock_owner(transaction, actor.user_id).await?;
-    if !crate::auth::security_repository::require_active_session(transaction, actor).await? {
+    if !crate::auth::security::repository::require_active_session(transaction, actor).await? {
         return Err(AppError::unauthorized());
     }
 

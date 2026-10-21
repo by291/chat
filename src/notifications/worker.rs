@@ -8,7 +8,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::{
     delivery::{self, PushOutcome},
-    job_repository,
+    jobs::repository as job_repository,
 };
 use crate::{AppState, error::AppError, infrastructure::web_push::ProviderOutcome};
 
@@ -77,7 +77,7 @@ async fn process_claim(state: &AppState) -> Result<bool, AppError> {
             database(job_repository::defer(&state.pool, &job, until, None)).await?;
         }
         PushOutcome::Provider(ProviderOutcome::BindingExpired) => {
-            database(job_repository::expire_binding(&state.pool, &job)).await?;
+            database(delivery::expire_binding(&state.pool, &job)).await?;
         }
         PushOutcome::Provider(ProviderOutcome::Definitive(category)) => {
             database(job_repository::complete(

@@ -507,3 +507,164 @@ async fn retry_after_beyond_deadline_expires_instead_of_sending_early() {
     assert_eq!(status(&fixture).await, "expired");
     assert_eq!(fixture.provider.requests().len(), 1);
 }
+
+#[tokio::test]
+async fn binding_expiry_rolls_back_revocation_when_job_completion_fails() {
+    let fixture = fixture().await;
+    send(&fixture, uuid::Uuid::new_v4()).await;
+    make_due(&fixture).await;
+    let job = chat_server::notifications::job_repository::claim(&fixture.app.pool)
+        .await
+        .unwrap()
+        .unwrap();
+    sqlx::query("ALTER TABLE push_jobs ADD CONSTRAINT reject_expiry CHECK (status <> 'expired')")
+        .execute(&fixture.app.pool)
+        .await
+        .unwrap();
+
+    let result =
+        chat_server::notifications::job_repository::expire_binding(&fixture.app.pool, &job).await;
+
+    assert!(result.is_err());
+    assert_eq!(status(&fixture).await, "pending");
+    assert!(
+        !sqlx::query_scalar::<_, bool>("SELECT revoked_at IS NOT NULL FROM push_subscriptions")
+            .fetch_one(&fixture.app.pool)
+            .await
+            .unwrap()
+    );
+
+    sqlx::query("ALTER TABLE push_jobs DROP CONSTRAINT reject_expiry")
+        .execute(&fixture.app.pool)
+        .await
+        .unwrap();
+    chat_server::notifications::job_repository::expire_binding(&fixture.app.pool, &job)
+        .await
+        .unwrap();
+
+    assert_eq!(status(&fixture).await, "expired");
+    assert!(
+        sqlx::query_scalar::<_, bool>("SELECT revoked_at IS NOT NULL FROM push_subscriptions")
+            .fetch_one(&fixture.app.pool)
+            .await
+            .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn binding_expiry_rolls_back_when_lease_expires_while_waiting_for_binding_lock() {
+    use std::time::Duration;
+
+    let fixture = fixture().await;
+    send(&fixture, uuid::Uuid::new_v4()).await;
+    make_due(&fixture).await;
+    let job = chat_server::notifications::job_repository::claim(&fixture.app.pool)
+        .await
+        .unwrap()
+        .unwrap();
+    let job_id = job.id;
+    let subscription_id = job.subscription_id;
+    sqlx::query(
+        "INSERT INTO push_activity(subscription_id, conversation_id, expires_at) VALUES ($1, $2, clock_timestamp() + interval '30 seconds')",
+    )
+    .bind(subscription_id)
+    .bind(job.conversation_id)
+    .execute(&fixture.app.pool)
+    .await
+    .unwrap();
+    let mut blocker = fixture.app.pool.begin().await.unwrap();
+    let blocker_pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *blocker)
+        .await
+        .unwrap();
+    sqlx::query("SELECT id FROM push_subscriptions WHERE id = $1 FOR UPDATE")
+        .bind(subscription_id)
+        .execute(&mut *blocker)
+        .await
+        .unwrap();
+    sqlx::query(
+        "UPDATE push_jobs SET lease_until = clock_timestamp() + interval '3 seconds' WHERE id = $1",
+    )
+    .bind(job_id)
+    .execute(&fixture.app.pool)
+    .await
+    .unwrap();
+    let pool = fixture.app.pool.clone();
+
+    let expiry = tokio::spawn(async move {
+        // Keep the established public path and SQLx error type compile-checked.
+        let result: Result<(), sqlx::Error> =
+            chat_server::notifications::job_repository::expire_binding(&pool, &job).await;
+        result
+    });
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            let waiting: bool = sqlx::query_scalar(
+                r#"
+                SELECT EXISTS (
+                    SELECT 1 FROM pg_stat_activity
+                    WHERE datname = current_database()
+                      AND $1 = ANY(pg_blocking_pids(pid))
+                      AND strpos(query, 'UPDATE push_subscriptions') > 0
+                )
+                "#,
+            )
+            .bind(blocker_pid)
+            .fetch_one(&fixture.app.pool)
+            .await
+            .unwrap();
+            if waiting {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("expiry did not reach the binding lock while its lease was live");
+    tokio::time::timeout(Duration::from_secs(4), async {
+        loop {
+            let expired: bool = sqlx::query_scalar(
+                "SELECT lease_until <= clock_timestamp() FROM push_jobs WHERE id = $1",
+            )
+            .bind(job_id)
+            .fetch_one(&fixture.app.pool)
+            .await
+            .unwrap();
+            if expired {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("captured job lease did not expire");
+    blocker.rollback().await.unwrap();
+    tokio::time::timeout(Duration::from_secs(3), expiry)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(status(&fixture).await, "pending");
+    let revoked: bool =
+        sqlx::query_scalar("SELECT revoked_at IS NOT NULL FROM push_subscriptions WHERE id = $1")
+            .bind(subscription_id)
+            .fetch_one(&fixture.app.pool)
+            .await
+            .unwrap();
+    assert!(
+        !revoked,
+        "a lost completion lease must roll back binding revocation"
+    );
+    let activity_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM push_activity WHERE subscription_id = $1)",
+    )
+    .bind(subscription_id)
+    .fetch_one(&fixture.app.pool)
+    .await
+    .unwrap();
+    assert!(
+        activity_exists,
+        "a lost completion lease must retain binding activity"
+    );
+}

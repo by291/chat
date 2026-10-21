@@ -3,6 +3,7 @@
 pub mod delivery;
 pub mod http;
 pub mod job_repository;
+pub(crate) mod jobs;
 pub mod model;
 pub(crate) mod repository;
 pub mod service;
