@@ -1,5 +1,7 @@
 //! Pair-serialized persistence; callers own transactions and commit decisions.
 
+use std::collections::{BTreeSet, HashMap};
+
 use sqlx::{Postgres, Transaction};
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -12,39 +14,40 @@ pub const PAGE_SIZE: usize = 50;
 /// Advisory locks also protect a pair before its first request or friendship exists.
 /// Existing conversation operations acquire their aggregate lock before this lock.
 pub async fn lock_pair(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     first: UserId,
     second: UserId,
 ) -> Result<(), sqlx::Error> {
     let key = format!("friendship:{}:{}", first.min(second), first.max(second));
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
         .bind(key)
-        .execute(&mut **tx)
+        .execute(&mut **transaction)
         .await?;
+
     Ok(())
 }
 
 pub async fn user(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     id: UserId,
 ) -> Result<Option<UserView>, sqlx::Error> {
     sqlx::query_as("SELECT id, username, display_name FROM users WHERE id = $1")
         .bind(id)
-        .fetch_optional(&mut **tx)
+        .fetch_optional(&mut **transaction)
         .await
 }
 
 pub async fn is_friend(
-    tx: &mut Transaction<'_, Postgres>,
-    a: UserId,
-    b: UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    first: UserId,
+    second: UserId,
 ) -> Result<bool, sqlx::Error> {
     sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM friendships WHERE user_low = $1 AND user_high = $2)",
     )
-    .bind(a.min(b))
-    .bind(a.max(b))
-    .fetch_one(&mut **tx)
+    .bind(first.min(second))
+    .bind(first.max(second))
+    .fetch_one(&mut **transaction)
     .await
 }
 
@@ -59,7 +62,7 @@ pub struct RequestRow {
 }
 
 pub async fn request(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     id: Uuid,
 ) -> Result<Option<RequestRow>, sqlx::Error> {
     sqlx::query_as(
@@ -70,14 +73,14 @@ pub async fn request(
         "#,
     )
     .bind(id)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut **transaction)
     .await
 }
 
 pub async fn pending(
-    tx: &mut Transaction<'_, Postgres>,
-    a: UserId,
-    b: UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    first: UserId,
+    second: UserId,
 ) -> Result<Option<RequestRow>, sqlx::Error> {
     sqlx::query_as(
         r#"
@@ -86,16 +89,16 @@ pub async fn pending(
         WHERE user_low = $1 AND user_high = $2 AND status = 'pending'
     "#,
     )
-    .bind(a.min(b))
-    .bind(a.max(b))
-    .fetch_optional(&mut **tx)
+    .bind(first.min(second))
+    .bind(first.max(second))
+    .fetch_optional(&mut **transaction)
     .await
 }
 
 pub async fn insert_request(
-    tx: &mut Transaction<'_, Postgres>,
-    a: UserId,
-    b: UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    first: UserId,
+    second: UserId,
 ) -> Result<RequestRow, sqlx::Error> {
     sqlx::query_as(
         r#"
@@ -105,50 +108,52 @@ pub async fn insert_request(
     "#,
     )
     .bind(Uuid::now_v7())
-    .bind(a)
-    .bind(b)
-    .fetch_one(&mut **tx)
+    .bind(first)
+    .bind(second)
+    .fetch_one(&mut **transaction)
     .await
 }
 
 pub async fn set_status(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     id: Uuid,
     status: FriendRequestStatus,
 ) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE friend_requests SET status = $2, updated_at = now() WHERE id = $1")
         .bind(id)
         .bind(status)
-        .execute(&mut **tx)
+        .execute(&mut **transaction)
         .await?;
+
     Ok(())
 }
 
 pub async fn insert_friend(
-    tx: &mut Transaction<'_, Postgres>,
-    a: UserId,
-    b: UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    first: UserId,
+    second: UserId,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO friendships(user_low, user_high) VALUES ($1, $2) ON CONFLICT DO NOTHING",
     )
-    .bind(a.min(b))
-    .bind(a.max(b))
-    .execute(&mut **tx)
+    .bind(first.min(second))
+    .bind(first.max(second))
+    .execute(&mut **transaction)
     .await?;
+
     Ok(())
 }
 
 pub async fn remove_friend(
-    tx: &mut Transaction<'_, Postgres>,
-    a: UserId,
-    b: UserId,
+    transaction: &mut Transaction<'_, Postgres>,
+    first: UserId,
+    second: UserId,
 ) -> Result<bool, sqlx::Error> {
     Ok(
         sqlx::query("DELETE FROM friendships WHERE user_low = $1 AND user_high = $2")
-            .bind(a.min(b))
-            .bind(a.max(b))
-            .execute(&mut **tx)
+            .bind(first.min(second))
+            .bind(first.max(second))
+            .execute(&mut **transaction)
             .await?
             .rows_affected()
             > 0,
@@ -156,7 +161,7 @@ pub async fn remove_friend(
 }
 
 pub async fn enqueue_contacts_changed(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     user: UserId,
 ) -> Result<(), sqlx::Error> {
     let id = Uuid::now_v7();
@@ -172,29 +177,72 @@ pub async fn enqueue_contacts_changed(
     .bind(sqlx::types::Json(
         crate::realtime::model::OutboxPayload::ContactsUpdated { user_id: user },
     ))
-    .execute(&mut **tx)
+    .execute(&mut **transaction)
     .await?;
+
     Ok(())
 }
 
+/// Project both parties while preserving the caller's snapshot and request order.
+pub async fn request_views(
+    transaction: &mut Transaction<'_, Postgres>,
+    requests: Vec<RequestRow>,
+) -> Result<Vec<FriendRequestView>, sqlx::Error> {
+    if requests.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let user_ids: Vec<UserId> = requests
+        .iter()
+        .flat_map(|request| [request.sender_id, request.recipient_id])
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let users: Vec<UserView> = sqlx::query_as(
+        r#"
+        SELECT id, username, display_name
+        FROM users
+        WHERE id = ANY($1)
+        "#,
+    )
+    .bind(user_ids)
+    .fetch_all(&mut **transaction)
+    .await?;
+    let users: HashMap<UserId, UserView> = users.into_iter().map(|user| (user.id, user)).collect();
+
+    requests
+        .into_iter()
+        .map(|request| {
+            // Each response owns its profile values; repeated participants share only the lookup.
+            let sender = users
+                .get(&request.sender_id)
+                .cloned()
+                .ok_or(sqlx::Error::RowNotFound)?;
+            let recipient = users
+                .get(&request.recipient_id)
+                .cloned()
+                .ok_or(sqlx::Error::RowNotFound)?;
+
+            Ok(FriendRequestView {
+                id: request.id,
+                sender,
+                recipient,
+                status: request.status,
+                created_at: request.created_at,
+                updated_at: request.updated_at,
+            })
+        })
+        .collect()
+}
+
 pub async fn request_view(
-    tx: &mut Transaction<'_, Postgres>,
-    row: RequestRow,
+    transaction: &mut Transaction<'_, Postgres>,
+    request: RequestRow,
 ) -> Result<FriendRequestView, sqlx::Error> {
-    let sender = user(tx, row.sender_id)
+    request_views(transaction, vec![request])
         .await?
-        .ok_or(sqlx::Error::RowNotFound)?;
-    let recipient = user(tx, row.recipient_id)
-        .await?
-        .ok_or(sqlx::Error::RowNotFound)?;
-    Ok(FriendRequestView {
-        id: row.id,
-        sender,
-        recipient,
-        status: row.status,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-    })
+        .pop()
+        .ok_or(sqlx::Error::RowNotFound)
 }
 
 #[derive(sqlx::FromRow)]
@@ -206,7 +254,7 @@ struct FriendRow {
 }
 
 pub async fn friends(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     actor: UserId,
     query: &str,
     cursor: Option<Uuid>,
@@ -227,8 +275,9 @@ pub async fn friends(
     .bind(query)
     .bind(cursor)
     .bind((PAGE_SIZE + 1) as i64)
-    .fetch_all(&mut **tx)
+    .fetch_all(&mut **transaction)
     .await?;
+
     Ok(rows
         .into_iter()
         .map(|row| FriendshipView {
@@ -243,7 +292,7 @@ pub async fn friends(
 }
 
 pub async fn requests(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     actor: UserId,
     direction: RequestDirection,
     status: Option<FriendRequestStatus>,
@@ -265,25 +314,28 @@ pub async fn requests(
     .bind(status)
     .bind(cursor)
     .bind((PAGE_SIZE + 1) as i64)
-    .fetch_all(&mut **tx)
+    .fetch_all(&mut **transaction)
     .await
 }
 
 pub async fn pending_count(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     actor: UserId,
 ) -> Result<i64, sqlx::Error> {
     sqlx::query_scalar(
         "SELECT count(*) FROM friend_requests WHERE recipient_id = $1 AND status = 'pending'",
     )
     .bind(actor)
-    .fetch_one(&mut **tx)
+    .fetch_one(&mut **transaction)
     .await
 }
 
-pub async fn repeatable_read(tx: &mut Transaction<'_, Postgres>) -> Result<(), sqlx::Error> {
+pub async fn repeatable_read(
+    transaction: &mut Transaction<'_, Postgres>,
+) -> Result<(), sqlx::Error> {
     sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
-        .execute(&mut **tx)
+        .execute(&mut **transaction)
         .await?;
+
     Ok(())
 }
