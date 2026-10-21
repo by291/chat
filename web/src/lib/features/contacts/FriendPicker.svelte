@@ -161,14 +161,16 @@
           {results.length ? '匹配好友已全部选择' : '没有找到匹配的好友'}
         </p>
       {/each}
-      {#if nextCursor}<Button
+      {#if nextCursor}
+        <Button
           type="button"
           variant="ghost"
           disabled={searching}
           onclick={loadMore}
         >
           加载更多好友
-        </Button>{/if}
+        </Button>
+      {/if}
     {/if}
   </Combobox.ContentStatic>
 </Combobox.Root>

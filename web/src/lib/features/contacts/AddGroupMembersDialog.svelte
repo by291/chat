@@ -38,18 +38,20 @@
       await Promise.all([sync.refreshSummaries(), sync.refreshMembers()]);
       if (!lifetime.signal.aborted) open = false;
     } catch (reason) {
-      if (!lifetime.signal.aborted)
+      if (!lifetime.signal.aborted) {
         error = reason instanceof Error ? reason.message : '添加成员失败';
+      }
     } finally {
       if (!lifetime.signal.aborted) busy = false;
     }
   }
   $effect(() => {
-    if (open)
+    if (open) {
       untrack(() => {
         selected = [];
         error = '';
       });
+    }
   });
   onDestroy(() => lifetime.abort());
 </script>
@@ -79,7 +81,9 @@
       }}
     >
       <FriendPicker bind:selected {excludedIds} disabled={busy} />
-      {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+      {#if error}
+        <p class="form-error" role="alert">{error}</p>
+      {/if}
       <Button type="submit" disabled={busy || !selected.length}>
         {busy ? '正在添加…' : '添加成员'}
       </Button>

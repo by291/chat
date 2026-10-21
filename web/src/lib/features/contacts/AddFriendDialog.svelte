@@ -32,20 +32,22 @@
   const incoming = $derived(pending?.sender.id === selected?.id);
 
   $effect(() => {
-    if (open)
+    if (open) {
       untrack(() => {
         selected = user;
         query = '';
         error = '';
       });
+    }
   });
 
   $effect(() => {
     const owner = contacts.owner;
     const id = selected?.id;
     relationship = undefined;
-    if (open && owner && id)
+    if (open && owner && id) {
       return owner.watchRelationship(id, (value) => (relationship = value));
+    }
   });
 
   $effect(() => {
@@ -61,8 +63,9 @@
         const users = await api.searchUsers(term, controller.signal);
         if (!controller.signal.aborted) results = users;
       } catch (reason) {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
           error = reason instanceof Error ? reason.message : '搜索失败';
+        }
       } finally {
         if (!controller.signal.aborted) searching = false;
       }
@@ -91,8 +94,12 @@
       oncompositionstart={() => (composing = true)}
       oncompositionend={() => (composing = false)}
     />
-    {#if searching}<p role="status">正在搜索…</p>{/if}
-    {#if error}<p class="form-error" role="alert">{error}</p>{/if}
+    {#if searching}
+      <p role="status">正在搜索…</p>
+    {/if}
+    {#if error}
+      <p class="form-error" role="alert">{error}</p>
+    {/if}
     <ul class="contact-list" aria-label="搜索结果">
       {#each results as result (result.id)}
         <li>
@@ -107,9 +114,9 @@
           </Button>
         </li>
       {:else}
-        {#if query.trim() && !searching && !error}<li class="muted">
-            没有找到匹配的用户
-          </li>{/if}
+        {#if query.trim() && !searching && !error}
+          <li class="muted">没有找到匹配的用户</li>
+        {/if}
       {/each}
     </ul>
     {#if selected}
@@ -154,8 +161,10 @@
         {/if}
       </div>
     {/if}
-    {#if contacts.owner?.mutationError}<p class="form-error" role="alert">
+    {#if contacts.owner?.mutationError}
+      <p class="form-error" role="alert">
         {contacts.owner.mutationError}
-      </p>{/if}
+      </p>
+    {/if}
   </Dialog.Content>
 </Dialog.Root>
