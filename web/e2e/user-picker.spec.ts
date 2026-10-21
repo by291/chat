@@ -192,7 +192,9 @@ test('late search results cannot replace a new query and failed group creation k
   await add.click();
   await expect(page.getByRole('dialog')).not.toBeVisible();
   await expect(
-    page.getByRole('heading', { name: '周末计划', exact: true }),
+    page
+      .locator('.chat-heading')
+      .getByRole('heading', { name: '周末计划', exact: true }),
   ).toBeVisible();
   expect(requests).toEqual([
     [second.user.id, first.user.id],
