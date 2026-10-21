@@ -35,7 +35,13 @@ const cancel = () => {
 };
 process.once("SIGINT", cancel);
 process.once("SIGTERM", cancel);
-const env = { ...process.env };
+const env = {
+  ...process.env,
+  // Each Rust integration test provisions its own database in the shared test
+  // server. Bound concurrent fixture migrations to its shared-memory budget;
+  // concurrency inside each behavior test remains unchanged.
+  RUST_TEST_THREADS: process.env.RUST_TEST_THREADS ?? "2",
+};
 const command = async (name, args, cwd = repositoryRoot) => {
   controller.signal.throwIfAborted();
   // Killing only Cargo/Vitest/Playwright can orphan their fixture processes on Windows.
