@@ -61,7 +61,7 @@ export class MediaUploads {
   metadata(entry: UploadDraft): Attachment | undefined {
     // Query-cache notifications rerun consumers without making the draft own a
     // mutable second copy of the server's processing metadata.
-    this.revision;
+    void this.revision;
     return entry.attachmentId
       ? this.options.queryClient.getQueryData(attachmentKey(entry.attachmentId))
       : undefined;

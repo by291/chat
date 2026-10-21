@@ -116,6 +116,11 @@ const steps = [
   ],
   [
     "frontend",
+    "Svelte and TypeScript lint",
+    () => tool("eslint", "eslint", [".", "--max-warnings", "0"]),
+  ],
+  [
+    "frontend",
     "Formatting",
     () =>
       tool("prettier", "prettier", [
@@ -124,6 +129,7 @@ const steps = [
         "tests",
         "e2e",
         "*.ts",
+        "*.js",
         "*.json",
         "../scripts/*.mjs",
         "../tests/*.mjs",
