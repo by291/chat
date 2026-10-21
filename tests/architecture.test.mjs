@@ -214,3 +214,114 @@ test("typed HTTP method checks retain the same adapter boundary", () => {
     [],
   );
 });
+
+test("approved workflow adapters can own HTTP without admitting component adapters", () => {
+  const source = "api.POST('/api/v1/messages');";
+
+  assert.deepEqual(
+    frontendSourceViolations(
+      "web/src/lib/features/chat/messages/api.ts",
+      source,
+    ),
+    [],
+  );
+  assert.equal(
+    frontendSourceViolations(
+      "web/src/lib/features/chat/components/api.ts",
+      source,
+    ).length,
+    1,
+  );
+  assert.equal(
+    frontendSourceViolations("web/src/lib/features/chat/unknown/api.ts", source)
+      .length,
+    1,
+  );
+});
+
+test("dynamic imports retain shared and route ownership boundaries", () => {
+  assert.equal(
+    frontendSourceViolations(
+      "web/src/lib/helpers.ts",
+      "import('#lib/features/chat/api.ts');",
+    ).length,
+    1,
+  );
+  assert.equal(
+    frontendSourceViolations(
+      "web/src/lib/features/workspace/lifetime.svelte.ts",
+      "import('../../../routes/app/+layout.svelte');",
+    ).length,
+    1,
+  );
+});
+
+test("only the authenticated workspace may clear the whole query client", () => {
+  for (const source of [
+    "queryClient.clear();",
+    "this.options.queryClient.clear();",
+  ]) {
+    assert.equal(
+      frontendSourceViolations(
+        "web/src/lib/features/chat/synchronization/conversation-store.ts",
+        source,
+      ).length,
+      1,
+    );
+    assert.deepEqual(
+      frontendSourceViolations(
+        "web/src/lib/features/workspace/lifetime.svelte.ts",
+        source,
+      ),
+      [],
+    );
+  }
+  assert.deepEqual(
+    frontendSourceViolations(
+      "web/src/lib/features/chat/synchronization/activity.svelte.ts",
+      "this.typingTimers.clear();",
+    ),
+    [],
+  );
+});
+
+test("repositories do not depend on application services or finish transactions", () => {
+  const filename = "src/notifications/jobs/repository.rs";
+
+  for (const source of [
+    "use super::service::expire_binding;",
+    "use crate::notifications::{delivery, worker};",
+    "transaction.commit().await?;",
+    "transaction.rollback().await?;",
+    "let transaction = pool.begin().await?;",
+  ]) {
+    assert.equal(rustLayerSourceViolations(filename, source).length, 1, source);
+  }
+
+  assert.deepEqual(
+    rustLayerSourceViolations(filename, "use super::model::Binding;"),
+    [],
+  );
+  assert.deepEqual(
+    rustLayerSourceViolations(
+      filename,
+      "// The caller owns transaction.commit().\nlet row = load(transaction).await?;",
+    ),
+    [],
+  );
+});
+
+test("legacy persistence facades may re-export workflow names but cannot own code", () => {
+  const exports = "pub use super::processing::lifecycle::publish;";
+  for (const filename of [
+    "src/media/repository.rs",
+    "src/notifications/job_repository.rs",
+  ]) {
+    assert.deepEqual(rustLayerSourceViolations(filename, exports), []);
+    assert.equal(
+      rustLayerSourceViolations(filename, `${exports}\npub fn save() {}`)
+        .length,
+      1,
+    );
+  }
+});

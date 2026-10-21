@@ -19,6 +19,23 @@ const httpMethods = new Set([
   "OPTIONS",
 ]);
 const browserGlobals = new Set(["window", "globalThis", "self"]);
+// Workflow adapters are explicit: a component folder named api.ts is not a boundary.
+const workflowAdapters = new Set([
+  "chat/conversations",
+  "chat/messages",
+  "chat/groups",
+  "contacts/friends",
+  "contacts/requests",
+  "settings/profile",
+  "settings/security",
+  "settings/sessions",
+  "auth/recovery",
+  "auth/verification",
+]);
+const persistenceFacades = new Set([
+  "src/media/repository.rs",
+  "src/notifications/job_repository.rs",
+]);
 
 async function filesUnder(directory) {
   const entries = await readdir(path.join(root, directory), {
@@ -110,6 +127,7 @@ function importsIn(source, filename) {
   );
   const imports = [];
   let hasHttpCall = false;
+  let clearsQueryClient = false;
 
   function visit(node) {
     if (
@@ -120,15 +138,38 @@ function importsIn(source, filename) {
       imports.push(node.moduleSpecifier.text);
     }
 
-    if (ts.isCallExpression(node) && isHttpCall(node.expression)) {
-      hasHttpCall = true;
+    if (ts.isCallExpression(node)) {
+      if (isHttpCall(node.expression)) hasHttpCall = true;
+
+      if (
+        node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+        node.arguments.length === 1 &&
+        ts.isStringLiteral(node.arguments[0])
+      ) {
+        imports.push(node.arguments[0].text);
+      }
+
+      const callee = unwrapExpression(node.expression);
+      if (
+        ts.isPropertyAccessExpression(callee) &&
+        callee.name.text === "clear"
+      ) {
+        const receiver = unwrapExpression(callee.expression);
+        if (
+          (ts.isIdentifier(receiver) && receiver.text === "queryClient") ||
+          (ts.isPropertyAccessExpression(receiver) &&
+            receiver.name.text === "queryClient")
+        ) {
+          clearsQueryClient = true;
+        }
+      }
     }
 
     ts.forEachChild(node, visit);
   }
 
   visit(syntax);
-  return { imports, hasHttpCall };
+  return { imports, hasHttpCall, clearsQueryClient };
 }
 
 function projectImport(filename, specifier) {
@@ -175,17 +216,50 @@ export function rustLayerSourceViolations(filename, source) {
   )
     return [];
 
-  const imports = [...source.matchAll(/\buse\s+([^;]+);/g)];
+  // This is a source guard, not a Rust parser. Ignore comments so documented
+  // transaction preconditions are not mistaken for application operations.
+  const code = source.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, "");
+  const imports = [...code.matchAll(/\buse\s+([^;]+);/g)];
   const importsHttpAdapter = imports.some(
     ([, declaration]) =>
       /^(?:crate|super|self)\s*::/.test(declaration) &&
       /\b(?:\w+_)?http\s*(?:::|[,{}])/.test(declaration),
   );
-  if (!importsHttpAdapter) return [];
+  const violations = [];
+  if (importsHttpAdapter) {
+    violations.push(
+      `${filename}: application and persistence modules must not import HTTP adapters`,
+    );
+  }
 
-  return [
-    `${filename}: application and persistence modules must not import HTTP adapters`,
-  ];
+  if (/(?:\/|_)repository\.rs$/.test(filename)) {
+    const importsWorkflow = imports.some(
+      ([, declaration]) =>
+        /^(?:crate|super|self)\s*::/.test(declaration) &&
+        /\b(?:service|delivery|worker|lifecycle)\s*(?:::|[,{}])/.test(
+          declaration,
+        ),
+    );
+    // Existing public facades export worker operations for external consumers.
+    // They may re-export names, but must never grow executable persistence.
+    const compatibilityExports =
+      persistenceFacades.has(filename) &&
+      code.replace(/\bpub\s+use\s+[^;]+;/g, "").trim() === "";
+    if (importsWorkflow && !compatibilityExports) {
+      violations.push(
+        `${filename}: repositories must not depend on application workflows`,
+      );
+    }
+    // begin_with is the documented isolation-level constructor: it returns the
+    // transaction to its caller. Ordinary transaction lifetimes belong to services.
+    if (/\.\s*(?:begin|commit|rollback)\s*\(/.test(code)) {
+      violations.push(
+        `${filename}: application workflows own transaction lifetimes`,
+      );
+    }
+  }
+
+  return violations;
 }
 
 export async function rustLayerViolations() {
@@ -205,16 +279,35 @@ export async function rustLayerViolations() {
 /** Inspect one source file so boundary regressions can use isolated source fixtures. */
 export function frontendSourceViolations(filename, source) {
   const violations = [];
-  const { imports, hasHttpCall } = importsIn(source, filename);
+  const { imports, hasHttpCall, clearsQueryClient } = importsIn(
+    source,
+    filename,
+  );
   const isFeature = filename.startsWith("web/src/lib/features/");
   const isRoute = filename.startsWith("web/src/routes/");
+  const workflow = filename.match(
+    /^web\/src\/lib\/features\/(.+)\/api\.ts$/,
+  )?.[1];
+  const isAdapter =
+    workflow !== undefined &&
+    (!workflow.includes("/") || workflowAdapters.has(workflow));
 
   if (
     hasHttpCall &&
     !filename.startsWith("web/src/lib/api-client/") &&
-    !/\/features\/[^/]+\/api\.ts$/.test(filename)
+    !isAdapter
   ) {
     violations.push(`${filename}: HTTP calls belong in a feature API adapter`);
+  }
+
+  if (
+    isFeature &&
+    clearsQueryClient &&
+    !filename.startsWith("web/src/lib/features/workspace/")
+  ) {
+    violations.push(
+      `${filename}: only the authenticated workspace owns whole-session cache clearing`,
+    );
   }
 
   for (const specifier of imports) {
