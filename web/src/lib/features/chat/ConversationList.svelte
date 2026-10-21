@@ -12,7 +12,7 @@
 
   import ProfileAvatar from '#lib/features/settings/ProfileAvatar.svelte';
 
-  import AccountMenu from '#lib/features/settings/AccountMenu.svelte';
+  import WorkspaceNavigation from './WorkspaceNavigation.svelte';
 
   import NotificationSettings from './NotificationSettings.svelte';
   import ConversationActions from './ConversationActions.svelte';
@@ -66,11 +66,12 @@
     });
 </script>
 
-<aside class="conversation-sidebar">
+<aside class="conversation-sidebar" aria-label="会话列表">
+  <WorkspaceNavigation />
   <PaneHeader title="聊天" level={1}>
     {#snippet actions()}<ConversationActions {sync} /><NotificationSettings
         {sync}
-      /><AccountMenu mobile />{/snippet}
+      />{/snippet}
   </PaneHeader>
   <div class="workspace-search">
     <Search size={16} aria-hidden="true" />

@@ -165,7 +165,9 @@
 {#if auth.user}
   <QueryClientProvider client={queryClient}>
     <div class="app-frame">
-      <WorkspaceNavigation />
+      {#if page.url.pathname.startsWith('/app/groups/')}
+        <aside class="standalone-sidebar"><WorkspaceNavigation /></aside>
+      {/if}
       <div class="app-content">
         {#if isChatRoute}
           <ChatShell id={page.params.id ?? null} />

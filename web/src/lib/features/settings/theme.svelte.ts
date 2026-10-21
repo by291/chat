@@ -2,7 +2,7 @@ export type Theme = 'system' | 'light' | 'dark';
 
 /** Browser appearance state; preference storage contains no session-owned records. */
 class ThemeState {
-  value = $state<Theme>('system');
+  value = $state<Theme>('dark');
 
   private media: MediaQueryList | undefined;
 
@@ -13,10 +13,10 @@ class ThemeState {
     try {
       saved = localStorage.getItem('chat.theme');
     } catch {
-      // Storage may be disabled; system theme remains a usable default.
+      // Storage may be disabled; the default dark theme remains usable.
     }
 
-    if (saved === 'light' || saved === 'dark') {
+    if (saved === 'light' || saved === 'dark' || saved === 'system') {
       this.value = saved;
     }
 

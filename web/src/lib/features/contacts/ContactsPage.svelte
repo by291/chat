@@ -12,7 +12,7 @@
 
   import { Input } from '#lib/components/ui/input/index.js';
   import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
-  import AccountMenu from '#lib/features/settings/AccountMenu.svelte';
+  import WorkspaceNavigation from '#lib/features/chat/WorkspaceNavigation.svelte';
   import type { ContactsState } from './contacts.svelte';
 
   import { Button } from '#lib/components/ui/button/index.js';
@@ -245,6 +245,7 @@
 
 <main class="contacts-shell workspace-columns" class:has-contact={!!selectedId}>
   <aside class="contacts-sidebar" aria-label="通讯录列表">
+    <WorkspaceNavigation />
     <PaneHeader title="通讯录" level={1}>
       {#snippet actions()}<Button
           variant="ghost"
@@ -255,7 +256,7 @@
           onclick={() => (addOpen = true)}
         >
           <UserPlus class="size-5" />
-        </Button><AccountMenu mobile />{/snippet}
+        </Button>{/snippet}
     </PaneHeader>
     <label class="workspace-search">
       <Search size={17} aria-hidden="true" />

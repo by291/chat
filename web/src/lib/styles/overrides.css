@@ -1,17 +1,21 @@
 /* Final theme and mobile-navigation overrides; cascade order is intentional. */
 
 [data-theme='dark'] {
-  --surface: #202a2c;
-  --background: #172123;
-  --line: #344345;
-  --subtle-text: #9eb2ac;
-  --text: #e6f0ed;
-  --soft: #29493f;
-  --brand: #83d6bb;
-  --outgoing: #286956;
-  --shadow: #0003;
-  --brand-hover: #4ab08f;
-  --danger: #ed9da1;
+  --surface: #272d2f;
+  --background: #161a1b;
+  --sidebar: #1c2021;
+  --raised: #2a3032;
+  --detail-surface: #1c2223;
+  --line: #343c3e;
+  --subtle-text: #a0aaac;
+  --text: #e4e8e7;
+  --soft: #303b44;
+  --brand: #79b3f5;
+  --outgoing: #69a6ec;
+  --outgoing-text: #102b49;
+  --shadow: #0002;
+  --brand-hover: #98c7ff;
+  --danger: #f2a3a7;
   --warning-surface: #433625;
   --warning-text: #f0cf92;
   color: var(--text);

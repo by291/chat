@@ -7,8 +7,8 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
+  background: var(--sidebar);
+  border-right: 0;
 }
 
 .contacts-heading {
@@ -64,8 +64,8 @@
 .contacts-sidebar .contact-entry {
   width: 100%;
   height: auto;
-  min-height: 76px;
-  padding: 12px 8px;
+  min-height: 68px;
+  padding: 12px;
   gap: 12px;
   justify-content: flex-start;
   text-align: left;
@@ -73,7 +73,7 @@
 }
 
 .contact-entry[aria-pressed='true'] {
-  box-shadow: inset 3px 0 var(--brand);
+  box-shadow: none;
   background: var(--soft);
 }
 
@@ -153,7 +153,7 @@
 }
 
 .contact-identity h3 {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 650;
 }
 .contact-identity p {
@@ -240,7 +240,7 @@
 
   .contact-detail-heading {
     padding: 16px;
-    min-height: 76px;
+    min-height: 68px;
   }
 
   .contacts-back {
@@ -252,4 +252,33 @@
   background: var(--surface);
   color: var(--brand);
   box-shadow: 0 1px 4px var(--shadow);
+}
+
+.contacts-sidebar .contact-entry [data-slot='avatar'] {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+}
+@media (max-width: 700px) {
+  .contact-profile {
+    width: calc(100% - 24px);
+    margin-block: 16px;
+  }
+  .contact-identity {
+    padding: 20px;
+    gap: 16px;
+  }
+  .contact-identity > div {
+    min-width: 0;
+  }
+  .contact-identity [data-slot='avatar'] {
+    width: 56px;
+    height: 56px;
+  }
+  .contact-facts {
+    padding-inline: 20px;
+  }
+  .contact-actions {
+    padding: 16px 20px 20px;
+  }
 }

@@ -11,7 +11,7 @@
   import { Label } from '#lib/components/ui/label/index.js';
 
   import SettingsNavigation from '#lib/features/settings/SettingsNavigation.svelte';
-  import AccountMenu from './AccountMenu.svelte';
+  import WorkspaceNavigation from '#lib/features/chat/WorkspaceNavigation.svelte';
   import SessionsPanel from '#lib/features/settings/SessionsPanel.svelte';
   import PasswordForm from '#lib/features/settings/PasswordForm.svelte';
   import EmailForm from '#lib/features/settings/EmailForm.svelte';
@@ -53,9 +53,8 @@
 </svelte:head>
 <main class="settings-page workspace-columns" class:settings-detail={detail}>
   <aside class="settings-sidebar" aria-label="设置导航">
-    <PaneHeader title="设置" level={1}>
-      {#snippet actions()}<AccountMenu mobile />{/snippet}
-    </PaneHeader>
+    <WorkspaceNavigation />
+    <PaneHeader title="设置" level={1} />
     <SettingsNavigation {active} />
   </aside>
   <div class="settings-main">
