@@ -7,8 +7,11 @@ copy is a separate concern; preserve its existing localization during refactors.
 ## Project and scope
 
 - Keep the Rust package at the repository root and the SvelteKit application in `web/`.
-- Organize by cohesive business workflows: authentication, conversations, realtime,
-  user profiles, and settings. Do not create a module for every function.
+- Run frontend installs, development servers and direct CLI commands with `web/`
+  as the working directory. Use the package manager pinned in `web/package.json`
+  (`corepack pnpm` when the global version differs). Never create root
+  `node_modules`, `.svelte-kit`, frontend package manifests or frontend lockfiles.
+  Root `node scripts/check.mjs` is supported; it sets the frontend working directory.
 - Read [the architecture map](docs/architecture.md) before changing ownership.
 - Preserve API paths, JSON fields, error codes, database semantics, and UI behavior
   unless the task explicitly changes them. Refactoring does not authorize a migration.
@@ -18,6 +21,25 @@ copy is a separate concern; preserve its existing localization during refactors.
 - Keep one root `compose.yaml` for development and test infrastructure. Isolate tests
   with project names, ports and owned data, rather than additional Compose files.
   Document production service requirements without requiring a deployment platform.
+
+## Directory and responsibility design
+
+- Group cohesive business workflows before adding more files to a flat feature
+  directory. Keep related adapters, operations, persistence and presentation near
+  their owner: for example, `src/conversations/messages/` and
+  `web/src/lib/features/chat/messages/`.
+- Keep feature roots focused on entry points, composition and genuinely shared
+  contracts. Small cohesive features may stay shallow; do not create a directory
+  for every function or empty layers just to make the tree look organized.
+- A move must clarify ownership. Split files when they mix responsibilities, and
+  update imports, tests, comments and the architecture map together. Do not merely
+  hide a flat layout behind Rust `#[path]` attributes or forwarding-only folders.
+- Preserve existing public Rust paths with explicit compatibility re-exports when
+  consumers need them. Internal code imports the actual owner; compatibility
+  facades do not acquire business logic.
+- Reuse maintained libraries for general infrastructure when they fit. Keep
+  transaction, lock, lease, replay and sequence invariants explicit; do not replace
+  them with a generic framework just to shorten application code.
 
 ## Readability and logical paragraphs
 
@@ -41,21 +63,6 @@ workflow without decoding a dense block of statements.
 - Put SQL clauses and parameter bindings on separate lines. Keep Svelte control
   blocks and sibling elements on separate lines. Do not compress logic into macros,
   strings, chained assignments, or adjacent template branches.
-
-```rust
-let username = validation::username(&input.username)?;
-let password_hash = state.passwords.hash(&input.password).await?;
-
-let mut transaction = state.pool.begin().await?;
-let invitation = repository::lock_invitation(&mut transaction, &token_hash).await?;
-
-// Consumption and account creation must commit together: failed registration
-// must leave the invitation available for another attempt.
-repository::insert_user(&mut transaction, &user, &password_hash).await?;
-repository::consume_invitation(&mut transaction, invitation, user.id).await?;
-
-transaction.commit().await?;
-```
 
 ## Comments and documentation
 
@@ -86,8 +93,8 @@ transaction.commit().await?;
   result to an HTTP response. It must not query PostgreSQL directly.
 - `service.rs` and cohesive workflow modules own validation, authorization, operation
   ordering, and transactions. They use repository operations rather than embedding SQL.
-- `repository.rs` and named workflow files such as `group_repository.rs` own SQL,
-  row mappings, and database locking. Repository functions
+- `repository.rs` and focused files such as `messages/reactions_repository.rs` own
+  SQL, row mappings, and database locking. Repository functions
   accept an existing transaction when the caller must compose atomic operations.
   They must not commit that caller-owned transaction or depend on HTTP handlers.
 - `model.rs` owns a feature's DTOs. Shared IDs, authenticated actor, and exact sequence
@@ -109,8 +116,14 @@ transaction.commit().await?;
   HttpOnly cookie authentication, Origin validation, and private internal credentials.
 - Run blocking password work through the bounded password service. Bound external
   calls and make long-running loops cancellation-aware.
+- Cancellation must cover database waits as well as network calls. Keep writes
+  rollbackable when cancellation must discard them; document commit ambiguity.
+  Treat a lost lease separately from a durable database failure. A missed final
+  lease CAS must not commit dependent effects that require that lease.
 - Keep message/event/outbox writes atomic, invite consumption atomic, and read
   receipts monotonic. Sequence values remain canonical decimal strings across JSON.
+- Share typed persisted event payloads between producers and consumers, preserving
+  existing tags, fields and defaults for older queued records.
 - Use raw multiline strings for nontrivial SQL and Lua; never interpolate user input
   into SQL. Prefer local named constants for limits and deadlines over unexplained numbers.
 
@@ -135,6 +148,10 @@ transaction.commit().await?;
 - Give state one owner. The query cache holds authoritative server records; runes
   hold UI state such as selection, drafts, pending submissions, and connection status.
   Do not mirror the same mutable server records in a second store.
+- Keep mutable synchronization internals private. Expose observations and explicit
+  operations instead of letting callers change stream cursors or generation flags.
+  Coalesced requests must share the promise including its error handling and cleanup,
+  so every caller observes the same outcome.
 - Use `$derived` for pure computed values. Use `$effect` for actual side effects,
   with explicit dependencies and cleanup. Explain `untrack` where it prevents an
   accidental subscription or lifecycle restart.
@@ -148,6 +165,9 @@ transaction.commit().await?;
 - Scope contexts to the authenticated application tree. Browser globals belong in
   browser-only lifecycles; this SPA currently disables SSR. Revisit per-request state
   ownership before enabling SSR. Clear session-owned caches and timers on logout.
+- The workspace owns authenticated feature startup and whole-session teardown.
+  Stop feature owners before clearing the shared cache. Feature disposal removes
+  only its own queries, timers and subscriptions, never another feature's records.
 - Use typed props, stable keys, semantic elements, associated labels, and keyboard
   behavior. Respect IME composition and the existing mobile navigation/scroll behavior.
 - Put imports, props, local state, derived values, handlers, and lifecycle effects in
@@ -159,8 +179,8 @@ transaction.commit().await?;
 
 ## Verification and review
 
-- Run `node scripts/check.mjs` for format, lint, boundary checks, Rust tests, frontend
-  types, generated API checks, unit tests, and the static build.
+- For code changes, run `node scripts/check.mjs` for format, lint, boundary checks,
+  Rust tests, frontend types, generated API checks, unit tests, and the static build.
 - Run `node scripts/check.mjs --integration` after changes to auth, message
   transactions, replay, realtime transport, session lifetime, or production wiring.
 - Validate production wiring with `pnpm -C web test:deployment`
@@ -179,8 +199,38 @@ transaction.commit().await?;
 - Tests should read as arrange, act, and assert, separated by blank lines. Name the
   behavior and failure condition. Isolate test databases/containers, wait for explicit
   state with a deadline, and clean up only resources owned by the test.
+- Only one verification process may own the shared test infrastructure at a time.
+  Wait for its cleanup before starting another infrastructure suite; do not remove
+  an active ownership lock or tear down another run's resources.
 - Before completion, review the architecture map, contracts, comments, documentation,
   and actual command output. A passing formatter alone does not establish readability.
+- Report which checks ran and their outcomes. Distinguish source review, unit tests,
+  integration tests and deployed validation. A focused rerun can resolve a known
+  failure, but must not be described as a fresh successful full-suite invocation.
+- For documentation-only changes, verify the diff, referenced paths and commands;
+  do not start database/browser suites unless the change requires runtime evidence.
+
+## Git delivery
+
+- Inspect the branch, worktree and staged changes before modifying Git state.
+  Preserve unrelated edits and never include generated caches or test artifacts.
+- When asked to group commits, split by responsibility: workflow refactors,
+  reliability fixes with their regressions, tooling and documentation. Keep imports
+  with their moves and dependent changes together; use partial staging for shared
+  files rather than mixing unrelated work.
+- Local commit, local merge and remote push are separate actions. A request to merge
+  locally means `git merge --ff-only` into the requested branch; it does not authorize
+  a push. Honor explicit authorization already given in the current conversation.
+- After splitting commits or merging, verify that the final tree matches the intended
+  reviewed content and report any remaining changes. Git-only operations do not
+  require repeating unchanged runtime tests.
+
+## Maintaining these instructions
+
+Keep rules concrete and specific to this repository: name the owner, path, command
+or invariant. Update an existing rule instead of appending a duplicate. Put detailed
+design rationale in `docs/architecture.md` and transient execution records in task
+documentation, not here. Recheck examples and commands when the architecture changes.
 
 ## Reference material
 
@@ -193,3 +243,4 @@ mandated by a language. Use the official references to understand the underlying
 - [SvelteKit project structure](https://svelte.dev/docs/kit/project-structure)
 - [Svelte effects](https://svelte.dev/docs/svelte/$effect)
 - [SvelteKit state management](https://svelte.dev/docs/kit/state-management)
+- [AGENTS.md format and authoring guidance](https://agents.md/)
