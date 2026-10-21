@@ -143,7 +143,9 @@ test('three browsers manage a private group and rejoining hides the old episode'
     await expect(secondRow).toContainText('管理员');
     await page.getByRole('button', { name: '关闭', exact: true }).click();
     await expect(
-      member.getByRole('heading', { name: '新的群名称', exact: true }),
+      member
+        .locator('.chat-heading')
+        .getByRole('heading', { name: '新的群名称', exact: true }),
     ).toBeVisible();
 
     const oldEpisode = (await summary(stack, guest, id)).membership

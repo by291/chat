@@ -54,8 +54,8 @@ test('dialogs retain keyboard focus, dark surfaces and mobile bounds', async ({
         bottom: bounds.bottom,
       };
     });
-    expect(surface.background).toBe('rgb(32, 42, 44)');
-    expect(surface.foreground).toBe('rgb(230, 240, 237)');
+    expect(surface.background).toBe('rgb(39, 45, 47)');
+    expect(surface.foreground).toBe('rgb(228, 232, 231)');
     expect(surface.left).toBeGreaterThanOrEqual(0);
     expect(surface.right).toBeLessThanOrEqual(390);
     expect(surface.top).toBeGreaterThanOrEqual(0);

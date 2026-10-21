@@ -19,12 +19,14 @@ test('own profile edits in a centered dialog while chat info stays local and pre
   await composer.fill('修改资料后继续写');
   const destination = page.url();
   await page.getByRole('button', { name: '我的账号', exact: true }).click();
-  await page.getByRole('menuitem', { name: '个人资料', exact: true }).click();
   const profile = page.getByRole('dialog', { name: '个人资料', exact: true });
 
   await expect(profile).toBeVisible();
   await expect(page).toHaveURL(destination);
-  await expect(profile.getByLabel('昵称', { exact: true })).toHaveCount(0);
+  await expect(profile.getByLabel('昵称', { exact: true })).toBeVisible();
+  await expect(
+    profile.getByRole('button', { name: '退出登录', exact: true }),
+  ).toBeVisible();
   const bounds = await profile.boundingBox();
   expect(
     Math.abs(bounds!.x + bounds!.width / 2 - page.viewportSize()!.width / 2),
@@ -32,11 +34,12 @@ test('own profile edits in a centered dialog while chat info stays local and pre
   await page.screenshot({
     path: test.info().outputPath('profile-desktop.png'),
   });
-  await profile.getByRole('button', { name: '编辑资料', exact: true }).click();
   await page.getByLabel('昵称', { exact: true }).fill('新的昵称');
   await page.getByRole('button', { name: '保存资料', exact: true }).click();
-  await expect(profile).toContainText('新的昵称');
-  await expect(page.getByLabel('昵称', { exact: true })).toHaveCount(0);
+  await expect(profile.getByRole('status')).toContainText('资料已保存');
+  await expect(profile.getByLabel('昵称', { exact: true })).toHaveValue(
+    '新的昵称',
+  );
   await page.keyboard.press('Escape');
   await expect(composer).toHaveValue('修改资料后继续写');
   await expect(
@@ -61,7 +64,6 @@ test('own profile edits in a centered dialog while chat info stays local and pre
   ).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: '我的账号', exact: true }).click();
-  await page.getByRole('menuitem', { name: '个人资料', exact: true }).click();
   await expect(profile).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('profile-mobile.png') });
   await page.keyboard.press('Escape');
@@ -89,6 +91,14 @@ test('friend requests keep the search field and person rows across categories', 
       })
     ).status,
   ).toBe(200);
+  const recipient = await account(stack);
+  expect(
+    (
+      await api(stack, cookie, '/friend-requests', 'POST', {
+        user_id: recipient.user.id,
+      })
+    ).status,
+  ).toBe(200);
   await page.goto('/app/contacts');
   const search = page.getByRole('textbox', { name: '搜索通讯录' });
   await expect(search).toBeVisible();
@@ -96,7 +106,15 @@ test('friend requests keep the search field and person rows across categories', 
   await page.getByRole('button', { name: /^新的朋友/ }).click();
   await expect(search).toBeVisible();
   expect(await search.boundingBox()).toEqual(before);
-  const row = page.getByRole('list', { name: '新的朋友' }).getByRole('button');
+  const requests = page.getByRole('list', { name: '新的朋友' });
+  const row = requests.getByRole('button', {
+    name: new RegExp(sender.user.username),
+  });
+  const outgoing = requests.getByRole('button', {
+    name: new RegExp(recipient.user.username),
+  });
+  await expect(outgoing).toContainText('你发出的申请');
+  await expect(row).toContainText('请求添加你');
   await expect(row).toContainText(sender.user.username);
   await row.click();
   await expect(page.getByRole('region', { name: '好友申请' })).toContainText(
@@ -108,11 +126,30 @@ test('friend requests keep the search field and person rows across categories', 
   await expect(
     page.getByRole('button', { name: '发起聊天', exact: true }),
   ).toHaveCount(0);
-  await page.getByRole('button', { name: '申请筛选', exact: true }).click();
-  await page.getByRole('menuitem', { name: '发出的申请', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: '已发送', exact: true }),
+    page.getByRole('button', { name: '接受', exact: true }),
   ).toBeVisible();
+  await outgoing.click();
+  await expect(
+    page.getByRole('button', { name: '取消申请', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: '接受', exact: true }),
+  ).toHaveCount(0);
+  await search.fill(recipient.user.username);
+  await expect(outgoing).toBeVisible();
+  await expect(row).toHaveCount(0);
+  await search.fill(sender.user.username);
+  await expect(row).toBeVisible();
+  await expect(outgoing).toHaveCount(0);
+  await search.clear();
+  await page.reload();
+  await expect(
+    page.getByRole('button', { name: '取消申请', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: '申请筛选', exact: true }),
+  ).toHaveCount(0);
 });
 
 test('leaving the chat page aborts a pending group join without redirecting back', async ({

@@ -58,7 +58,7 @@ test('captured verification link stays in the fragment through inline login and 
   const target = new URL(link);
   const path = target.pathname + target.hash;
   await page.getByRole('button', { name: '我的账号', exact: true }).click();
-  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click();
+  await page.getByRole('button', { name: '退出登录', exact: true }).click();
   await expect(page).toHaveURL(/\/login/);
   const scanner = await page.request.get(target.origin + target.pathname);
   expect(scanner.status()).toBe(200);

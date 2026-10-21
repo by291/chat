@@ -315,3 +315,47 @@ test('a refresh during deep-link pagination resumes the interrupted next page', 
   release({ items: [friend], next_cursor: null });
   owner.stop();
 });
+
+test.each(['incoming', 'outgoing'] as const)(
+  'combined request deep links find later %s pages and honor cancellation',
+  async (direction) => {
+    const cache = new QueryClient();
+    const request = {
+      id: 'request-bob',
+      sender: friend.user,
+      recipient: { id: 'alice', username: 'alice', display_name: 'Alice' },
+      status: 'pending' as const,
+      created_at: friend.created_at,
+      updated_at: friend.created_at,
+    };
+    const requests = vi.fn(
+      async (kind: 'incoming' | 'outgoing', cursor?: string) => ({
+        items: cursor && kind === direction ? [request] : [],
+        next_cursor: cursor ? null : 'next-page',
+        pending_incoming_count: 1,
+      }),
+    );
+    const owner = new ContactsState({
+      queryClient: cache,
+      userId: 'alice',
+      api: {
+        ...createContactsApi(),
+        friends: async () => ({ items: [], next_cursor: null }),
+        requests,
+      },
+    });
+    await owner.start();
+    const cancelled = new AbortController();
+    cancelled.abort();
+
+    await owner.revealRequest(request.id, cancelled.signal);
+    expect(requests).toHaveBeenCalledTimes(2);
+    await owner.revealRequest(request.id, new AbortController().signal);
+
+    expect(owner[direction]).toEqual([request]);
+    const reads = requests.mock.calls.length;
+    await owner.revealRequest(request.id, new AbortController().signal);
+    expect(requests).toHaveBeenCalledTimes(reads);
+    owner.stop();
+  },
+);

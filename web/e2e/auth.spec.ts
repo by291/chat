@@ -48,7 +48,7 @@ test('six-character password registers, logs in and restores identity', async ({
   expect(await page.locator('body').innerText()).not.toContain('token_hash');
 
   await page.getByRole('button', { name: '我的账号', exact: true }).click();
-  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click();
+  await page.getByRole('button', { name: '退出登录', exact: true }).click();
   await expect(page).toHaveURL(/\/login/);
   await page.getByLabel('用户名', { exact: true }).fill(credentials.username);
   await page.getByLabel('密码', { exact: true }).fill(credentials.password);

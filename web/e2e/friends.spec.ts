@@ -168,16 +168,13 @@ test('cancelled and declined requests can be sent again, and reverse search requ
     await bob.getByRole('link', { name: '通讯录', exact: true }).click();
 
     await sendRequest(bobAccount.username);
-    await page.getByRole('button', { name: '申请筛选', exact: true }).click();
+    await page.getByRole('button', { name: /^新的朋友/ }).click();
     await page
-      .getByRole('menuitem', { name: '发出的申请', exact: true })
-      .click();
-    await page
-      .getByRole('list', { name: '已发送' })
+      .getByRole('list', { name: '新的朋友' })
       .getByRole('button')
       .click();
     await page.getByRole('button', { name: '取消申请', exact: true }).click();
-    await expect(page.getByRole('list', { name: '已发送' })).toContainText(
+    await expect(page.getByRole('list', { name: '新的朋友' })).toContainText(
       '暂无好友申请',
     );
     await expect(
@@ -196,7 +193,7 @@ test('cancelled and declined requests can be sent again, and reverse search requ
     await expect(bob.getByRole('list', { name: '新的朋友' })).toContainText(
       '暂无好友申请',
     );
-    await expect(page.getByRole('list', { name: '已发送' })).toContainText(
+    await expect(page.getByRole('list', { name: '新的朋友' })).toContainText(
       '暂无好友申请',
     );
 

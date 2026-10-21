@@ -22,7 +22,9 @@ test('contacts share the workspace layout and returning to chat preserves the se
   await expect(
     navigation.getByRole('link', { name: '聊天', exact: true }),
   ).toHaveAttribute('aria-current', 'page');
-  const chatSidebar = await page.getByRole('complementary').boundingBox();
+  const chatSidebar = await page
+    .getByRole('complementary', { name: '会话列表' })
+    .boundingBox();
   await navigation.getByRole('link', { name: '设置', exact: true }).click();
   await page
     .getByRole('navigation', { name: '主导航' })

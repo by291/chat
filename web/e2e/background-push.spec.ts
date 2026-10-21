@@ -353,7 +353,7 @@ test('controlled browser enrollment uses real REST, encrypted TLS delivery and a
   expect(privateCaches).toEqual([]);
 
   await page.getByRole('button', { name: '我的账号', exact: true }).click();
-  await page.getByRole('menuitem', { name: '退出登录', exact: true }).click();
+  await page.getByRole('button', { name: '退出登录', exact: true }).click();
   await expect(page).toHaveURL('/login');
   await expect
     .poll(() =>

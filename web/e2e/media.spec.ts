@@ -87,7 +87,10 @@ test('real signed uploads report progress, retry and send image/files with avata
     await expect(page.getByText('已就绪', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: '发送消息', exact: true }).click();
     const downloaded = peer.waitForEvent('download');
-    await peer.getByRole('button', { name: /notes\.bin/ }).click();
+    await peer
+      .getByRole('log')
+      .getByRole('button', { name: /notes\.bin/ })
+      .click();
     const download = await downloaded;
     expect(download.suggestedFilename()).toBe('notes.bin');
     const path = await download.path();
@@ -96,6 +99,18 @@ test('real signed uploads report progress, retry and send image/files with avata
         .update(await readFile(path!))
         .digest('hex'),
     ).toBe(createHash('sha256').update(bytes).digest('hex'));
+
+    const overview = peer.getByRole('complementary', { name: '聊天概览' });
+    await expect(
+      overview.getByRole('img', { name: 'sample.png', exact: true }),
+    ).toBeVisible();
+    await expect(
+      overview.getByRole('button', { name: /notes\.bin/ }),
+    ).toBeVisible();
+    await peer.screenshot({
+      path: test.info().outputPath('media-desktop.png'),
+      animations: 'disabled',
+    });
 
     await page.goto('/app/settings');
     await editOwnProfile(page);

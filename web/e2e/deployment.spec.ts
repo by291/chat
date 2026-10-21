@@ -248,8 +248,6 @@ test('six-character accounts and real browser conversation work behind HTTPS', a
     expect(policy).toContain('blob:');
     await page.goto('/app/settings');
     await page.getByRole('button', { name: '我的账号', exact: true }).click();
-    await page.getByRole('menuitem', { name: '个人资料', exact: true }).click();
-    await page.getByRole('button', { name: '编辑资料', exact: true }).click();
     await page.getByLabel('选择头像', { exact: true }).setInputFiles(sample);
     await expect(page.getByText('已就绪', { exact: true })).toBeVisible({
       timeout: 15000,

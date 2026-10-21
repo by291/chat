@@ -571,7 +571,7 @@ test('open-page alerts request permission only on click omit private bodies open
       page.locator(`[data-message-id="${fromSettings.id}"]`),
     ).toBeVisible();
     await page.getByRole('button', { name: '我的账号', exact: true }).click();
-    await page.getByRole('menuitem', { name: '退出登录', exact: true }).click();
+    await page.getByRole('button', { name: '退出登录', exact: true }).click();
     await expect(page).toHaveURL(/\/login/);
     expect((await state()).audioCloses).toBe(1);
     await expect(page.locator('.in-app-alert')).toHaveCount(0);
