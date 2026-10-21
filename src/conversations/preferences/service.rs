@@ -1,8 +1,8 @@
 //! Actor-owned conversation preferences and durable private invalidation hints.
 
-use super::{
+use crate::conversations::{
     model::{ConversationPreferences, ConversationPreferencesInput},
-    preferences_repository,
+    preferences::repository as preferences_repository,
     service::lock_membership,
 };
 use crate::{

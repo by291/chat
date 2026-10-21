@@ -5,8 +5,9 @@ use sqlx::{Postgres, Transaction};
 use time::OffsetDateTime;
 
 use super::{
-    events, message_repository,
+    events,
     messages::enrich_message,
+    messages::repository as message_repository,
     model::{
         ConversationPreferences, ConversationSummary, GroupConversationView, GroupKind, GroupRole,
         MembershipContext,

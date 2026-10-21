@@ -7,7 +7,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use super::{
+use crate::conversations::{
     groups,
     model::{
         AcceptGroupInvitationInput, GroupActionInput, GroupConversationView, GroupInput,
@@ -276,13 +276,13 @@ pub async fn accept(
 
 /// Add accepted friends using the caller's current membership episode.
 #[utoipa::path(post, path="/api/v1/conversations/{id}/members", operation_id="group_add_members",
-    params(("id"=ConversationId, Path)), request_body=super::model::AddGroupMembersInput,
+    params(("id"=ConversationId, Path)), request_body=crate::conversations::model::AddGroupMembersInput,
     responses((status=200, body=Vec<GroupMemberView>)), tag="groups")]
 pub async fn add_members(
     State(state): State<AppState>,
     actor: Actor,
     Path(id): Path<ConversationId>,
-    Json(input): Json<super::model::AddGroupMembersInput>,
+    Json(input): Json<crate::conversations::model::AddGroupMembersInput>,
 ) -> Result<Json<Vec<GroupMemberView>>, AppError> {
     Ok(Json(
         groups::add_members(&state, actor, id, input.membership_id, &input.member_ids).await?,

@@ -1,8 +1,8 @@
 //! Repeatable history, search, contextual windows and current-state event replay.
 
-use super::{
-    message_repository,
+use crate::conversations::{
     messages::enrich_message,
+    messages::repository as message_repository,
     repository,
     service::{check_membership, require_member},
 };
@@ -165,7 +165,7 @@ async fn project_message_event(
             }
             ConversationEventPayload::MessageReactionsUpdated(_) => {
                 ConversationEventPayload::MessageReactionsUpdated(
-                    super::model::ReactionUpdateData {
+                    crate::conversations::model::ReactionUpdateData {
                         message_id,
                         message: Some(current),
                     },

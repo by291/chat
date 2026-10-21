@@ -1,10 +1,11 @@
 //! Authorized reactions composed with message revision, event and realtime outbox.
 
-use super::{
-    events, message_repository,
+use crate::conversations::{
+    events,
     messages::enrich_message,
+    messages::reactions_repository::{self as reactions_repository, ChoiceChange},
+    messages::repository as message_repository,
     model::{ReactionKind, ReactionUpdateData},
-    reactions_repository::{self, ChoiceChange},
     repository,
     service::require_membership,
 };

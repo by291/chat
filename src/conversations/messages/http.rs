@@ -5,7 +5,7 @@ use axum::{
     extract::{Path, Query, State},
 };
 
-use super::model::{
+use crate::conversations::model::{
     EditMessageInput, MessageContext, MessageSearchQuery, MessageSearchResult, MessageTargetQuery,
     MessageView, SetReactionInput,
 };
@@ -31,7 +31,7 @@ pub async fn edit(
     Json(input): Json<EditMessageInput>,
 ) -> Result<Json<MessageView>, AppError> {
     Ok(Json(
-        super::messages::edit_message(&state, actor, id, message_id, input).await?,
+        crate::conversations::messages::edit_message(&state, actor, id, message_id, input).await?,
     ))
 }
 
@@ -50,8 +50,14 @@ pub async fn withdraw(
     Query(query): Query<MessageTargetQuery>,
 ) -> Result<Json<MessageView>, AppError> {
     Ok(Json(
-        super::messages::withdraw_message(&state, actor, id, message_id, query.membership_id)
-            .await?,
+        crate::conversations::messages::withdraw_message(
+            &state,
+            actor,
+            id,
+            message_id,
+            query.membership_id,
+        )
+        .await?,
     ))
 }
 
@@ -70,7 +76,7 @@ pub async fn search(
     Query(query): Query<MessageSearchQuery>,
 ) -> Result<Json<MessageSearchResult>, AppError> {
     Ok(Json(
-        super::message_queries::search_messages(&state, actor, id, query).await?,
+        crate::conversations::messages::queries::search_messages(&state, actor, id, query).await?,
     ))
 }
 
@@ -89,7 +95,10 @@ pub async fn context(
     Query(query): Query<MessageTargetQuery>,
 ) -> Result<Json<MessageContext>, AppError> {
     Ok(Json(
-        super::message_queries::message_context(&state, actor, id, message_id, query).await?,
+        crate::conversations::messages::queries::message_context(
+            &state, actor, id, message_id, query,
+        )
+        .await?,
     ))
 }
 
@@ -111,7 +120,7 @@ pub async fn set_reaction(
     let Json(input) = input.map_err(|_| AppError::invalid("表情回应格式无效"))?;
 
     Ok(Json(
-        super::reactions::set_reaction(
+        crate::conversations::reactions::set_reaction(
             &state,
             actor,
             id,
@@ -138,7 +147,14 @@ pub async fn remove_reaction(
     Query(query): Query<MessageTargetQuery>,
 ) -> Result<Json<MessageView>, AppError> {
     Ok(Json(
-        super::reactions::set_reaction(&state, actor, id, message_id, query.membership_id, None)
-            .await?,
+        crate::conversations::reactions::set_reaction(
+            &state,
+            actor,
+            id,
+            message_id,
+            query.membership_id,
+            None,
+        )
+        .await?,
     ))
 }

@@ -2,7 +2,7 @@
 
 use sqlx::{Postgres, Transaction};
 
-use super::model::{ReactionKind, ReactionSummary};
+use crate::conversations::model::{ReactionKind, ReactionSummary};
 use crate::{
     error::AppError,
     types::{MessageId, Seq, UserId},

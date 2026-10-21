@@ -2,8 +2,9 @@
 
 use sqlx::{Postgres, Transaction};
 
-use super::{
-    events, message_repository,
+use crate::conversations::{
+    events,
+    messages::repository as message_repository,
     model::{EditMessageInput, MessageReplyView},
     repository,
     service::require_membership,
@@ -17,9 +18,6 @@ use crate::{
         MembershipId, MessageId, MessageView, SendMessageInput, Seq,
     },
 };
-
-// Retain existing public application imports after separating read-side workflows.
-pub use super::message_queries::{events_after, events_with_membership, message_snapshot};
 
 const MAX_MESSAGE_LENGTH: usize = 4096;
 const REPLY_PREVIEW_LENGTH: usize = 160;
@@ -126,7 +124,7 @@ pub async fn send_message(
         ConversationEventPayload::MessageCreated(message.clone()),
     )
     .await?;
-    crate::notifications::job_repository::enqueue_message_push(
+    crate::notifications::jobs::repository::enqueue_message_push(
         &mut transaction,
         actor.user_id,
         id,
@@ -252,8 +250,12 @@ pub(crate) async fn enrich_message(
 
     message.attachments =
         media::reference_repository::message_views(transaction, message.id).await?;
-    message.reactions =
-        super::reactions_repository::summaries(transaction, message.id, actor.user_id).await?;
+    message.reactions = crate::conversations::messages::reactions_repository::summaries(
+        transaction,
+        message.id,
+        actor.user_id,
+    )
+    .await?;
 
     message.reply = if let Some(reply_id) = message.reply_to_message_id {
         message_repository::message(transaction, message.conversation_id, reply_id, joined_seq)

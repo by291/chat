@@ -3,7 +3,7 @@
 use sha2::{Digest, Sha256};
 use sqlx::{Postgres, Transaction};
 
-use super::model::{MessageView, SendMessageInput};
+use crate::conversations::model::{MessageView, SendMessageInput};
 use crate::types::{AttachmentId, ConversationId, MessageId, Seq, UserId};
 
 #[derive(sqlx::FromRow)]

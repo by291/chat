@@ -4,7 +4,7 @@ use sqlx::{Postgres, Transaction};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-use super::model::{GroupMemberView, GroupRole};
+use crate::conversations::model::{GroupMemberView, GroupRole};
 use crate::{
     error::AppError,
     types::{ConversationId, MembershipId, Seq, UserId, UserView},
@@ -33,7 +33,7 @@ struct RosterRow {
 
 /// Lock users in ID order so initial membership cannot race a user deletion.
 pub async fn initial_users_exist(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     members: &[UserId],
 ) -> Result<bool, sqlx::Error> {
     let users: Vec<UserId> = sqlx::query_scalar(
@@ -46,14 +46,14 @@ pub async fn initial_users_exist(
         "#,
     )
     .bind(members)
-    .fetch_all(&mut **tx)
+    .fetch_all(&mut **transaction)
     .await?;
 
     Ok(users.len() == members.len())
 }
 
 pub async fn insert_group(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     id: ConversationId,
     title: &str,
 ) -> Result<(), sqlx::Error> {
@@ -65,14 +65,14 @@ pub async fn insert_group(
     )
     .bind(id)
     .bind(title)
-    .execute(&mut **tx)
+    .execute(&mut **transaction)
     .await?;
 
     Ok(())
 }
 
 pub async fn insert_member(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     id: ConversationId,
     user: UserId,
     membership: MembershipId,
@@ -92,14 +92,14 @@ pub async fn insert_member(
     .bind(membership)
     .bind(role.as_str())
     .bind(joined_seq)
-    .execute(&mut **tx)
+    .execute(&mut **transaction)
     .await?;
 
     Ok(())
 }
 
 pub async fn count_members(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     id: ConversationId,
 ) -> Result<i64, sqlx::Error> {
     sqlx::query_scalar(
@@ -111,12 +111,12 @@ pub async fn count_members(
         "#,
     )
     .bind(id)
-    .fetch_one(&mut **tx)
+    .fetch_one(&mut **transaction)
     .await
 }
 
 pub async fn rename(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     id: ConversationId,
     title: &str,
 ) -> Result<(), sqlx::Error> {
@@ -129,14 +129,14 @@ pub async fn rename(
     )
     .bind(id)
     .bind(title)
-    .execute(&mut **tx)
+    .execute(&mut **transaction)
     .await?;
 
     Ok(())
 }
 
 pub async fn set_role(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     membership: MembershipId,
     role: GroupRole,
 ) -> Result<(), sqlx::Error> {
@@ -150,14 +150,14 @@ pub async fn set_role(
     )
     .bind(membership)
     .bind(role.as_str())
-    .execute(&mut **tx)
+    .execute(&mut **transaction)
     .await?;
 
     Ok(())
 }
 
 pub async fn end_membership(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     membership: MembershipId,
     left_seq: Seq,
 ) -> Result<(), sqlx::Error> {
@@ -171,14 +171,14 @@ pub async fn end_membership(
     )
     .bind(membership)
     .bind(left_seq)
-    .execute(&mut **tx)
+    .execute(&mut **transaction)
     .await?;
 
     Ok(())
 }
 
 pub async fn roster(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     id: ConversationId,
 ) -> Result<Vec<GroupMemberView>, AppError> {
     let rows: Vec<RosterRow> = sqlx::query_as(
@@ -193,7 +193,7 @@ pub async fn roster(
         "#,
     )
     .bind(id)
-    .fetch_all(&mut **tx)
+    .fetch_all(&mut **transaction)
     .await?;
 
     rows.into_iter()
@@ -214,7 +214,7 @@ pub async fn roster(
 }
 
 pub async fn insert_invitation(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     id: Uuid,
     conversation: ConversationId,
     issuer: UserId,
@@ -232,14 +232,14 @@ pub async fn insert_invitation(
     .bind(issuer)
     .bind(hash)
     .bind(expires)
-    .execute(&mut **tx)
+    .execute(&mut **transaction)
     .await?;
 
     Ok(())
 }
 
 pub async fn invitation_conversation(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     hash: &str,
 ) -> Result<Option<ConversationId>, sqlx::Error> {
     sqlx::query_scalar(
@@ -250,12 +250,12 @@ pub async fn invitation_conversation(
         "#,
     )
     .bind(hash)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut **transaction)
     .await
 }
 
 pub async fn lock_invitation(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     hash: &str,
 ) -> Result<Option<Invitation>, sqlx::Error> {
     sqlx::query_as(
@@ -267,12 +267,12 @@ pub async fn lock_invitation(
         "#,
     )
     .bind(hash)
-    .fetch_optional(&mut **tx)
+    .fetch_optional(&mut **transaction)
     .await
 }
 
 pub async fn consume_invitation(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     id: Uuid,
     user: UserId,
 ) -> Result<(), sqlx::Error> {
@@ -285,14 +285,14 @@ pub async fn consume_invitation(
     )
     .bind(id)
     .bind(user)
-    .execute(&mut **tx)
+    .execute(&mut **transaction)
     .await?;
 
     Ok(())
 }
 
 pub async fn revoke_invitation(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     conversation: ConversationId,
     invitation: Uuid,
 ) -> Result<bool, sqlx::Error> {
@@ -306,14 +306,14 @@ pub async fn revoke_invitation(
     )
     .bind(invitation)
     .bind(conversation)
-    .execute(&mut **tx)
+    .execute(&mut **transaction)
     .await?;
 
     Ok(result.rows_affected() == 1)
 }
 
 pub async fn revoke_issuer_invitations(
-    tx: &mut Transaction<'_, Postgres>,
+    transaction: &mut Transaction<'_, Postgres>,
     conversation: ConversationId,
     issuer: UserId,
 ) -> Result<(), sqlx::Error> {
@@ -329,7 +329,7 @@ pub async fn revoke_issuer_invitations(
     )
     .bind(conversation)
     .bind(issuer)
-    .execute(&mut **tx)
+    .execute(&mut **transaction)
     .await?;
 
     Ok(())

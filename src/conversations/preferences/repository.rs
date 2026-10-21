@@ -2,7 +2,7 @@
 
 use sqlx::{Postgres, Transaction};
 
-use super::model::ConversationPreferences;
+use crate::conversations::model::ConversationPreferences;
 use crate::types::{ConversationId, UserId};
 
 pub async fn get(
