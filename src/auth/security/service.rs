@@ -4,12 +4,14 @@ use std::time::Duration;
 
 use sqlx::{Postgres, Transaction};
 use time::OffsetDateTime;
-use uuid::Uuid;
 
-use super::{
+use crate::auth::mail::enqueue_mail;
+use crate::auth::{
     model::{EmailEnrollmentInput, EmailStatus, PasswordChangeInput},
     repository,
-    security_repository::{self, EmailRecord, SecurityChallenge, SecurityIdentity},
+    security::repository::{
+        self as security_repository, EmailRecord, SecurityChallenge, SecurityIdentity,
+    },
 };
 use crate::{
     AppState,
@@ -19,39 +21,6 @@ use crate::{
 };
 
 const VERIFICATION_SECONDS: u32 = 30 * 60;
-
-/// Compose an encrypted mail intent with the caller's security transaction, without sending it.
-/// The caller must validate the account/challenge and commit; missing mail returns email_unavailable.
-pub async fn enqueue_mail(
-    transaction: &mut Transaction<'_, Postgres>,
-    state: &AppState,
-    user_id: UserId,
-    challenge_id: Option<Uuid>,
-    payload: &MailPayload,
-    expires_at: OffsetDateTime,
-) -> Result<Uuid, AppError> {
-    let delivery = state.mail.as_ref().ok_or_else(|| {
-        AppError::new(
-            axum::http::StatusCode::SERVICE_UNAVAILABLE,
-            "email_unavailable",
-            "邮件服务暂未启用",
-        )
-    })?;
-
-    let id = Uuid::now_v7();
-    let encrypted_payload = delivery.seal(id, payload.purpose, payload)?;
-    let job = super::mail_repository::NewMailJob {
-        id,
-        user_id,
-        purpose: payload.purpose,
-        challenge_id,
-        encrypted_payload,
-        expires_at,
-    };
-    super::mail_repository::insert_job(transaction, &job).await?;
-
-    Ok(id)
-}
 
 /// Return mailbox state only for the authenticated owner; absent mail remains a supported mode.
 pub async fn email_status(state: &AppState, actor: Actor) -> Result<EmailStatus, AppError> {
@@ -104,7 +73,7 @@ pub async fn enroll_email(
         .await?;
 
     let prepared = prepare_password(state, actor, &input.current_password).await?;
-    let token = super::service::token();
+    let token = crate::auth::service::token();
 
     let mut transaction = state.pool.begin().await?;
     let identity = lock_prepared(&mut transaction, &prepared).await?;
@@ -118,7 +87,7 @@ pub async fn enroll_email(
         &mut transaction,
         &identity,
         MailPurpose::EmailVerification,
-        &super::service::token_hash(&token),
+        &crate::auth::service::token_hash(&token),
         &email,
         VERIFICATION_SECONDS,
     )
@@ -216,7 +185,7 @@ pub async fn verify_email(
     email_status(state, actor).await
 }
 
-pub(super) fn normalize_email(input: &str) -> Result<EmailRecord, AppError> {
+pub(crate) fn normalize_email(input: &str) -> Result<EmailRecord, AppError> {
     let email = input.trim();
     if email.len() > 320 {
         return Err(AppError::invalid("邮箱格式无效"));
@@ -284,7 +253,7 @@ async fn require_session(
     Ok(())
 }
 
-pub(super) fn require_mail(state: &AppState) -> Result<&MailConfig, AppError> {
+pub(crate) fn require_mail(state: &AppState) -> Result<&MailConfig, AppError> {
     state.config.mail.as_ref().ok_or_else(|| {
         AppError::new(
             axum::http::StatusCode::SERVICE_UNAVAILABLE,
@@ -294,7 +263,7 @@ pub(super) fn require_mail(state: &AppState) -> Result<&MailConfig, AppError> {
     })
 }
 
-pub(super) async fn load_token(
+pub(crate) async fn load_token(
     state: &AppState,
     token: &str,
     purpose: MailPurpose,
@@ -302,10 +271,12 @@ pub(super) async fn load_token(
     if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(invalid_token());
     }
-    let challenge =
-        security_repository::challenge_by_hash(&state.pool, &super::service::token_hash(token))
-            .await?
-            .ok_or_else(invalid_token)?;
+    let challenge = security_repository::challenge_by_hash(
+        &state.pool,
+        &crate::auth::service::token_hash(token),
+    )
+    .await?
+    .ok_or_else(invalid_token)?;
     if challenge.purpose != purpose {
         return Err(invalid_token());
     }
@@ -313,7 +284,7 @@ pub(super) async fn load_token(
     Ok(challenge)
 }
 
-pub(super) fn validate_challenge(
+pub(crate) fn validate_challenge(
     challenge: &SecurityChallenge,
     identity: &SecurityIdentity,
     purpose: MailPurpose,
@@ -332,7 +303,7 @@ pub(super) fn validate_challenge(
     Ok(())
 }
 
-pub(super) fn invalid_token() -> AppError {
+pub(crate) fn invalid_token() -> AppError {
     AppError::new(
         axum::http::StatusCode::BAD_REQUEST,
         "invalid_security_token",

@@ -1,13 +1,14 @@
 //! Open registration, authentication and revocable device sessions.
 
 pub mod http;
-pub(crate) mod mail_repository;
-pub mod mail_worker;
+pub mod mail;
 pub mod model;
 pub mod password;
-pub mod recovery;
 pub(crate) mod repository;
 pub mod security;
-pub(crate) mod security_repository;
 pub mod service;
 pub(crate) mod validation;
+
+// Public compatibility paths remain stable for existing worker and recovery consumers.
+pub use mail::worker as mail_worker;
+pub use security::recovery;

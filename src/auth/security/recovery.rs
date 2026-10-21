@@ -2,7 +2,10 @@
 
 use std::{net::IpAddr, time::Duration};
 
-use super::{model::PasswordResetInput, repository, security, security_repository, service};
+use crate::auth::{
+    model::PasswordResetInput, repository, security, security::repository as security_repository,
+    service,
+};
 use crate::{
     AppState,
     error::AppError,

@@ -5,7 +5,7 @@ use std::time::Duration;
 use rand::Rng;
 use tokio_util::sync::CancellationToken;
 
-use super::mail_repository;
+use super::repository;
 use crate::{AppState, error::AppError, infrastructure::mail::MailOutcome};
 
 const DATABASE_DEADLINE: Duration = Duration::from_secs(5);
@@ -41,14 +41,14 @@ pub async fn process_next(state: &AppState, cancel: &CancellationToken) -> Resul
 }
 
 async fn process_claim(state: &AppState) -> Result<bool, AppError> {
-    database(mail_repository::retire_unusable(&state.pool)).await?;
+    database(repository::retire_unusable(&state.pool)).await?;
     let Some(delivery) = &state.mail else {
         return Ok(false);
     };
-    let Some(job) = database(mail_repository::claim(&state.pool)).await? else {
+    let Some(job) = database(repository::claim(&state.pool)).await? else {
         return Ok(false);
     };
-    if !database(mail_repository::eligible(&state.pool, &job)).await? {
+    if !database(repository::eligible(&state.pool, &job)).await? {
         return Ok(true);
     }
 
@@ -56,7 +56,7 @@ async fn process_claim(state: &AppState) -> Result<bool, AppError> {
         Ok(payload) => payload,
         Err(_) => {
             tracing::error!(job_id = %job.id, category = "invalid_mail_payload", "mail payload rejected");
-            database(mail_repository::complete(
+            database(repository::complete(
                 &state.pool,
                 &job,
                 false,
@@ -73,10 +73,10 @@ async fn process_claim(state: &AppState) -> Result<bool, AppError> {
     };
     let confirmed = match outcome {
         MailOutcome::Accepted => {
-            database(mail_repository::complete(&state.pool, &job, true, None)).await?
+            database(repository::complete(&state.pool, &job, true, None)).await?
         }
         MailOutcome::Permanent(category) => {
-            database(mail_repository::complete(
+            database(repository::complete(
                 &state.pool,
                 &job,
                 false,
@@ -88,7 +88,7 @@ async fn process_claim(state: &AppState) -> Result<bool, AppError> {
             let exponent = job.attempts.clamp(0, 6) as u32;
             let base = (1u32 << exponent).min(60);
             let delay = rand::thread_rng().gen_range(base / 2..=base).max(1);
-            database(mail_repository::retry(&state.pool, &job, delay, category)).await?
+            database(repository::retry(&state.pool, &job, delay, category)).await?
         }
     };
 
