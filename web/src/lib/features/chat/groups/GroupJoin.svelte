@@ -8,8 +8,8 @@
 
   import { auth } from '#lib/features/auth/session.svelte.ts';
 
-  import { createGroupApi } from './api';
-  import { useChat } from './context.svelte';
+  import { createGroupApi } from '../api';
+  import { useChat } from '../context.svelte';
 
   const chat = useChat();
   const requests = createGroupApi();

@@ -16,14 +16,14 @@
   import ProfileAvatar from '#lib/features/settings/profile/ProfileAvatar.svelte';
 
   import { useChat } from './context.svelte';
-  import ConversationList from './ConversationList.svelte';
-  import MessageList from './MessageList.svelte';
-  import Composer from './Composer.svelte';
-  import GroupDetails from './GroupDetails.svelte';
-  import ConversationTools from './ConversationTools.svelte';
-  import MessageDialogs from './MessageDialogs.svelte';
-  import PeerDetails from './PeerDetails.svelte';
-  import ConversationOverview from './ConversationOverview.svelte';
+  import ConversationList from './conversations/ConversationList.svelte';
+  import MessageList from './messages/MessageList.svelte';
+  import Composer from './messages/Composer.svelte';
+  import GroupDetails from './groups/GroupDetails.svelte';
+  import ConversationTools from './messages/ConversationTools.svelte';
+  import MessageDialogs from './messages/MessageDialogs.svelte';
+  import PeerDetails from './conversations/PeerDetails.svelte';
+  import ConversationOverview from './conversations/ConversationOverview.svelte';
   import { isGroup, conversationName, membershipId } from './models';
 
   let {

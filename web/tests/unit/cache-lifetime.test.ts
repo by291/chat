@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import type { components } from '../../src/lib/api-client';
 import { createQueryClient, keys } from '../../src/lib/features/chat/cache';
-import { ConversationStore } from '../../src/lib/features/chat/conversation-store';
+import { ConversationStore } from '../../src/lib/features/chat/synchronization/conversation-store';
 import type {
   ChatApi,
   Group,
@@ -194,7 +194,7 @@ test('manual canonical records remain available beyond the former five-minute GC
   expect.soft(queryClient.getQueryData(keys.conversations)).toEqual([group]);
   expect.soft(store.messages(group.id)).toEqual([message]);
   expect.soft(store.groups.members(group.id)).toEqual([member]);
-  expect.soft(store.stream(group.id).applied).toBe('1');
+  expect.soft(store.status(group.id).applied).toBe('1');
   expect.soft(uploads.readyIds(group.id)).toEqual([attachment.id]);
   expect.soft(settings.sessions).toEqual([session]);
 });

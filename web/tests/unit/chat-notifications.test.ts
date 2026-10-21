@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import {
   ChatNotifications,
   shouldNotify,
-} from '../../src/lib/features/chat/notifications.svelte';
+} from '../../src/lib/features/chat/notifications/notifications.svelte';
 import type { Conversation, Message } from '../../src/lib/features/chat/models';
 
 afterEach(() => {

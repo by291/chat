@@ -1,6 +1,6 @@
-import { mergeMessageRecords } from './message-records';
-import type { Conversation, Message } from './models';
-import { isGroup, membershipId, sequence } from './models';
+import { mergeMessageRecords } from '../messages/message-records';
+import type { Conversation, Message } from '../models';
+import { isGroup, membershipId, sequence } from '../models';
 
 /** Preserve monotonic decimal-string cursors without passing through Number. */
 export function latestSequence(existing: string, incoming: string): string {

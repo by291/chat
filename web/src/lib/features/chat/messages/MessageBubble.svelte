@@ -5,9 +5,9 @@
 
   import AttachmentList from '#lib/features/media/AttachmentList.svelte';
 
-  import type { Message } from './models';
-  import { isGroup, sequence } from './models';
-  import type { ChatSync } from './sync.svelte';
+  import type { Message } from '../models';
+  import { isGroup, sequence } from '../models';
+  import type { ChatSync } from '../sync.svelte';
   import MessageReactions from './MessageReactions.svelte';
 
   let {

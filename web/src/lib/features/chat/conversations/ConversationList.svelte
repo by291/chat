@@ -6,19 +6,17 @@
   import { Badge } from '#lib/components/ui/badge/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
-
   import PaneHeader from '#lib/components/PaneHeader.svelte';
   import { avatarTone } from '#lib/utils.js';
 
   import ProfileAvatar from '#lib/features/settings/profile/ProfileAvatar.svelte';
+  import WorkspaceNavigation from '#lib/features/chat/WorkspaceNavigation.svelte';
 
-  import WorkspaceNavigation from './WorkspaceNavigation.svelte';
-
-  import NotificationSettings from './NotificationSettings.svelte';
+  import NotificationSettings from '../notifications/NotificationSettings.svelte';
   import ConversationActions from './ConversationActions.svelte';
-  import { isGroup, conversationName, type Conversation } from './models';
-  import { useChat } from './context.svelte';
-  import type { ChatSync } from './sync.svelte';
+  import { isGroup, conversationName, type Conversation } from '../models';
+  import { useChat } from '../context.svelte';
+  import type { ChatSync } from '../sync.svelte';
 
   let {
     sync,
@@ -30,10 +28,6 @@
   let list: HTMLElement;
   const filter = $derived(chat.listView.filter);
   const archived = $derived(chat.listView.archived);
-
-  onMount(() => {
-    list.scrollTop = chat.listView.scrollTop;
-  });
 
   const archivedCount = $derived(
     sync.conversations.filter(
@@ -64,14 +58,19 @@
       hour: '2-digit',
       minute: '2-digit',
     });
+
+  onMount(() => {
+    list.scrollTop = chat.listView.scrollTop;
+  });
 </script>
 
 <aside class="conversation-sidebar" aria-label="会话列表">
   <WorkspaceNavigation />
   <PaneHeader title="聊天" level={1}>
-    {#snippet actions()}<ConversationActions {sync} /><NotificationSettings
-        {sync}
-      />{/snippet}
+    {#snippet actions()}
+      <ConversationActions {sync} />
+      <NotificationSettings {sync} />
+    {/snippet}
   </PaneHeader>
   <div class="workspace-search">
     <Search size={16} aria-hidden="true" />

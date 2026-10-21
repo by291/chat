@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from 'vitest';
 
 import { createQueryClient } from '../../src/lib/features/chat/cache';
-import { ConversationStore } from '../../src/lib/features/chat/conversation-store';
-import { mergeMessageRecords } from '../../src/lib/features/chat/message-records';
+import { ConversationStore } from '../../src/lib/features/chat/synchronization/conversation-store';
+import { mergeMessageRecords } from '../../src/lib/features/chat/messages/message-records';
 import {
   createChatSync,
   type ChatSync,
@@ -15,7 +15,7 @@ import type {
   Message,
   RealtimeEvent,
 } from '../../src/lib/features/chat/models';
-import type { RealtimeTransport } from '../../src/lib/features/chat/realtime';
+import type { RealtimeTransport } from '../../src/lib/features/chat/synchronization/realtime';
 
 const running: ChatSync[] = [];
 

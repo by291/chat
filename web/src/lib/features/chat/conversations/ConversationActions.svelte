@@ -4,9 +4,9 @@
   import { Button } from '#lib/components/ui/button/index.js';
   import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 
-  import CreateGroupDialog from './CreateGroupDialog.svelte';
-  import JoinGroupDialog from './JoinGroupDialog.svelte';
-  import type { ChatSync } from './sync.svelte';
+  import CreateGroupDialog from '../groups/CreateGroupDialog.svelte';
+  import JoinGroupDialog from '../groups/JoinGroupDialog.svelte';
+  import type { ChatSync } from '../sync.svelte';
 
   let { sync }: { sync: ChatSync } = $props();
 

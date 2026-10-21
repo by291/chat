@@ -1,19 +1,18 @@
 <script lang="ts">
   import type { QueryObserverResult } from '@tanstack/svelte-query';
-  import { useContacts } from '#lib/features/contacts/context.svelte.ts';
-  import type { Relationship } from '#lib/features/contacts/api.ts';
-  import AddFriendDialog from '#lib/features/contacts/AddFriendDialog.svelte';
-
   import { Send, Paperclip, X } from '@lucide/svelte';
 
   import { Button } from '#lib/components/ui/button/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
 
+  import { useContacts } from '#lib/features/contacts/context.svelte.ts';
+  import type { Relationship } from '#lib/features/contacts/api.ts';
+  import AddFriendDialog from '#lib/features/contacts/AddFriendDialog.svelte';
   import UploadList from '#lib/features/media/UploadList.svelte';
 
-  import type { ChatSync } from './sync.svelte';
-  import { membershipId, isGroup } from './models';
+  import type { ChatSync } from '../sync.svelte';
+  import { membershipId, isGroup } from '../models';
 
   const MAX_MESSAGE_CHARACTERS = 4_096;
   const CHARACTER_WARNING_THRESHOLD = 3_500;
@@ -30,6 +29,12 @@
   const contacts = useContacts();
   let relationship = $state.raw<QueryObserverResult<Relationship>>();
   let addOpen = $state(false);
+  let composing = false;
+  // Component refs are bindable props; their assignment participates in Svelte's
+  // lifecycle even though the elements themselves do not own the message draft.
+  let input = $state<HTMLTextAreaElement>(null!);
+  let files = $state<HTMLInputElement>(null!);
+
   const peer = $derived(
     sync.current && !isGroup(sync.current) ? sync.current.peer : undefined,
   );
@@ -39,20 +44,6 @@
         !relationship.isError &&
         !relationship.isFetching),
   );
-
-  $effect(() => {
-    const owner = contacts.owner;
-    const userId = peer?.id;
-    relationship = undefined;
-    if (owner && userId)
-      return owner.watchRelationship(userId, (value) => (relationship = value));
-  });
-
-  let composing = false;
-  // Component refs are bindable props; their assignment participates in Svelte's
-  // lifecycle even though the elements themselves do not own the message draft.
-  let input = $state<HTMLTextAreaElement>(null!);
-  let files = $state<HTMLInputElement>(null!);
 
   let draft = $derived(sync.drafts[id] ?? '');
   // Count Unicode scalars like Rust's chars(), rather than UTF-16 code units.
@@ -103,6 +94,14 @@
       sendDraft();
     }
   }
+  $effect(() => {
+    const owner = contacts.owner;
+    const userId = peer?.id;
+    relationship = undefined;
+    if (owner && userId) {
+      return owner.watchRelationship(userId, (value) => (relationship = value));
+    }
+  });
 </script>
 
 <div class="composer-wrap">

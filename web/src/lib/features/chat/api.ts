@@ -1,9 +1,4 @@
-import {
-  api as sharedApi,
-  unwrap,
-  type ApiClient,
-  type components,
-} from '#lib/api-client';
+import { api as sharedApi, unwrap, type ApiClient } from '#lib/api-client';
 
 import type { ChatApi } from './models';
 

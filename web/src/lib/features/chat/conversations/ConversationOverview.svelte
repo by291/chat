@@ -4,12 +4,15 @@
   import * as Avatar from '#lib/components/ui/avatar/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
   import { avatarTone } from '#lib/utils.js';
+
   import ProfileAvatar from '#lib/features/settings/profile/ProfileAvatar.svelte';
   import AttachmentList from '#lib/features/media/AttachmentList.svelte';
-  import { conversationName, isGroup } from './models';
-  import type { ChatSync } from './sync.svelte';
+
+  import { conversationName, isGroup } from '../models';
+  import type { ChatSync } from '../sync.svelte';
 
   let { sync }: { sync: ChatSync } = $props();
+
   const current = $derived(sync.current);
   // Only summarize loaded canonical history; this is not a second media index.
   const attachments = $derived(

@@ -4,7 +4,7 @@
   import { Textarea } from '#lib/components/ui/textarea/index.js';
   import * as Dialog from '#lib/components/ui/dialog/index.js';
 
-  import type { ChatSync } from './sync.svelte';
+  import type { ChatSync } from '../sync.svelte';
 
   let { sync }: { sync: ChatSync } = $props();
 

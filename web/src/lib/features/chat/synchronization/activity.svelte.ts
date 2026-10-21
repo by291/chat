@@ -1,4 +1,4 @@
-import type { ChatApi, RealtimeEvent } from './models';
+import type { ChatApi, RealtimeEvent } from '../models';
 
 const TYPING_LIFETIME_MS = 5_000;
 const TYPING_PUBLISH_INTERVAL_MS = 3_000;

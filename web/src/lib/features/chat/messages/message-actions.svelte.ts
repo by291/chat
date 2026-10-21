@@ -1,5 +1,5 @@
-import type { ChatApi, Message, Preferences, ReactionKind } from './models';
-import type { ConversationStore } from './conversation-store';
+import type { ChatApi, Message, Preferences, ReactionKind } from '../models';
+import type { ConversationStore } from '../synchronization/conversation-store';
 
 const MAX_MESSAGE_CHARACTERS = 4_096;
 

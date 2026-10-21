@@ -1,8 +1,8 @@
 import type { QueryClient } from '@tanstack/svelte-query';
 
-import { keys } from './cache';
-import type { ChatApi, GroupMember } from './models';
-import { sequence } from './models';
+import { keys } from '../cache';
+import type { ChatApi, GroupMember } from '../models';
+import { sequence } from '../models';
 
 type RosterFlight = {
   membership: string;

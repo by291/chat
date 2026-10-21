@@ -7,8 +7,8 @@
   import { Label } from '#lib/components/ui/label/index.js';
   import * as Dialog from '#lib/components/ui/dialog/index.js';
 
-  import { createGroupApi } from './api';
-  import type { ChatSync } from './sync.svelte';
+  import { createGroupApi } from '../api';
+  import type { ChatSync } from '../sync.svelte';
 
   let {
     sync,
@@ -42,8 +42,9 @@
       token = '';
       await goto(`/app/chats/${group.id}`);
     } catch (reason) {
-      if (!lifetime.signal.aborted)
+      if (!lifetime.signal.aborted) {
         error = reason instanceof Error ? reason.message : '加入群聊失败';
+      }
     } finally {
       busy = false;
     }

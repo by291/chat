@@ -3,7 +3,7 @@
 
   import { Button } from '#lib/components/ui/button/index.js';
 
-  import type { Message, ReactionKind } from './models';
+  import type { Message, ReactionKind } from '../models';
   import type { MessageActions } from './message-actions.svelte';
 
   const choices: ReadonlyArray<{

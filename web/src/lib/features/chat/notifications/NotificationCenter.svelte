@@ -5,7 +5,7 @@
 
   import { Button } from '#lib/components/ui/button/index.js';
 
-  import type { ChatSync } from './sync.svelte';
+  import type { ChatSync } from '../sync.svelte';
 
   let { sync }: { sync: ChatSync } = $props();
 

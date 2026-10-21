@@ -8,9 +8,10 @@
   import * as Dialog from '#lib/components/ui/dialog/index.js';
   import type { components } from '#lib/api-client';
 
-  import { createGroupApi } from './api';
   import FriendPicker from '#lib/features/contacts/FriendPicker.svelte';
-  import type { ChatSync } from './sync.svelte';
+
+  import { createGroupApi } from '../api';
+  import type { ChatSync } from '../sync.svelte';
 
   type User = components['schemas']['UserView'];
 
@@ -24,11 +25,12 @@
     onCloseAutoFocus: (event: Event) => void;
   } = $props();
 
+  const lifetime = new AbortController();
+  const groups = createGroupApi();
+
   let selected = $state<User[]>([]);
   let error = $state('');
   let busy = $state(false);
-  const lifetime = new AbortController();
-  const groups = createGroupApi();
   let groupTitle = $state('');
   let createdId = $state('');
 
@@ -39,6 +41,7 @@
   );
 
   const selectedIds = $derived(selected.map((user) => user.id));
+
   function reset() {
     groupTitle = '';
     createdId = '';
@@ -48,6 +51,7 @@
 
   async function create() {
     if (busy || !selected.length) return;
+
     busy = true;
     error = '';
     const owner = sync;

@@ -1,5 +1,5 @@
-import type { ChatApi, Message } from './models';
-import type { ConversationStore } from './conversation-store';
+import type { ChatApi, Message } from '../models';
+import type { ConversationStore } from '../synchronization/conversation-store';
 
 const MAX_SEARCH_CHARACTERS = 200;
 

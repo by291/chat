@@ -1,6 +1,6 @@
 import type { components } from '#lib/api-client';
 
-import type { Message, PendingMessage } from './models';
+import type { Message, PendingMessage } from '../models';
 
 /** Freeze the original send payload; later draft/reply/upload changes must not change a retry. */
 export function createPendingMessage(input: {

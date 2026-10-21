@@ -10,18 +10,21 @@ import type {
   RealtimeEvent,
   PendingMessage,
 } from './models';
-import type { RealtimeTransport, ConnectionStatus } from './realtime';
-import { ConversationStore } from './conversation-store';
-import { PeerActivity } from './activity.svelte';
+import type {
+  RealtimeTransport,
+  ConnectionStatus,
+} from './synchronization/realtime';
+import { ConversationStore } from './synchronization/conversation-store';
+import { PeerActivity } from './synchronization/activity.svelte';
 import { sequence, isGroup, membershipId } from './models';
-import { HistoryNavigation } from './history.svelte';
-import { MessageActions } from './message-actions.svelte';
-import { ChatNotifications } from './notifications.svelte';
+import { HistoryNavigation } from './messages/history.svelte';
+import { MessageActions } from './messages/message-actions.svelte';
+import { ChatNotifications } from './notifications/notifications.svelte';
 import {
   createPendingMessage,
   pendingMessageInput,
   unacknowledgedMessages,
-} from './pending-messages';
+} from './messages/pending-messages';
 
 const RECONCILIATION_INTERVAL_MS = 60_000;
 
@@ -172,12 +175,12 @@ export class ChatSync {
   // Cache records stay authoritative. Reading this rune makes cache notifications
   // observable to Svelte getters without mirroring those records in another store.
   get conversations(): Conversation[] {
-    this.revision;
+    void this.revision;
     return this.store.conversations;
   }
 
   get messages(): Message[] {
-    this.revision;
+    void this.revision;
     return this.history.contextual
       ? this.history.messages
       : this.selectedId
@@ -186,17 +189,17 @@ export class ChatSync {
   }
 
   get searchResults() {
-    this.revision;
+    void this.revision;
     return this.history.results;
   }
 
   get replyTarget() {
-    this.revision;
+    void this.revision;
     return this.actions.replyTarget;
   }
 
   get canSaveEdit() {
-    this.revision;
+    void this.revision;
     return this.actions.canSaveEdit;
   }
 
@@ -238,7 +241,7 @@ export class ChatSync {
   }
 
   get groupMembers() {
-    this.revision;
+    void this.revision;
     return this.selectedId ? this.store.groups.members(this.selectedId) : [];
   }
 
@@ -261,37 +264,37 @@ export class ChatSync {
   }
 
   get appliedSeq() {
-    this.revision;
+    void this.revision;
     return this.selectedId
-      ? (this.store.stream(this.selectedId)?.applied ?? '0')
+      ? (this.store.status(this.selectedId)?.applied ?? '0')
       : '0';
   }
 
   get loading() {
-    this.revision;
+    void this.revision;
     return (
       this.history.loading ||
       (this.selectedId
-        ? (this.store.stream(this.selectedId)?.loading ?? false)
+        ? (this.store.status(this.selectedId)?.loading ?? false)
         : false)
     );
   }
 
   get loadingOlder() {
-    this.revision;
+    void this.revision;
     return this.history.contextual
       ? this.history.loading
       : this.selectedId
-        ? (this.store.stream(this.selectedId)?.olderLoading ?? false)
+        ? (this.store.status(this.selectedId)?.olderLoading ?? false)
         : false;
   }
 
   get hasOlder() {
-    this.revision;
+    void this.revision;
     return this.history.contextual
       ? this.history.hasOlder
       : this.selectedId
-        ? !!this.store.stream(this.selectedId)?.nextBefore
+        ? !!this.store.status(this.selectedId)?.nextBefore
         : false;
   }
 
@@ -363,7 +366,7 @@ export class ChatSync {
     await this.store.refreshSummaries();
     const id = this.selectedId;
     if (this.initialized && id && isGroup(this.current)) {
-      const stream = this.store.stream(id);
+      const stream = this.store.status(id);
       if (!stream.ready && !stream.loading) {
         await this.store.select(id, async () => {});
       }
@@ -416,9 +419,13 @@ export class ChatSync {
       return;
     }
 
-    this.store.stream(this.selectedId).ready = false;
-    this.store.stream(this.selectedId).hasSnapshot = false;
-    await this.select(this.selectedId);
+    this.visible = false;
+    this.focused = false;
+    this.error = '';
+    await this.store.reload(
+      this.selectedId,
+      () => this.readiness ?? this.start(),
+    );
   }
 
   clearSelection() {
@@ -613,49 +620,20 @@ export class ChatSync {
       return;
     }
 
-    const state = this.store.stream(id);
-    // A saved send can appear ahead of replay. Both rendering and contiguous
-    // application are required before this cursor is safe to acknowledge.
+    const outcome = await this.store.readRendered(id, cursor);
+    if (outcome === 'ignored') return;
+    if (outcome === 'acknowledged') void this.refreshSummaries();
+
+    // A newer visible render may arrive during the request. Follow only that
+    // explicit DOM confirmation, never a newer record that merely entered cache.
     if (
-      state.reading ||
-      sequence(cursor) <= state.lastRead ||
-      sequence(cursor) > sequence(state.applied)
+      this.active &&
+      this.visible &&
+      this.selectedId === id &&
+      this.renderedReadSeq &&
+      sequence(this.renderedReadSeq) > sequence(cursor)
     ) {
-      return;
-    }
-
-    state.reading = cursor;
-    const epoch = this.epoch;
-    const generation = state.generation;
-    const membership = state.membershipId;
-
-    try {
-      const result = await this.options.api.read(id, cursor, membership);
-      if (
-        this.active &&
-        this.epoch === epoch &&
-        state.generation === generation &&
-        this.store.membership(id) === membership
-      ) {
-        state.lastRead =
-          state.lastRead > sequence(result.my_read_seq)
-            ? state.lastRead
-            : sequence(result.my_read_seq);
-        void this.refreshSummaries();
-      }
-    } catch {
-      /* Read receipts retry only after another visible update, never as an offline queue. */
-    } finally {
-      state.reading = undefined;
-      if (
-        this.active &&
-        this.visible &&
-        this.selectedId === id &&
-        this.renderedReadSeq &&
-        sequence(this.renderedReadSeq) > sequence(cursor)
-      ) {
-        void this.readLatest();
-      }
+      void this.readLatest();
     }
   }
 
@@ -694,6 +672,7 @@ export class ChatSync {
   }
 }
 
+/** Build a session-scoped coordinator; its authenticated owner must call stop on teardown. */
 export function createChatSync(
   options: ConstructorParameters<typeof ChatSync>[0],
 ) {

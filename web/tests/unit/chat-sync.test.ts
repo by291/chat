@@ -11,7 +11,7 @@ import {
   type Snapshot,
   type RealtimeEvent,
 } from '../../src/lib/features/chat/models';
-import type { RealtimeTransport } from '../../src/lib/features/chat/realtime';
+import type { RealtimeTransport } from '../../src/lib/features/chat/synchronization/realtime';
 const first = '9007199254740993',
   second = '9007199254740994';
 function message(id: string, seq: string, conversation = 'a'): Message {
@@ -377,4 +377,34 @@ test('contacts hints and reconnect refresh contacts without changing conversatio
   sync.stop();
   transport.receive({ kind: 'contacts.updated' });
   expect(hints).toBe(1);
+});
+
+test('a receipt from an older reload generation follows only the newly rendered cursor', async () => {
+  const firstRead = deferred<{ my_read_seq: string }>();
+  const reads: string[] = [];
+  let snapshots = 0;
+  const { sync } = fixture({
+    snapshot: async () => {
+      const cursor = ++snapshots === 1 ? '2' : '3';
+      return {
+        items: [message(`message-${cursor}`, cursor)],
+        snapshot_seq: cursor,
+        next_before: null,
+      };
+    },
+    read: async (_id, cursor) => {
+      reads.push(cursor);
+      return cursor === '2' ? firstRead.promise : { my_read_seq: cursor };
+    },
+  });
+  await sync.start();
+  await sync.select('a');
+  sync.setVisible(true);
+
+  await sync.reload();
+  sync.setVisible(true);
+  expect(reads).toEqual(['2']);
+  firstRead.resolve({ my_read_seq: '2' });
+
+  await expect.poll(() => reads).toEqual(['2', '3']);
 });

@@ -16,8 +16,8 @@
     canManageMemberRole,
     canRemoveGroupMember,
   } from './group-actions.svelte';
-  import { isGroup, membershipId } from './models';
-  import type { ChatSync } from './sync.svelte';
+  import { isGroup, membershipId } from '../models';
+  import type { ChatSync } from '../sync.svelte';
 
   const roleNames = { owner: '群主', admin: '管理员', member: '成员' };
 

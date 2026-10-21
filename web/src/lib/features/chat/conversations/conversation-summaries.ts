@@ -1,4 +1,4 @@
-import type { ChatApi, Conversation } from './models';
+import type { ChatApi, Conversation } from '../models';
 
 /** Collect one paginated attempt; the caller owns coalescing and revision/episode reconciliation. */
 export async function collectConversationSummaries(options: {

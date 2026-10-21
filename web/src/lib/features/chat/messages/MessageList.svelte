@@ -5,14 +5,13 @@
 
   import * as Avatar from '#lib/components/ui/avatar/index.js';
   import { avatarTone } from '#lib/utils.js';
-  import { auth } from '#lib/features/auth/session.svelte.ts';
-
   import { Button } from '#lib/components/ui/button/index.js';
 
-  import { useChat } from './context.svelte';
-  import { membershipId } from './models';
+  import { auth } from '#lib/features/auth/session.svelte.ts';
 
-  import type { ChatSync } from './sync.svelte';
+  import { useChat } from '../context.svelte';
+  import { membershipId } from '../models';
+  import type { ChatSync } from '../sync.svelte';
   import MessageBubble from './MessageBubble.svelte';
 
   const FOLLOW_LATEST_TOLERANCE_PX = 80;
@@ -78,8 +77,10 @@
       sync.loading ||
       sync.selectedId !== id ||
       sync.history.contextual
-    )
+    ) {
       return;
+    }
+
     const top = scroller.getBoundingClientRect().top;
     const anchor = Array.from(
       scroller.querySelectorAll<HTMLElement>('[data-message-id]'),
@@ -100,6 +101,7 @@
       scroller.scrollTop = scroller.scrollHeight;
       return;
     }
+
     following = false;
     const anchor = saved.anchorId
       ? document.getElementById(`message-${saved.anchorId}`)
@@ -144,6 +146,7 @@
   async function mediaLayoutChanged() {
     sync.setVisible(false);
     await tick();
+
     if (following && !sync.history.contextual) {
       scroller.scrollTop = scroller.scrollHeight;
     }
@@ -151,12 +154,12 @@
   }
 
   $effect(() => {
-    sync.messages;
-    sync.currentPending.length;
-    sync.loading;
+    void sync.messages;
+    void sync.currentPending.length;
+    void sync.loading;
     // Replay can advance without changing row count, so the applied cursor is
     // also a dependency for a new rendered-read confirmation.
-    sync.appliedSeq;
+    void sync.appliedSeq;
     const contextual = sync.history.contextual;
     const target = sync.history.targetId;
     const jump = target !== renderedTarget;
@@ -206,6 +209,7 @@
     window.addEventListener('focus', confirmRenderedVisibility);
     window.addEventListener('blur', confirmRenderedVisibility);
     document.addEventListener('visibilitychange', confirmRenderedVisibility);
+
     return () => {
       observer.disconnect();
       window.removeEventListener('focus', confirmRenderedVisibility);

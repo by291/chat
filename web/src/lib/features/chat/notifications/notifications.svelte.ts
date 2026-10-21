@@ -1,5 +1,5 @@
-import type { Conversation, Message } from './models';
-import { conversationName } from './models';
+import type { Conversation, Message } from '../models';
+import { conversationName } from '../models';
 
 const MAX_SEEN_MESSAGES = 200;
 const MAX_VISIBLE_ALERTS = 5;

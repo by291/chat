@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 
 import type { components } from '../../src/lib/api-client';
 import { createQueryClient, keys } from '../../src/lib/features/chat/cache';
-import { GroupRecords } from '../../src/lib/features/chat/group-records';
+import { GroupRecords } from '../../src/lib/features/chat/groups/group-records';
 import {
   createChatSync,
   type ChatSync,
@@ -14,7 +14,7 @@ import type {
   RealtimeEvent,
   Snapshot,
 } from '../../src/lib/features/chat/models';
-import type { RealtimeTransport } from '../../src/lib/features/chat/realtime';
+import type { RealtimeTransport } from '../../src/lib/features/chat/synchronization/realtime';
 
 type Group = components['schemas']['GroupConversationView'];
 const running: ChatSync[] = [];

@@ -5,14 +5,14 @@ import {
   type ChatSync,
 } from '../../src/lib/features/chat/sync.svelte';
 import { createQueryClient } from '../../src/lib/features/chat/cache';
-import { mergeMessageRecords } from '../../src/lib/features/chat/message-records';
+import { mergeMessageRecords } from '../../src/lib/features/chat/messages/message-records';
 import type {
   ChatApi,
   Conversation,
   Message,
   Event,
 } from '../../src/lib/features/chat/models';
-import type { RealtimeTransport } from '../../src/lib/features/chat/realtime';
+import type { RealtimeTransport } from '../../src/lib/features/chat/synchronization/realtime';
 
 const running: ChatSync[] = [];
 afterEach(() => running.splice(0).forEach((sync) => sync.stop()));

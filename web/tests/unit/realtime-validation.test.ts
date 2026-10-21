@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { createRealtimeTransport } from '../../src/lib/features/chat/realtime';
+import { createRealtimeTransport } from '../../src/lib/features/chat/synchronization/realtime';
 
 const transport = vi.hoisted(() => ({
   publication: undefined as ((context: { data: unknown }) => void) | undefined,

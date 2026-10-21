@@ -13,11 +13,11 @@
   import { createQueryClient } from '#lib/features/chat/cache.ts';
   import { createChatApi } from '#lib/features/chat/api.ts';
   import { createChatSync } from '#lib/features/chat/sync.svelte.ts';
-  import { createRealtimeTransport } from '#lib/features/chat/realtime.ts';
+  import { createRealtimeTransport } from '#lib/features/chat/synchronization/realtime.ts';
   import { provideChat } from '#lib/features/chat/context.svelte.ts';
   import ChatShell from '#lib/features/chat/ChatShell.svelte';
   import WorkspaceNavigation from '#lib/features/chat/WorkspaceNavigation.svelte';
-  import NotificationCenter from '#lib/features/chat/NotificationCenter.svelte';
+  import NotificationCenter from '#lib/features/chat/notifications/NotificationCenter.svelte';
   import UpdateNotice from '#lib/features/pwa/UpdateNotice.svelte';
   import { provideBackgroundPush } from '#lib/features/notifications/context.svelte.ts';
   import { PushSubscriptions } from '#lib/features/notifications/subscriptions.svelte.ts';

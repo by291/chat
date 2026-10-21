@@ -1,5 +1,5 @@
-import type { Message, Reply } from './models';
-import { sequence } from './models';
+import type { Message, Reply } from '../models';
+import { sequence } from '../models';
 
 function latestReply(
   left: Reply | null | undefined,

@@ -1,7 +1,7 @@
 import { Centrifuge } from 'centrifuge';
 import { z } from 'zod';
 
-import type { RealtimeEvent } from './models';
+import type { RealtimeEvent } from '../models';
 
 const SUBSCRIPTION_READY_TIMEOUT_MS = 5_000;
 const MAX_EVENT_SEQUENCE = 9_223_372_036_854_775_807n;

@@ -1,7 +1,7 @@
 import type { components } from '#lib/api-client';
 
-import { createGroupApi } from './api';
-import type { Group, GroupMember } from './models';
+import { createGroupApi } from '../api';
+import type { Group, GroupMember } from '../models';
 
 /** UI permissions describe available controls; the server remains the authorization boundary. */
 export function canManageMemberRole(

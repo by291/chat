@@ -2,21 +2,20 @@ import type { QueryClient } from '@tanstack/svelte-query';
 
 import { ApiFailure } from '#lib/api-client';
 
-import { keys } from './cache';
+import { keys } from '../cache';
 import {
   applySummaryReceipt,
   reconcileSummaryPreview,
   updateSummaryPreview,
-} from './conversation-projections';
-import { collectConversationSummaries } from './conversation-summaries';
-import { GroupRecords } from './group-records';
-import { mergeMessageRecords } from './message-records';
-import type { ChatApi, Conversation, Message, Event } from './models';
-import { sequence, isGroup, membershipId } from './models';
+} from '../conversations/conversation-projections';
+import { collectConversationSummaries } from '../conversations/conversation-summaries';
+import { GroupRecords } from '../groups/group-records';
+import { mergeMessageRecords } from '../messages/message-records';
+import type { ChatApi, Conversation, Message, Event } from '../models';
+import { sequence, isGroup, membershipId } from '../models';
+import { LiveMessageCandidates } from '../notifications/live-candidates';
 
-const MAX_LIVE_CANDIDATES = 200;
-
-export type ConversationStream = {
+type ConversationStream = {
   generation: number;
   abort: AbortController;
   applied: string;
@@ -30,7 +29,6 @@ export type ConversationStream = {
   lastRead: bigint;
   reading?: string;
   membershipId?: string;
-  notificationFloor: bigint;
 };
 
 type StoreOptions = {
@@ -57,10 +55,15 @@ export class ConversationStore {
   private summaryAgain = false;
   private summaryRevision = 0;
   private revokedMemberships = new Set<string>();
-  private liveCandidates = new Set<string>();
+  private liveCandidates: LiveMessageCandidates;
   readonly groups: GroupRecords;
 
   constructor(private options: StoreOptions) {
+    this.liveCandidates = new LiveMessageCandidates({
+      conversations: () => this.conversations,
+      messages: (id) => this.messages(id),
+      applied: options.messageApplied,
+    });
     this.groups = new GroupRecords({
       ...options,
       membership: (id) => this.membership(id),
@@ -74,14 +77,14 @@ export class ConversationStore {
   }
 
   private forget(id: string) {
-    for (const candidate of this.liveCandidates) {
-      if (candidate.startsWith(`${id}/`)) this.liveCandidates.delete(candidate);
-    }
+    this.liveCandidates.forget(id);
+
     const stream = this.streams.get(id);
     if (stream) {
       stream.abort.abort();
       stream.generation++;
     }
+
     this.streams.delete(id);
     this.options.queryClient.removeQueries({ queryKey: keys.messages(id) });
     this.groups.forget(id);
@@ -90,6 +93,7 @@ export class ConversationStore {
 
   revokeMembership(id: string, membership: string) {
     if (this.membership(id) && this.membership(id) !== membership) return false;
+
     this.revokedMemberships.add(`${id}/${membership}`);
     this.summaryRevision++;
     this.summaryAgain = true;
@@ -98,6 +102,7 @@ export class ConversationStore {
       keys.conversations,
       (rows) => rows?.filter((row) => row.id !== id),
     );
+
     return true;
   }
 
@@ -138,7 +143,19 @@ export class ConversationStore {
       streamState.target > target ? streamState.target : target;
   }
 
-  stream(id: string) {
+  /** A detached observation cannot mutate stream generations or read fences. */
+  status(id: string) {
+    const state = this.stream(id);
+    return Object.freeze({
+      applied: state.applied,
+      ready: state.ready,
+      loading: state.loading,
+      olderLoading: state.olderLoading,
+      nextBefore: state.nextBefore,
+    });
+  }
+
+  private stream(id: string) {
     let streamState = this.streams.get(id);
     if (!streamState) {
       streamState = {
@@ -153,7 +170,6 @@ export class ConversationStore {
         nextBefore: null,
         lastRead: 0n,
         membershipId: this.membership(id),
-        notificationFloor: 0n,
       };
       this.streams.set(id, streamState);
     }
@@ -185,52 +201,56 @@ export class ConversationStore {
     }
 
     const epoch = this.options.epoch();
-    const work = (async () => {
-      do {
-        this.summaryAgain = false;
-        const revision = this.summaryRevision;
-        const summaries = await collectConversationSummaries({
-          api: this.options.api,
-          current: () =>
-            this.options.active() && epoch === this.options.epoch(),
-          revoked: (conversation) =>
-            this.revokedMemberships.has(
-              `${conversation.id}/${membershipId(conversation)}`,
-            ),
-        });
-        if (
-          !summaries ||
-          !this.options.active() ||
-          epoch !== this.options.epoch()
-        ) {
-          return;
+    const work = this.refreshSummaryPages(epoch);
+
+    // Every caller joins the handled promise, including error reporting and cleanup.
+    // Sharing raw work would let later callers observe an unhandled rejection.
+    const flight = work
+      .catch((reason) => {
+        if (this.options.active() && epoch === this.options.epoch()) {
+          this.options.failed(
+            reason instanceof Error ? reason.message : '会话列表加载失败',
+          );
         }
-
-        // A removal can race a paginated response. Reread rather than resurrect
-        // a snapshot authorized before the control hint invalidated its episode.
-        if (revision !== this.summaryRevision) {
-          this.summaryAgain = true;
-          continue;
+      })
+      .finally(() => {
+        if (this.summaryFlight === flight) {
+          this.summaryFlight = undefined;
         }
+      });
+    this.summaryFlight = flight;
+    return flight;
+  }
 
-        this.reconcileSummaries(summaries);
-      } while (this.summaryAgain && this.options.active());
-    })();
-    this.summaryFlight = work;
+  private async refreshSummaryPages(epoch: number) {
+    do {
+      this.summaryAgain = false;
+      const revision = this.summaryRevision;
+      const summaries = await collectConversationSummaries({
+        api: this.options.api,
+        current: () => this.options.active() && epoch === this.options.epoch(),
+        revoked: (conversation) =>
+          this.revokedMemberships.has(
+            `${conversation.id}/${membershipId(conversation)}`,
+          ),
+      });
+      if (
+        !summaries ||
+        !this.options.active() ||
+        epoch !== this.options.epoch()
+      ) {
+        return;
+      }
 
-    try {
-      await work;
-    } catch (reason) {
-      if (this.options.active() && epoch === this.options.epoch()) {
-        this.options.failed(
-          reason instanceof Error ? reason.message : '会话列表加载失败',
-        );
+      // A removal can race a paginated response. Reread rather than resurrect
+      // a snapshot authorized before the control hint invalidated its episode.
+      if (revision !== this.summaryRevision) {
+        this.summaryAgain = true;
+        continue;
       }
-    } finally {
-      if (this.summaryFlight === work) {
-        this.summaryFlight = undefined;
-      }
-    }
+
+      this.reconcileSummaries(summaries);
+    } while (this.summaryAgain && this.options.active());
   }
 
   private reconcileSummaries(summaries: Map<string, Conversation>) {
@@ -280,7 +300,7 @@ export class ConversationStore {
           ? streamState.lastRead
           : ownReadSequence;
 
-      if (this.firstFresh(conversation.id) !== undefined) {
+      if (this.liveCandidates.first(conversation.id) !== undefined) {
         this.initializeLive(conversation.id);
         if (streamState.ready) void this.drain(conversation.id);
       }
@@ -314,6 +334,15 @@ export class ConversationStore {
       return;
     }
 
+    await this.loadSnapshot(id, streamState, generation, epoch);
+  }
+
+  private async loadSnapshot(
+    id: string,
+    streamState: ConversationStream,
+    generation: number,
+    epoch: number,
+  ) {
     streamState.loading = true;
     this.options.changed();
 
@@ -333,7 +362,7 @@ export class ConversationStore {
 
       // Snapshot responses can race a newer acknowledgement or replay revision.
       this.merge(id, snapshot.items);
-      const baseline = this.liveBaseline(id, snapshot.snapshot_seq);
+      const baseline = this.liveCandidates.baseline(id, snapshot.snapshot_seq);
       if (baseline > sequence(streamState.applied)) {
         streamState.applied = baseline.toString();
       }
@@ -361,6 +390,58 @@ export class ConversationStore {
     }
   }
 
+  /** Reload through selection so old snapshot/replay responses lose their generation. */
+  async reload(id: string, ensureReady: () => Promise<void>) {
+    const state = this.stream(id);
+    state.ready = false;
+    state.hasSnapshot = false;
+    await this.select(id, ensureReady);
+  }
+
+  /** Accept only a DOM-confirmed cursor supplied by the visible latest timeline.
+   * Rendering alone is insufficient: a send acknowledgement can precede replay.
+   * The store owns continuous application, membership and request-generation fences.
+   */
+  async readRendered(
+    id: string,
+    cursor: string,
+  ): Promise<'ignored' | 'acknowledged' | 'stale' | 'failed'> {
+    const state = this.stream(id);
+    if (
+      !this.options.active() ||
+      state.reading ||
+      sequence(cursor) <= state.lastRead ||
+      sequence(cursor) > sequence(state.applied)
+    ) {
+      return 'ignored';
+    }
+
+    state.reading = cursor;
+    const epoch = this.options.epoch();
+    const generation = state.generation;
+    const membership = state.membershipId;
+
+    try {
+      const result = await this.options.api.read(id, cursor, membership);
+      if (
+        !this.valid(state, generation, epoch) ||
+        this.membership(id) !== membership
+      ) {
+        return 'stale';
+      }
+
+      const acknowledged = sequence(result.my_read_seq);
+      state.lastRead =
+        state.lastRead > acknowledged ? state.lastRead : acknowledged;
+      return 'acknowledged';
+    } catch {
+      // Receipts retry after another visible update, never as an offline queue.
+      return 'failed';
+    } finally {
+      state.reading = undefined;
+    }
+  }
+
   async drain(id: string) {
     const streamState = this.stream(id);
     if (!streamState.ready || !this.options.active()) {
@@ -372,56 +453,14 @@ export class ConversationStore {
 
     const generation = streamState.generation;
     const epoch = this.options.epoch();
-    const work = (async () => {
-      while (
-        this.valid(streamState, generation, epoch) &&
-        sequence(streamState.applied) < streamState.target
-      ) {
-        const page = await this.options.api.events(
-          id,
-          streamState.applied,
-          streamState.abort.signal,
-          streamState.membershipId,
-        );
-        if (!this.valid(streamState, generation, epoch)) {
-          return;
-        }
-        if (page.membership?.membership_id !== streamState.membershipId) return;
+    const work = this.replay(id, streamState, generation, epoch);
 
-        if (sequence(page.snapshot_seq) > streamState.target) {
-          streamState.target = sequence(page.snapshot_seq);
-        }
+    // Recovery belongs to the shared flight so all joiners wait for the same
+    // membership refresh and observe the same handled transport failure.
+    const flight = work
+      .catch(async (reason) => {
+        if (!this.valid(streamState, generation, epoch)) return;
 
-        // A notification only raises the target. Apply every persisted predecessor
-        // before advancing the cursor, including sequences beyond Number precision.
-        let progressed = false;
-        for (const event of page.events) {
-          if (event.envelope.conversation_id !== id) {
-            throw new Error('同步响应中的会话不匹配');
-          }
-          const next = sequence(event.envelope.event_seq);
-          if (next <= sequence(streamState.applied)) {
-            continue;
-          }
-          if (next !== sequence(streamState.applied) + 1n) {
-            throw new Error('消息同步出现空缺，请重新加载');
-          }
-          this.apply(id, event);
-          streamState.applied = event.envelope.event_seq;
-          progressed = true;
-          this.options.changed();
-        }
-        if (!progressed && sequence(streamState.applied) < streamState.target) {
-          throw new Error('消息同步暂未完成，请重新加载');
-        }
-      }
-    })();
-    streamState.draining = work;
-
-    try {
-      await work;
-    } catch (reason) {
-      if (this.valid(streamState, generation, epoch)) {
         if (
           reason instanceof ApiFailure &&
           reason.status === 409 &&
@@ -434,14 +473,67 @@ export class ConversationStore {
           }
           return;
         }
+
         this.options.failed(
           reason instanceof Error ? reason.message : '同步暂时中断',
         );
+      })
+      .finally(() => {
+        if (streamState.draining === flight) {
+          streamState.draining = undefined;
+          this.options.changed();
+        }
+      });
+    streamState.draining = flight;
+    return flight;
+  }
+
+  private async replay(
+    id: string,
+    streamState: ConversationStream,
+    generation: number,
+    epoch: number,
+  ) {
+    while (
+      this.valid(streamState, generation, epoch) &&
+      sequence(streamState.applied) < streamState.target
+    ) {
+      const page = await this.options.api.events(
+        id,
+        streamState.applied,
+        streamState.abort.signal,
+        streamState.membershipId,
+      );
+      if (!this.valid(streamState, generation, epoch)) {
+        return;
       }
-    } finally {
-      if (streamState.draining === work) {
-        streamState.draining = undefined;
+      if (page.membership?.membership_id !== streamState.membershipId) return;
+
+      if (sequence(page.snapshot_seq) > streamState.target) {
+        streamState.target = sequence(page.snapshot_seq);
+      }
+
+      // A notification only raises the target. Apply every persisted predecessor
+      // before advancing the cursor, including sequences beyond Number precision.
+      let progressed = false;
+      for (const event of page.events) {
+        if (event.envelope.conversation_id !== id) {
+          throw new Error('同步响应中的会话不匹配');
+        }
+        const next = sequence(event.envelope.event_seq);
+        if (next <= sequence(streamState.applied)) {
+          continue;
+        }
+        if (next !== sequence(streamState.applied) + 1n) {
+          throw new Error('消息同步出现空缺，请重新加载');
+        }
+        this.apply(id, event);
+        streamState.applied = event.envelope.event_seq;
+        progressed = true;
         this.options.changed();
+      }
+      if (!progressed && sequence(streamState.applied) < streamState.target) {
+        throw new Error('消息同步暂未完成，请重新加载');
       }
     }
   }
@@ -456,9 +548,7 @@ export class ConversationStore {
     ) {
       this.merge(id, [payload.data]);
       if (payload.type === 'message.created') {
-        const fresh = this.liveCandidates.delete(
-          `${id}/${event.envelope.event_seq}`,
-        );
+        const fresh = this.liveCandidates.take(id, event.envelope.event_seq);
         this.options.messageApplied?.(
           this.messages(id).find((message) => message.id === payload.data.id)!,
           fresh,
@@ -527,105 +617,37 @@ export class ConversationStore {
    */
   liveHint(id: string, eventSeq: string, notify: boolean) {
     const state = this.stream(id);
-    if (
-      notify &&
-      sequence(eventSeq) > state.notificationFloor &&
-      sequence(eventSeq) <= sequence(state.applied)
-    ) {
-      const conversation = this.conversations.find(
-        (record) => record.id === id,
-      );
-      const message = this.messages(id).find(
-        (record) => record.created_seq === eventSeq,
-      );
-      // A preceding receipt can replay this message before its own publication.
-      // The exact live hint may announce its authorized canonical record once;
-      // initial/reconnect history and a cursor already read elsewhere stay silent.
-      if (
-        message &&
-        conversation &&
-        sequence(conversation.my_read_seq) < sequence(message.created_seq) &&
-        state.lastRead < sequence(message.created_seq)
-      ) {
-        this.options.messageApplied?.(message, true);
-      }
+    if (notify) {
+      this.liveCandidates.hint(id, eventSeq, state.applied, state.lastRead);
     }
-    if (
-      notify &&
-      sequence(eventSeq) > sequence(state.applied) &&
-      sequence(eventSeq) > state.notificationFloor
-    ) {
-      this.liveCandidates.add(`${id}/${eventSeq}`);
-      if (this.liveCandidates.size > MAX_LIVE_CANDIDATES) {
-        this.liveCandidates.delete(this.liveCandidates.values().next().value!);
-      }
-    }
+
     this.raiseTarget(id, eventSeq);
     this.initializeLive(id);
     if (state.ready) void this.drain(id);
-  }
-
-  private firstFresh(id: string) {
-    const conversation = this.conversations.find((record) => record.id === id);
-    const joined = isGroup(conversation)
-      ? sequence(conversation.membership.joined_seq)
-      : 0n;
-    const state = this.stream(id);
-
-    let first: bigint | undefined;
-    for (const candidate of this.liveCandidates) {
-      if (!candidate.startsWith(`${id}/`)) continue;
-
-      const candidateSequence = sequence(candidate.slice(id.length + 1));
-      if (
-        candidateSequence < joined ||
-        candidateSequence <= state.notificationFloor
-      ) {
-        this.liveCandidates.delete(candidate);
-        continue;
-      }
-      if (first === undefined || candidateSequence < first) {
-        first = candidateSequence;
-      }
-    }
-    return first;
-  }
-
-  private liveBaseline(id: string, snapshotSequence: string) {
-    const first = this.firstFresh(id);
-    return first !== undefined && first <= sequence(snapshotSequence)
-      ? first - 1n
-      : sequence(snapshotSequence);
   }
 
   private initializeLive(id: string) {
     const conversation = this.conversations.find((record) => record.id === id);
     const state = this.stream(id);
     if (!conversation || state.ready || state.loading) return;
-    const first = this.firstFresh(id);
+    const first = this.liveCandidates.first(id);
     // Metadata received after a creation hint may already contain the first
     // message. Await its exact live candidate instead of adopting that summary
     // as applied history. Startup/reconnect floors distinguish old outbox hints.
-    if (first === undefined && state.notificationFloor === 0n) return;
+    if (first === undefined && this.liveCandidates.floor(id) === 0n) return;
 
     // Only an uninitialized stream adopts an episode. Established episodes are
     // replaced by forget(), so old HTTP generations cannot cross a rejoin.
     state.membershipId = membershipId(conversation);
-    state.applied = this.liveBaseline(
-      id,
-      conversation.latest_event_seq,
-    ).toString();
+    state.applied = this.liveCandidates
+      .baseline(id, conversation.latest_event_seq)
+      .toString();
     state.ready = true;
   }
 
   /** Freeze known history after startup/reconnect, not after live metadata refreshes. */
   captureNotificationBaseline() {
-    this.liveCandidates.clear();
-    for (const conversation of this.conversations) {
-      this.stream(conversation.id).notificationFloor = sequence(
-        conversation.latest_event_seq,
-      );
-    }
+    this.liveCandidates.captureBaseline();
   }
 
   clearFresh() {
@@ -688,7 +710,12 @@ export class ConversationStore {
     }
     this.streams.clear();
     this.revokedMemberships.clear();
-    this.liveCandidates.clear();
-    this.options.queryClient.clear();
+    this.liveCandidates.stop();
+
+    // Other features share this client. Whole-session disposal belongs to the
+    // authenticated workspace; chat removes only its own canonical records.
+    for (const queryKey of [keys.conversations, ['messages'], ['members']]) {
+      this.options.queryClient.removeQueries({ queryKey });
+    }
   }
 }
