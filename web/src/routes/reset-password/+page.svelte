@@ -1,5 +1,5 @@
 <script lang="ts">
-  import PasswordReset from '#lib/features/auth/PasswordReset.svelte';
+  import PasswordReset from '#lib/features/auth/recovery/PasswordReset.svelte';
 </script>
 
 <PasswordReset />

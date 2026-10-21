@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/svelte-query';
 import { expect, test } from 'vitest';
 
 import type { components } from '../../src/lib/api-client';
-import { SettingsSessions } from '../../src/lib/features/settings/sessions.svelte';
+import { SettingsSessions } from '../../src/lib/features/settings/sessions/sessions.svelte';
 
 type Session = components['schemas']['SessionView'];
 

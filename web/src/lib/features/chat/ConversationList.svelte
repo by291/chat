@@ -10,7 +10,7 @@
   import PaneHeader from '#lib/components/PaneHeader.svelte';
   import { avatarTone } from '#lib/utils.js';
 
-  import ProfileAvatar from '#lib/features/settings/ProfileAvatar.svelte';
+  import ProfileAvatar from '#lib/features/settings/profile/ProfileAvatar.svelte';
 
   import WorkspaceNavigation from './WorkspaceNavigation.svelte';
 

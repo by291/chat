@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { PasswordResetState } from '../../src/lib/features/auth/password-recovery.svelte';
+import { PasswordResetState } from '../../src/lib/features/auth/recovery/password-recovery.svelte';
 
 const token = 'b'.repeat(64);
 

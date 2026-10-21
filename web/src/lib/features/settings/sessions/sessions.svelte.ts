@@ -8,7 +8,7 @@ import {
 
 import type { components } from '#lib/api-client';
 
-import { settingsApi } from './api';
+import { settingsApi } from '../api';
 
 type Session = components['schemas']['SessionView'];
 type SessionRequests = Pick<typeof settingsApi, 'sessions' | 'revokeSession'>;

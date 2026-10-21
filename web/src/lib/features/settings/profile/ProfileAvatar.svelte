@@ -4,7 +4,7 @@
 
   import { downloadBlob } from '#lib/features/media/api.ts';
 
-  import { settingsApi } from './api';
+  import { settingsApi } from '../api';
 
   const AVATAR_REFRESH_INTERVAL_MS = 60_000;
 
@@ -18,7 +18,7 @@
 
   $effect(() => {
     const id = userId;
-    revision;
+    void revision;
     const controller = new AbortController();
     let current = '';
     let generation = 0;

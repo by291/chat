@@ -5,9 +5,9 @@
   import { Input } from '#lib/components/ui/input/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
 
-  import { createAuthApi } from './api';
-  import { auth } from './session.svelte';
-  import { PasswordResetState } from './password-recovery.svelte';
+  import { createAuthApi } from '../api';
+  import { auth } from '../session.svelte.ts';
+  import { PasswordResetState } from './password-recovery.svelte.ts';
 
   const reset = new PasswordResetState(createAuthApi().resetPassword);
   let password = $state('');

@@ -5,7 +5,7 @@
   import { Input } from '#lib/components/ui/input/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
 
-  import { createAuthApi } from './api';
+  import { createAuthApi } from '../api';
 
   const requests = createAuthApi();
   let email = $state('');

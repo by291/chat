@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import {
   EmailVerificationState,
   securityToken,
-} from '../../src/lib/features/auth/email-verification.svelte';
+} from '../../src/lib/features/auth/verification/email-verification.svelte';
 import { ApiFailure } from '../../src/lib/api-client';
 
 const token = 'a'.repeat(64);

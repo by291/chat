@@ -10,5 +10,6 @@
 @import './lib/features/auth/auth.css';
 @import './lib/styles/app-shell.css';
 @import './lib/features/settings/settings.css';
-@import './lib/styles/responsive.css';
+@import './lib/features/auth/responsive.css';
+@import './lib/features/settings/responsive.css';
 @import './lib/styles/overrides.css';

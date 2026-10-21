@@ -8,7 +8,7 @@
   import UploadList from '#lib/features/media/UploadList.svelte';
 
   import ProfileAvatar from './ProfileAvatar.svelte';
-  import { settingsApi } from './api';
+  import { settingsApi } from '../api';
 
   let { userId, name }: { userId: string; name: string } = $props();
 

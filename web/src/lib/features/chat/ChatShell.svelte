@@ -13,7 +13,7 @@
   import { Button } from '#lib/components/ui/button/index.js';
   import { avatarTone } from '#lib/utils.js';
 
-  import ProfileAvatar from '#lib/features/settings/ProfileAvatar.svelte';
+  import ProfileAvatar from '#lib/features/settings/profile/ProfileAvatar.svelte';
 
   import { useChat } from './context.svelte';
   import ConversationList from './ConversationList.svelte';

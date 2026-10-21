@@ -2,7 +2,7 @@
   import { Info } from '@lucide/svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import * as Dialog from '#lib/components/ui/dialog/index.js';
-  import ProfileAvatar from '#lib/features/settings/ProfileAvatar.svelte';
+  import ProfileAvatar from '#lib/features/settings/profile/ProfileAvatar.svelte';
   import type { User } from '#lib/features/contacts/api.ts';
 
   let { user }: { user: User } = $props();

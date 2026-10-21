@@ -3,7 +3,7 @@
   import { MessageCircle, Settings2, Users } from '@lucide/svelte';
 
   import { Button } from '#lib/components/ui/button/index.js';
-  import AccountMenu from '#lib/features/settings/AccountMenu.svelte';
+  import AccountMenu from '#lib/features/settings/profile/AccountMenu.svelte';
   import { useContacts } from '#lib/features/contacts/context.svelte.ts';
   import { useChat } from './context.svelte';
   import { auth } from '#lib/features/auth/session.svelte.ts';

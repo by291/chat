@@ -7,7 +7,7 @@
   import { Label } from '#lib/components/ui/label/index.js';
   import type { components } from '#lib/api-client';
 
-  import { settingsApi } from './api';
+  import { settingsApi } from '../api';
 
   let {
     user,
@@ -48,8 +48,9 @@
       onSaved(updated);
       saved = true;
     } catch (reason) {
-      if (!lifetime.signal.aborted)
+      if (!lifetime.signal.aborted) {
         error = reason instanceof Error ? reason.message : '保存失败';
+      }
     } finally {
       pending = false;
     }
@@ -71,13 +72,11 @@
       <Button type="submit" disabled={pending}>
         {pending ? '保存中…' : '保存资料'}
       </Button>
-      {#if onCancel}<Button
-          variant="secondary"
-          disabled={pending}
-          onclick={onCancel}
-        >
+      {#if onCancel}
+        <Button variant="secondary" disabled={pending} onclick={onCancel}>
           取消
-        </Button>{/if}
+        </Button>
+      {/if}
       {#if saved}
         <span class="success" role="status">资料已保存</span>
       {/if}

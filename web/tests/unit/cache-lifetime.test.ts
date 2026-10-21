@@ -11,7 +11,7 @@ import type {
 } from '../../src/lib/features/chat/models';
 import type { Attachment, MediaApi } from '../../src/lib/features/media/models';
 import { MediaUploads } from '../../src/lib/features/media/uploads.svelte';
-import { SettingsSessions } from '../../src/lib/features/settings/sessions.svelte';
+import { SettingsSessions } from '../../src/lib/features/settings/sessions/sessions.svelte';
 
 const cleanups: Array<() => void> = [];
 

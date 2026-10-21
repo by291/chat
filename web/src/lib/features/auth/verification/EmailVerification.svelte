@@ -3,10 +3,10 @@
 
   import { Button } from '#lib/components/ui/button/index.js';
 
-  import AuthForm from './AuthForm.svelte';
-  import { createAuthApi } from './api';
-  import { auth } from './session.svelte';
-  import { EmailVerificationState } from './email-verification.svelte';
+  import AuthForm from '../AuthForm.svelte';
+  import { createAuthApi } from '../api';
+  import { auth } from '../session.svelte.ts';
+  import { EmailVerificationState } from './email-verification.svelte.ts';
 
   const requests = createAuthApi();
   const verification = new EmailVerificationState(

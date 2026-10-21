@@ -1,4 +1,4 @@
-/* Shared responsive adjustments; imported after feature styles. */
+/* Auth mobile overrides retain their position after feature styles. */
 
 @media (max-width: 760px) {
   .auth-page {
@@ -37,9 +37,5 @@
 
   .auth-card h2 {
     font-size: 27px;
-  }
-
-  .session-item {
-    gap: 10px;
   }
 }

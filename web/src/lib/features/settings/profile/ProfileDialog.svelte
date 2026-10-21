@@ -60,6 +60,8 @@
       <span class="muted">仅退出当前设备</span>
       <Button variant="secondary" onclick={() => (open = false)}>完成</Button>
     </footer>
-    {#if logoutError}<p class="form-error" role="alert">{logoutError}</p>{/if}
+    {#if logoutError}
+      <p class="form-error" role="alert">{logoutError}</p>
+    {/if}
   </Dialog.Content>
 </Dialog.Root>

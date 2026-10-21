@@ -1,6 +1,6 @@
 import type { components } from '#lib/api-client';
 
-import { securityToken } from './email-verification.svelte';
+import { securityToken } from '../verification/email-verification.svelte.ts';
 
 type ResetPassword = (
   input: components['schemas']['PasswordResetInput'],

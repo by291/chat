@@ -1,0 +1,7 @@
+/* Device-list mobile spacing retains its position after feature styles. */
+
+@media (max-width: 760px) {
+  .session-item {
+    gap: 10px;
+  }
+}

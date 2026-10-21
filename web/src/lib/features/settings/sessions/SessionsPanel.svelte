@@ -8,7 +8,7 @@
 
   import { auth } from '#lib/features/auth/session.svelte.ts';
 
-  import { SettingsSessions } from './sessions.svelte';
+  import { SettingsSessions } from './sessions.svelte.ts';
 
   const queryClient = useQueryClient();
   let owner = $state<SettingsSessions | null>(null);

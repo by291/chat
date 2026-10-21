@@ -6,18 +6,14 @@
   import { Button } from '#lib/components/ui/button/index.js';
   import PaneHeader from '#lib/components/PaneHeader.svelte';
 
-  import * as Card from '#lib/components/ui/card/index.js';
-  import * as NativeSelect from '#lib/components/ui/native-select/index.js';
-  import { Label } from '#lib/components/ui/label/index.js';
-
+  import AppearanceSettings from './appearance/AppearanceSettings.svelte';
   import SettingsNavigation from '#lib/features/settings/SettingsNavigation.svelte';
   import WorkspaceNavigation from '#lib/features/chat/WorkspaceNavigation.svelte';
-  import SessionsPanel from '#lib/features/settings/SessionsPanel.svelte';
-  import PasswordForm from '#lib/features/settings/PasswordForm.svelte';
-  import EmailForm from '#lib/features/settings/EmailForm.svelte';
+  import SessionsPanel from '#lib/features/settings/sessions/SessionsPanel.svelte';
+  import PasswordForm from '#lib/features/settings/security/PasswordForm.svelte';
+  import EmailForm from '#lib/features/settings/security/EmailForm.svelte';
   import InstallHelp from '#lib/features/pwa/InstallHelp.svelte';
   import BackgroundPushSettings from '#lib/features/notifications/BackgroundPushSettings.svelte';
-  import { theme, type Theme } from '#lib/features/settings/theme.svelte.ts';
   import { auth } from '#lib/features/auth/session.svelte.ts';
 
   const sections: Record<string, { title: string; description: string }> = {
@@ -43,7 +39,7 @@
   let content: HTMLElement;
 
   $effect(() => {
-    active;
+    void active;
     if (content) content.scrollTop = 0;
   });
 </script>
@@ -104,26 +100,7 @@
           <h2 id="settings-preferences" tabindex="-1">通知与外观</h2>
         </header>
         <BackgroundPushSettings />
-        <Card.Root
-          class="settings-card gap-0 p-6"
-          role="region"
-          aria-label="界面外观"
-        >
-          <div class="section-heading">
-            <h3>界面外观</h3>
-          </div>
-          <Label class="form-label" for="theme">外观</Label>
-          <NativeSelect.Root
-            class="w-full"
-            id="theme"
-            value={theme.value}
-            onchange={(e) => theme.set(e.currentTarget.value as Theme)}
-          >
-            <NativeSelect.Option value="system">跟随系统</NativeSelect.Option>
-            <NativeSelect.Option value="light">浅色</NativeSelect.Option>
-            <NativeSelect.Option value="dark">深色</NativeSelect.Option>
-          </NativeSelect.Root>
-        </Card.Root>
+        <AppearanceSettings />
       </section>
       <section
         class="settings-group"
