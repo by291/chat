@@ -5,7 +5,7 @@
   import { ArrowLeft, Search, UserPlus, Users } from '@lucide/svelte';
 
   import { Input } from '#lib/components/ui/input/index.js';
-  import WorkspaceNavigation from '#lib/features/chat/WorkspaceNavigation.svelte';
+  import WorkspaceNavigation from '#lib/features/workspace/WorkspaceNavigation.svelte';
   import type { ContactsState } from './contacts.svelte';
 
   import { Button } from '#lib/components/ui/button/index.js';

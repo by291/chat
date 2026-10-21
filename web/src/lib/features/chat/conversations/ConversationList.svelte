@@ -10,7 +10,7 @@
   import { avatarTone } from '#lib/utils.js';
 
   import ProfileAvatar from '#lib/features/settings/profile/ProfileAvatar.svelte';
-  import WorkspaceNavigation from '#lib/features/chat/WorkspaceNavigation.svelte';
+  import WorkspaceNavigation from '#lib/features/workspace/WorkspaceNavigation.svelte';
 
   import NotificationSettings from '../notifications/NotificationSettings.svelte';
   import ConversationActions from './ConversationActions.svelte';

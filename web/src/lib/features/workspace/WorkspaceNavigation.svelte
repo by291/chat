@@ -5,7 +5,7 @@
   import { Button } from '#lib/components/ui/button/index.js';
   import AccountMenu from '#lib/features/settings/profile/AccountMenu.svelte';
   import { useContacts } from '#lib/features/contacts/context.svelte.ts';
-  import { useChat } from './context.svelte';
+  import { useChat } from '#lib/features/chat/context.svelte.ts';
   import { auth } from '#lib/features/auth/session.svelte.ts';
 
   const chat = useChat();
@@ -58,9 +58,11 @@
   >
     <Users class="size-5" />
     <span class="workspace-label">通讯录</span>
-    {#if contacts.owner?.pendingCount}<span class="workspace-badge">
+    {#if contacts.owner?.pendingCount}
+      <span class="workspace-badge">
         {contacts.owner.pendingCount}
-      </span>{/if}
+      </span>
+    {/if}
   </Button>
   <Button
     variant="ghost"

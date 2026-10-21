@@ -8,7 +8,7 @@
 
   import AppearanceSettings from './appearance/AppearanceSettings.svelte';
   import SettingsNavigation from '#lib/features/settings/SettingsNavigation.svelte';
-  import WorkspaceNavigation from '#lib/features/chat/WorkspaceNavigation.svelte';
+  import WorkspaceNavigation from '#lib/features/workspace/WorkspaceNavigation.svelte';
   import SessionsPanel from '#lib/features/settings/sessions/SessionsPanel.svelte';
   import PasswordForm from '#lib/features/settings/security/PasswordForm.svelte';
   import EmailForm from '#lib/features/settings/security/EmailForm.svelte';
