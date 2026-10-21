@@ -13,6 +13,7 @@
   let { userId, name }: { userId: string; name: string } = $props();
 
   const chat = useChat();
+  let fileInput = $state<HTMLInputElement | null>(null);
   let revision = $state(0);
   let busy = $state(false);
   let error = $state('');
@@ -53,14 +54,20 @@
   }
 </script>
 
-<Card.Root class="settings-card gap-0 p-6" role="region" aria-label="头像">
+<Card.Root
+  class="settings-card profile-avatar-editor gap-0 p-6"
+  role="region"
+  aria-label="头像"
+>
   <div class="section-heading">
     <h3>头像</h3>
-    <p class="muted">选择 JPEG、PNG 或 WebP 图片。</p>
   </div>
   <ProfileAvatar {userId} {name} {revision} />
-  <Label class="form-label" for="avatar-file">选择头像</Label>
+  <Label class="sr-only" for="avatar-file">选择头像</Label>
   <Input
+    bind:ref={fileInput}
+    class="sr-only"
+    tabindex={-1}
     id="avatar-file"
     type="file"
     accept="image/jpeg,image/png,image/webp"
@@ -71,14 +78,24 @@
       if (selected) void uploads?.add([selected], { purpose: 'avatar' });
     }}
   />
+  <Button
+    variant="secondary"
+    disabled={busy || entries.length > 0}
+    onclick={() => fileInput?.click()}
+  >
+    更换头像
+  </Button>
+  <p class="field-help">支持 JPEG、PNG、WebP</p>
   {#if uploads && entries.length}
     <UploadList {uploads} {entries} />
   {/if}
   <div class="form-actions">
-    <Button disabled={busy || !ready} onclick={() => save(false)}>
-      保存头像
-    </Button>
-    <Button variant="secondary" disabled={busy} onclick={() => save(true)}>
+    {#if entries.length}
+      <Button disabled={busy || !ready} onclick={() => save(false)}>
+        保存头像
+      </Button>
+    {/if}
+    <Button variant="ghost" disabled={busy} onclick={() => save(true)}>
       移除头像
     </Button>
   </div>
