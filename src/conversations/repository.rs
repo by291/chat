@@ -446,7 +446,7 @@ pub async fn insert_event_job(
     tx: &mut Transaction<'_, Postgres>,
     id: ConversationId,
     seq: Seq,
-    payload: serde_json::Value,
+    payload: &crate::realtime::model::OutboxPayload,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
@@ -457,7 +457,7 @@ pub async fn insert_event_job(
     .bind(uuid::Uuid::now_v7())
     .bind(format!("conversation:{id}"))
     .bind(seq)
-    .bind(payload)
+    .bind(sqlx::types::Json(payload))
     .execute(&mut **tx)
     .await?;
 

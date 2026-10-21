@@ -1,32 +1,36 @@
 //! Durable job delivery. Duplicate publications are safe because clients replay by sequence.
 
 use super::{
-    model::{EphemeralEvent, RealtimeEvent},
+    model::{EphemeralEvent, OutboxPayload, RealtimeEvent},
     repository::{self, LeasedJob},
 };
-use crate::{
-    AppState,
-    error::AppError,
-    types::{ConversationId, EventEnvelope, SessionId, UserId},
-};
+use crate::{AppState, error::AppError};
 
 /// Deliver a leased job; completion is a separate CAS operation after the network call.
 pub async fn deliver(state: &AppState, job: &LeasedJob) -> Result<(), AppError> {
-    match job.payload["type"].as_str() {
-        Some("conversation.event") => {
-            let envelope: EventEnvelope = serde_json::from_value(job.payload["envelope"].clone())
-                .map_err(|_| AppError::unavailable())?;
+    // Preserve the existing malformed/unknown-job distinction while decoding every
+    // recognized job through the same contract its producer serialized.
+    if !matches!(
+        job.payload["type"].as_str(),
+        Some(
+            "conversation.event"
+                | "conversation.preferences"
+                | "contacts.updated"
+                | "session.revoked"
+        )
+    ) {
+        return Err(AppError::invalid("未知投递任务"));
+    }
+    let payload: OutboxPayload =
+        serde_json::from_value(job.payload.clone()).map_err(|_| AppError::unavailable())?;
 
-            // Old jobs have no control recipients. Episode IDs keep delayed retries
-            // from purging a later rejoin, and no conversation content is published.
-            let invalidations: Vec<crate::conversations::model::MembershipInvalidation> =
-                serde_json::from_value(
-                    job.payload
-                        .get("invalidations")
-                        .cloned()
-                        .unwrap_or_else(|| serde_json::json!([])),
-                )
-                .map_err(|_| AppError::unavailable())?;
+    match payload {
+        OutboxPayload::ConversationEvent {
+            envelope,
+            invalidations,
+        } => {
+            // Episode IDs keep delayed retries from purging a later rejoin, and no
+            // conversation content is published in the control hint.
             for recipient in invalidations {
                 state
                     .centrifugo
@@ -52,12 +56,10 @@ pub async fn deliver(state: &AppState, job: &LeasedJob) -> Result<(), AppError> 
                     .await?;
             }
         }
-        Some("conversation.preferences") => {
-            let user_id: UserId = serde_json::from_value(job.payload["user_id"].clone())
-                .map_err(|_| AppError::unavailable())?;
-            let conversation_id: ConversationId =
-                serde_json::from_value(job.payload["conversation_id"].clone())
-                    .map_err(|_| AppError::unavailable())?;
+        OutboxPayload::ConversationPreferences {
+            user_id,
+            conversation_id,
+        } => {
             state
                 .centrifugo
                 .publish(
@@ -68,30 +70,29 @@ pub async fn deliver(state: &AppState, job: &LeasedJob) -> Result<(), AppError> 
                 )
                 .await?;
         }
-        Some("contacts.updated") => {
-            let user: UserId = serde_json::from_value(job.payload["user_id"].clone())
-                .map_err(|_| AppError::unavailable())?;
+        OutboxPayload::ContactsUpdated { user_id } => {
             state
                 .centrifugo
                 .publish(
-                    &format!("personal:#{user}"),
+                    &format!("personal:#{user_id}"),
                     &RealtimeEvent::Ephemeral(EphemeralEvent::ContactsUpdated),
                 )
                 .await?;
         }
-        Some("session.revoked") => {
-            let session: SessionId = serde_json::from_value(job.payload["session_id"].clone())
-                .map_err(|_| AppError::unavailable())?;
-            let user: UserId = serde_json::from_value(job.payload["user_id"].clone())
-                .map_err(|_| AppError::unavailable())?;
-            let clients = repository::session_clients(&state.pool, session).await?;
+        OutboxPayload::SessionRevoked {
+            session_id,
+            user_id,
+        } => {
+            let clients = repository::session_clients(&state.pool, session_id).await?;
 
             // Retain connection records until disconnect succeeds, so a failed call
             // can retry with the same client list. Session refresh already rejects it.
-            state.centrifugo.disconnect_clients(user, &clients).await?;
-            repository::remove_session_connections(&state.pool, session).await?;
+            state
+                .centrifugo
+                .disconnect_clients(user_id, &clients)
+                .await?;
+            repository::remove_session_connections(&state.pool, session_id).await?;
         }
-        _ => return Err(AppError::invalid("未知投递任务")),
     }
 
     Ok(())

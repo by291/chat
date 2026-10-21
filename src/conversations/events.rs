@@ -71,11 +71,10 @@ pub async fn append_with_invalidations(
         transaction,
         id,
         envelope.event_seq,
-        serde_json::json!({
-            "type": "conversation.event",
-            "envelope": envelope,
-            "invalidations": invalidations,
-        }),
+        &crate::realtime::model::OutboxPayload::ConversationEvent {
+            envelope: envelope.clone(),
+            invalidations,
+        },
     )
     .await?;
 

@@ -164,11 +164,10 @@ pub async fn enqueue_revocation(
     user_id: UserId,
     session_id: SessionId,
 ) -> Result<(), sqlx::Error> {
-    let payload = serde_json::json!({
-        "type": "session.revoked",
-        "user_id": user_id,
-        "session_id": session_id,
-    });
+    let payload = crate::realtime::model::OutboxPayload::SessionRevoked {
+        user_id,
+        session_id,
+    };
 
     sqlx::query(
         r#"
@@ -179,7 +178,7 @@ pub async fn enqueue_revocation(
     )
     .bind(Uuid::now_v7())
     .bind(format!("session:{session_id}"))
-    .bind(payload)
+    .bind(sqlx::types::Json(payload))
     .execute(&mut **transaction)
     .await?;
 

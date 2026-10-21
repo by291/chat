@@ -169,7 +169,9 @@ pub async fn enqueue_contacts_changed(
     )
     .bind(id)
     .bind(format!("contacts:{user}:{id}"))
-    .bind(serde_json::json!({"type":"contacts.updated", "user_id":user}))
+    .bind(sqlx::types::Json(
+        crate::realtime::model::OutboxPayload::ContactsUpdated { user_id: user },
+    ))
     .execute(&mut **tx)
     .await?;
     Ok(())
