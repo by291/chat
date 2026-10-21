@@ -4,10 +4,10 @@
 
 Start with `AGENTS.md` for the conventions, then follow one complete operation:
 
-1. Sending a message: `conversations/http.rs` → `messages.rs` → `message_repository.rs`
+1. Sending a message: `conversations/messages/http.rs` → `messages/service.rs` → `messages/repository.rs`
    and `events.rs` → `realtime/outbox.rs` → `delivery.rs`.
-2. Rendering it: chat `api.ts` → `conversation-store.ts` → `sync.svelte.ts`
-   → `MessageList.svelte`.
+2. Rendering it: chat `api.ts` → `synchronization/conversation-store.ts` → `sync.svelte.ts`
+   → `messages/MessageList.svelte`.
 3. Logging in: auth `http.rs` → `service.rs` → `repository.rs` and `password.rs`;
    browser auth `api.ts` → `session.svelte.ts` → `AuthForm.svelte`.
 
@@ -18,85 +18,84 @@ workflow first and its persistence/transport implementation second.
 
 ```text
 src/
-  bin/                    process and CLI composition
-  app.rs                  dependency state and public router composition
-  error.rs                application errors and stable HTTP error rendering
-  types/                  shared IDs, actor and exact sequence; DTO facade
+  bin/                          process and CLI composition
+  app.rs                        dependency state and router composition
+  error.rs                      application errors and HTTP error rendering
+  types/                        shared IDs, exact sequence and DTO compatibility facade
   auth/
-    http.rs               cookies, Origin guard, extraction and HTTP results
-    model.rs              request/response DTOs and authenticated session result
-    validation.rs         username and display-name rules
-    service.rs            public registration, login, bootstrap, reset and revocation workflows
-    security.rs           password changes, verified mailbox enrollment and encrypted intents
-    recovery.rs           anonymous verified-mailbox recovery and atomic token resets
-    security_repository.rs credential/email version fences and challenge SQL
-    mail_repository.rs    encrypted queue persistence and leased completion
-    mail_worker.rs        independent bounded delivery and retry lifecycle
-    repository.rs         users/sessions SQL and locking
-    password.rs           bounded Argon2 work
+    http.rs                     cookies, Origin guard and HTTP adapters
+    service.rs                  registration, login and session workflows
+    repository.rs               user/session SQL and locks
+    security/                   credential changes, mailbox enrollment and recovery
+      service.rs                security transactions and encrypted challenge intents
+      recovery.rs               anonymous recovery and atomic token resets
+      repository.rs             credential/email version fences and challenge SQL
+    mail/                       encrypted security-mail queue
+      worker.rs                 bounded provider delivery and retry lifecycle
+      repository.rs             leased queue persistence
+    model.rs, validation.rs, password.rs
   friends/
-    http.rs               authenticated friend/request REST adapters
-    model.rs              paginated contacts and per-person relationship contracts
-    service.rs            consent transitions, friendship policy and transactions
-    repository.rs         canonical pair locks, requests, friendships and refresh jobs
+    http.rs, model.rs            contacts and per-person relationship contracts
+    service.rs                  consent transitions, policy and transaction ownership
+    repository.rs               canonical pair locks, requests and refresh jobs
   conversations/
-    http.rs               REST adapters
-    group_http.rs         private group REST adapters
-    model.rs              conversation/message/event/pagination DTOs
-    service.rs            direct conversation and summary workflows
-    messages.rs           immutable send identity, author mutations and content projection
-    message_http.rs       message mutation/search/context REST adapters
-    message_queries.rs    repeatable history/search/context and authorized replay
-    message_repository.rs message rows, immutable retry metadata and discovery SQL
-    preferences.rs        actor preferences and private durable refresh hints
-    preferences_repository.rs preference persistence and targeted outbox SQL
-    receipts.rs           monotonic read receipts and temporary typing
-    reactions.rs          authorized single-choice revision/event transaction
-    reactions_repository.rs reader-specific counts and single-choice persistence
-    events.rs             transaction-composed event/outbox append
-    repository.rs         conversation/member/message/event SQL
-    groups.rs             atomic initial membership, roles, episodes and invitations
-    group_repository.rs   group/member/invitation SQL and locking
+    http.rs, service.rs          direct creation and authorized summaries
+    repository.rs               aggregate/member/event persistence and snapshot setup
+    model.rs                    shared conversation/message/event HTTP contracts
+    events.rs, receipts.rs      atomic append, monotonic receipts and temporary typing
+    messages/
+      http.rs                   mutation/search/context REST adapters
+      service.rs                immutable sends, edits and withdrawals
+      queries.rs                repeatable history/search/context and replay
+      repository.rs             message rows, retry metadata and discovery SQL
+      reactions.rs              authorized single-choice revision transaction
+      reactions_repository.rs   reaction counts and persistence
+    groups/
+      http.rs                   group REST adapters
+      membership.rs             initial membership, roles and membership episodes
+      invitations.rs            creation, expiry, revocation and consumption
+      repository.rs             group/member/invitation SQL and locks
+    preferences/
+      service.rs                personal preferences and private refresh hints
+      repository.rs             preference persistence and targeted outbox SQL
   notifications/
-    http.rs               authenticated subscription/config/activity adapters
-    model.rs              public capability/config acknowledgement DTOs
-    service.rs            current session, endpoint capability and activity ownership
-    repository.rs         deterministic binding locks and leased activity SQL
-    job_repository.rs     transactional message intent, authorization and lease CAS
-    delivery.rs           current eligibility and generic provider payload
-    worker.rs             independent cancellation, expiry and retry lifecycle
+    http.rs, model.rs            subscription/config/activity REST contracts
+    service.rs, repository.rs    session capabilities, binding locks and activity
+    jobs/repository.rs          message intent, authorization and lease CAS
+    job_repository.rs           explicit compatibility exports for existing consumers
+    delivery.rs                 current eligibility and generic provider payload
+    worker.rs                   cancellation, expiry and retry orchestration
   users/
-    http.rs               profile/search/status REST adapters
-    model.rs              user/profile/status DTOs
-    service.rs            bounded public-profile search, profile rules and presence exports
-    presence.rs           relationship-authorized presence and transition maintenance
-    repository.rs         profile and relationship authorization SQL
+    http.rs, model.rs            profile/search/status contracts
+    service.rs, repository.rs    profile rules, search and relationship authorization
+    presence.rs                 authorized presence and transition maintenance
   media/
-    http.rs               authenticated upload/status/download adapters
-    model.rs              stable metadata and short-lived transfer grants
-    uploads.rs            scoped upload allocation, renewal, completion and cancellation
-    references.rs         authorized downloads and transaction-composed message/avatar binding
-    processing_lifecycle.rs candidate/publication/lease/failure transaction decisions
-    retirement.rs         cleanup/reconciliation fencing and single quota release
-    attachment_repository.rs attachment/object rows, common locks and quota/state SQL
-    upload_repository.rs  upload attempts, sealing and processing enqueue SQL
-    processing_repository.rs processing claims, immutable candidates and lease/job SQL
-    reference_repository.rs message/avatar reference and visibility SQL
-    retirement_repository.rs retirement discovery, tombstones and scheduling SQL
-    service.rs            explicit application compatibility exports
-    repository.rs         explicit persistence/worker compatibility exports
-    processing.rs         bounded image inspection and sanitized variants
-    worker.rs             independent processing, cleanup and retired-key reconciliation
+    http.rs, model.rs            upload/status/download contracts
+    attachment_repository.rs    shared object rows, quota and state locks
+    uploads/                    grant allocation, renewal, completion and cancellation
+    references/                 authorized downloads and message/avatar attachment binding
+    retirement/                 cleanup, reconciliation fencing and single quota release
+    processing/
+      inspection.rs             bounded image inspection and sanitized variants
+      lifecycle.rs              publication, lease and failure transaction decisions
+      repository.rs             claims, immutable candidates and processing SQL
+    worker.rs                   processing and cleanup orchestration
+    service.rs, repository.rs    explicit compatibility exports for existing consumers
   realtime/
-    http.rs               private Centrifugo and metrics HTTP adapters
-    model.rs              proxy and realtime publication DTOs
-    service.rs            connect/refresh authorization and session leases
-    repository.rs         connection/presence/outbox persistence, leased rows and CAS
-    delivery.rs           durable fanout and revoked-client disconnects
-    outbox.rs             cancellation-aware worker orchestration
-    client.rs             bounded Centrifugo HTTP transport and publication compatibility exports
-  infrastructure/         configuration, DB setup, rate limiting and observability
+    http.rs, model.rs            private Centrifugo HTTP contracts
+    service.rs                  authorization and connection session leases
+    repository.rs               connection/presence/outbox rows and lease CAS
+    delivery.rs                 durable fanout and revoked-client disconnects
+    outbox.rs                   cancellation-aware orchestration
+    client.rs                   bounded Centrifugo HTTP transport
+  infrastructure/               concrete configuration, database and external adapters
 ```
+
+Workflow directories place related operations beside their SQL and adapters. Their
+`mod.rs` files expose intentional entry points; old Rust module paths remain explicit
+re-exports where callers rely on them. Small cohesive features stay shallow rather
+than acquiring empty layers. Group invitations share membership policy and aggregate
+locking with membership operations instead of duplicating either responsibility.
 
 The request direction is **HTTP adapter → application operation → repository**.
 Services own transactions so related writes can commit together. Repositories do
@@ -137,6 +136,17 @@ process-over-dotenv precedence remain unchanged; opaque secrets stay strings.
 The realtime repository owns `LeasedJob` because it maps the claimed database row.
 Delivery and orchestration consume that record; persistence does not import either
 workflow. `outbox` re-exports the type to keep its existing public API compatible.
+`realtime::model::OutboxPayload` is the private persisted contract shared by all
+job producers and delivery. Its existing JSON tags and fields are unchanged;
+historical event jobs still default missing membership invalidations to an empty list.
+
+Outbox cancellation covers claim, fanout, retry and completion, including blocked
+SQL. Database phases have bounded deadlines. Completion runs in a caller-owned
+transaction so a blocked update can roll back on cancellation; an already accepted
+commit can still succeed after confirmed delivery. Lost leases are expected CAS
+outcomes, while durable confirmation failures are reported and remain reclaimable.
+Push binding expiry likewise belongs to its delivery workflow, composing job and
+binding repository operations in one transaction under the existing lock order.
 
 `types` explicitly re-exports DTOs to preserve the existing crate consumers and
 OpenAPI names. Internal modules import the specific names they need. The facade
@@ -146,41 +156,48 @@ is a compatibility boundary, not the place to add new unrelated DTO definitions.
 
 ```text
 web/src/
-  routes/                       routing and application composition
+  routes/                       routing, redirects and feature composition
   lib/
-    api-client/                 typed HTTP client, shared errors, generated schema
-    components/ui/              shadcn-svelte presentational controls and primitives
-    utils.ts                    class merging and shared UI prop types
-    styles/                     shared foundation/layout/responsive/theme cascade
+    api-client/                 reusable HTTP transport, errors and generated schema
+    components/ui/              shadcn-svelte presentational primitives
+    styles/                     shared foundation/layout/theme cascade
     features/
-      auth/                     auth API, session lifetime, identity form and styles
-      contacts/                 session query observers, consent UI and accepted-friend pickers
-      settings/                 profile/device API, forms, theme and styles
-        sessions.svelte.ts      query/mutation observers and authenticated device-list lifetime
-      pwa/                      install/update browser lifecycle and consent controls
-      notifications/            session-owned background capability and activity lifecycle
-      media/                    scoped uploads, ephemeral transfer state and previews
+      workspace/                authenticated application composition
+        lifetime.svelte.ts      identity-scoped effects and foreground reconciliation
+        session.ts              feature startup and ordered whole-session teardown
+        WorkspaceShell.svelte   application shell and push activity presentation
+        WorkspaceNavigation.svelte account identity and primary destinations
+      auth/
+        api.ts, session.svelte.ts authentication transport and session identity
+        recovery/               password recovery/reset forms and transient state
+        verification/           email verification form and state
+      contacts/
+        api.ts, contacts.svelte.ts canonical query observers and consent mutations
+        context.svelte.ts       authenticated owner and remembered navigation
+        ContactsPage.svelte     list/detail composition and DOM focus/scroll
+        page.svelte.ts          URL selection, cancellable search/pagination and open-chat flow
+        friends/               friend-list and removal presentation
+        requests/              combined directional request projection and presentation
+      settings/
+        SettingsPage.svelte     settings category composition
+        profile/               editable account dialog, avatar and profile form
+        security/              email and password forms
+        sessions/              device-list query/mutation owner and presentation
+        appearance/            saved theme preference and controls
       chat/
-        api.ts                  typed feature HTTP adapter
-        models.ts               aliases to generated DTOs and application contracts
-        cache.ts                query cache configuration and key ownership
-        conversation-store.ts   summaries, snapshots, history, continuous replay
-        conversation-summaries.ts paginated collection without independent lifetime state
-        conversation-projections.ts pure summary/receipt/last-message projections
-        message-records.ts      revision fences and independently revised reply previews
-        pending-messages.ts     immutable optimistic send/retry records and acknowledgement matching
-        group-actions.svelte.ts group mutation and canonical cache reconciliation
-        history.svelte.ts       search/context ID windows and latest-history navigation
-        message-actions.svelte.ts reply selection, edit drafts and personal preferences
-        notifications.svelte.ts open-page alert policy and ephemeral browser capabilities
-        activity.svelte.ts      temporary typing/presence and timer cleanup
-        sync.svelte.ts          authenticated chat coordinator and UI state
-        realtime.ts             Centrifugo SDK and publication validation
-        context.svelte.ts       application-tree chat context
-        ConversationActions.svelte sidebar menu, dialog visibility and return focus
-        *.svelte                readable, cohesive UI components
-        chat.css                feature styling
-  service-worker/              static cache composition and generic push/click presentation
+        api.ts, models.ts        typed transport and shared application contracts
+        cache.ts, context.svelte.ts canonical query keys and application-tree context
+        ChatShell.svelte        conversation composition
+        sync.svelte.ts          authenticated coordinator and transient UI state
+        conversations/         list/actions/overview, summary collection and projections
+        messages/              timeline/composer, history, edits and optimistic records
+        groups/                group operations, roster cache and dialogs
+        synchronization/       private stream generations, continuous replay and transport
+        notifications/         open-page policy, live candidate floors and presentation
+      media/                    scoped uploads, ephemeral transfers and previews
+      notifications/            private background-push capability lifecycle
+      pwa/                      install/update browser lifecycle and consent controls
+  service-worker/               static cache and generic push/click presentation
 ```
 
 Routes and components consume feature state/API adapters. Transport is reusable
@@ -202,7 +219,10 @@ adaptations.
 
 The query cache owns authoritative server records. The coordinator owns selection,
 drafts and optimistic sends. The conversation store owns per-conversation request
-generations and continuous event cursors. Peer activity owns expiring information.
+generations, continuous event cursors and read-acknowledgement flights. Its public
+status snapshots are read-only; the coordinator requests reload/read operations
+without mutating stream internals. Shared summary/replay flights include error
+handling, so concurrent callers observe one consistent outcome. Peer activity owns expiring information.
 There is no second mutable copy of authoritative messages.
 
 Settings device lists use TanStack Query observers for request cancellation,
@@ -216,15 +236,16 @@ Manually maintained canonical records are retained for the authenticated lifetim
 Query-cache subscriptions report changes but do not pin queries as observers;
 automatic garbage collection must not remove messages while applied stream cursors
 remain live. Membership replacement/removal clears the affected records, and
-logout/coordinator teardown clears the session cache. Settings device-list owners
+chat teardown removes only chat-owned query prefixes. The workspace stops all
+feature owners before clearing the complete authenticated cache. Settings device-list owners
 also abort/fence late responses and remove their own query on teardown.
 
 Pure conversation summary, receipt and preview transforms live in
-`conversation-projections.ts`; `conversation-summaries.ts` owns paginated collection.
+`conversations/conversation-projections.ts`; `conversations/conversation-summaries.ts` owns paginated collection.
 The conversation store retains summary-flight/revision checks, membership episodes
-and stream generations. `pending-messages.ts` freezes optimistic send identity and
+and stream generations. `messages/pending-messages.ts` freezes optimistic send identity and
 content while `ChatSync` retains the existing lifetime and acknowledgement fences.
-`group-actions.svelte.ts` coordinates group mutations with canonical summary/roster
+`groups/group-actions.svelte.ts` coordinates group mutations with canonical summary/roster
 refresh; group components retain inputs, dialogs and presentation.
 
 Background capabilities are private acknowledgements owned by one authenticated
@@ -286,6 +307,8 @@ friend page is never used as an authorization snapshot. Friend-picker search pag
 have active query observers, so relationship invalidation refreshes their results.
 Query text and selected chips remain transient UI. Logout cancels queries,
 mutations and observers.
+Request pages project all participating profiles in one batch within the same
+snapshot, preserving request order and pagination without per-row profile queries.
 
 ## Consistency and lifecycle
 
@@ -304,7 +327,8 @@ mutations and observers.
   releasing quota only during the original confirmed retirement.
 - UI animation and semantic theme layers load before workflow styles in `app.css`.
   Feature styles and shared styles retain their relative cascade order.
-  Shared overrides remain last because their specificity/order is observable.
+  Auth/settings responsive rules live with those features at the former shared
+  responsive import position. Shared overrides remain last because their specificity/order is observable.
   `styles/feature-theme.css` preserves the shared dark form-error theme rule
   immediately after chat styles. Feature-specific auth/settings and application-shell
   selectors live with their owners.
@@ -321,7 +345,19 @@ startup composition and HTTP adapters retain their legitimate adapter dependenci
 Static bracket access, optional calls and expression wrappers are covered; comments,
 strings and unrelated object methods are ignored. Aliases and dynamic property access
 still require review; the guard is not a complete dependency analysis.
-`node scripts/check.mjs` includes those guards and normal format/type/lint/unit/build checks.
+Explicit nested workflow API paths are allowed; a nested component named `api.ts`
+is not an adapter. Guards also reject repository transaction completion/application
+imports, shared dynamic feature imports, and direct whole-cache clearing outside
+the workspace. These source checks supplement compiler and behavioral coverage;
+aliases and arbitrary dynamic expressions still require review.
+
+`web/eslint.config.js` applies ESLint, TypeScript and Svelte recommended rules to
+handwritten application code and tool configuration. Generated schemas are excluded;
+test harnesses retain type, format and behavioral gates. Lifecycle bookkeeping maps
+remain deliberately nonreactive, and root-deployed application paths do not need
+base-path resolution. `pnpm -C web lint` runs semantic checks;
+`pnpm -C web format:check` runs Prettier.
+`node scripts/check.mjs` includes both alongside the architecture/type/unit/build gates.
 Integration checks retain
 real PostgreSQL, Valkey, Centrifugo, SeaweedFS and browsers; they cover the invariants
 above rather than mocking the end-to-end application.
@@ -364,9 +400,9 @@ be paired with content committed after removal or rejoining.
 
 ## Workspace navigation
 
-The authenticated layout composes `ChatShell` for both `/app` and
+The authenticated layout composes `workspace/WorkspaceShell`, which mounts `ChatShell` for both `/app` and
 `/app/chats/:id`, keeping its list mounted when selecting conversations.
-`WorkspaceNavigation` is embedded in each workflow sidebar, combining account
+`workspace/WorkspaceNavigation` is embedded in each workflow sidebar, combining account
 identity and primary destinations without a separate navigation rail. Shared
 fluid column widths (`clamp(288px, 23vw, 400px)`) and `PaneHeader` geometry keep
 workflows aligned without crowding smaller screens. A 240px conversation
@@ -376,7 +412,7 @@ On phones, details replace the sidebar and expose a top-left parent action.
 Feature panes own scrolling. New browsers default to dark appearance; stored
 light, dark, and system preferences remain authoritative.
 
-`settings/AccountMenu` opens the centered `ProfileDialog` directly, with editable
+`settings/profile/AccountMenu` opens the centered `ProfileDialog` directly, with editable
 profile fields, avatar controls, and logout in one place. Editing one's own profile
 never navigates into settings. Settings retains security, notifications,
 appearance and application controls. `PeerDetails` and `GroupDetails` stay local to

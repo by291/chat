@@ -7,13 +7,22 @@ have no `needs` dependencies and do not share a workspace or test containers.
 | Job                       | Shared local command                         | Responsibilities                                                                       | Required tools                     |
 | ------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------- |
 | Backend                   | `node scripts/check.mjs --scope backend`     | Rust fmt/clippy and all Rust tests, including real media/associations                  | Node, Rust, Docker                 |
-| Frontend                  | `node scripts/check.mjs --scope frontend`    | Architecture guards, Svelte/service-worker types, formatting, units and static build   | Node, pnpm                         |
+| Frontend                  | `node scripts/check.mjs --scope frontend`    | Architecture guards, Svelte/service-worker types, ESLint, formatting, units and static build | Node, pnpm                         |
 | Contracts and integration | `node scripts/check.mjs --scope integration` | Generated API consistency, SDK authentication/delivery/presence, recovery and browsers | Node, pnpm, Rust, Docker, Chromium |
 
 Contract generation belongs to the integration job because Rust owns the API and
 the TypeScript generator needs frontend dependencies. Frontend checks use the
 committed schema; the integration job rejects any drift. This lets frontend and
 backend jobs start independently without installing each other's toolchains.
+
+The shared check runner defaults `RUST_TEST_THREADS` to `2` so concurrent Rust
+fixture migrations fit the isolated PostgreSQL server's shared-memory budget.
+An explicit environment value overrides this default. This limits independent
+test fixtures, not the concurrent operations exercised inside each test.
+The root Compose file gives PostgreSQL a 256 MiB `/dev/shm` mount: the image can
+already consume about 61 MiB at startup, leaving insufficient room for dynamic
+query segments under Docker's 64 MiB default. Capacity and fixture concurrency
+are explicit rather than hiding allocation failures with test retries.
 
 Rust, Node, pnpm and Actions references remain pinned. pnpm caches its dependency
 store; the backend and integration jobs cache Cargo dependencies/build artifacts
