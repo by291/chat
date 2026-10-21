@@ -306,7 +306,7 @@ mutations and observers.
   Feature styles and shared styles retain their relative cascade order.
   Shared overrides remain last because their specificity/order is observable.
   `styles/feature-theme.css` preserves the shared dark form-error theme rule
-  immediately after chat styles. Feature-specific auth/settings and application-rail
+  immediately after chat styles. Feature-specific auth/settings and application-shell
   selectors live with their owners.
 
 ## Verification
@@ -366,14 +366,19 @@ be paired with content committed after removal or rejoining.
 
 The authenticated layout composes `ChatShell` for both `/app` and
 `/app/chats/:id`, keeping its list mounted when selecting conversations.
-`WorkspaceNavigation` supplies a 64px desktop rail with chat, contacts and settings
-destinations plus an account menu. Shared column widths and `PaneHeader` geometry
-keep page titles aligned. On narrow screens, lists show bottom navigation and an
-account trigger in the list header; details replace the list and expose a top-left
-parent action. Feature panes own scrolling.
+`WorkspaceNavigation` is embedded in each workflow sidebar, combining account
+identity and primary destinations without a separate navigation rail. Shared
+fluid column widths (`clamp(288px, 23vw, 400px)`) and `PaneHeader` geometry keep
+workflows aligned without crowding smaller screens. A 240px conversation
+overview summarizes canonical profile, preferences, and attachments in loaded
+history above 1180px. Its visibility never changes the timeline's state owner.
+On phones, details replace the sidebar and expose a top-left parent action.
+Feature panes own scrolling. New browsers default to dark appearance; stored
+light, dark, and system preferences remain authoritative.
 
-`settings/AccountMenu` owns the centered `ProfileDialog`; viewing and editing one's
-own profile never navigates into settings. Settings retains security, notifications,
+`settings/AccountMenu` opens the centered `ProfileDialog` directly, with editable
+profile fields, avatar controls, and logout in one place. Editing one's own profile
+never navigates into settings. Settings retains security, notifications,
 appearance and application controls. `PeerDetails` and `GroupDetails` stay local to
 the conversation, using a right-side panel on desktop and a bottom panel on mobile.
 The chat actions menu creates or joins groups; direct chats start from contact details.
@@ -387,7 +392,9 @@ Contacts deep links load canonical pages until the selected record is found.
 Friend search observes server-filtered cache pages; request search loads remaining
 request pages because that endpoint has no query filter. Route cancellation stops
 pagination without cancelling shared cache reads. Incoming and outgoing requests
-share the same person-row list, with outgoing requests selected through its filter.
+appear together in the New Friends tab, sorted by creation time and labeled by
+direction. Direction determines the available actions, not a separate filter.
+Legacy incoming/outgoing deep links resolve to this combined list.
 
 `ChatContext.readingPositions` contains DOM anchors and offsets only, keyed by
 conversation and checked against membership identity. `MessageList` restores the
