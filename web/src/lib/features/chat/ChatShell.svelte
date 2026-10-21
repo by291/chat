@@ -1,7 +1,13 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { goto } from '$app/navigation';
-  import { ArrowLeft, MessageCircle, WifiOff, Users } from '@lucide/svelte';
+  import {
+    ArrowLeft,
+    MessageCircle,
+    WifiOff,
+    Users,
+    PanelRight,
+  } from '@lucide/svelte';
 
   import * as Avatar from '#lib/components/ui/avatar/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
@@ -17,6 +23,7 @@
   import ConversationTools from './ConversationTools.svelte';
   import MessageDialogs from './MessageDialogs.svelte';
   import PeerDetails from './PeerDetails.svelte';
+  import ConversationOverview from './ConversationOverview.svelte';
   import { isGroup, conversationName, membershipId } from './models';
 
   let {
@@ -26,6 +33,7 @@
   } = $props();
 
   const chat = useChat();
+  let overviewOpen = $state(true);
   let connectedBefore = $state(false);
   let selectionPending = $state(false);
 
@@ -91,7 +99,13 @@
         </div>
       {/if}
     </div>
-    <div class="chat-columns workspace-columns">
+    <div
+      class="chat-columns workspace-columns"
+      class:with-overview={overviewOpen &&
+        !!id &&
+        sync.selectedId === id &&
+        !!sync.current}
+    >
       <ConversationList {sync} />
       <section class="chat-panel">
         {#if id}
@@ -148,6 +162,17 @@
             {/if}
             {#if current}
               <ConversationTools {sync} />
+              <Button
+                variant="ghost"
+                size="icon"
+                class="overview-toggle"
+                aria-label="聊天概览"
+                aria-expanded={overviewOpen}
+                aria-controls="conversation-overview"
+                onclick={() => (overviewOpen = !overviewOpen)}
+              >
+                <PanelRight size={18} />
+              </Button>
             {/if}
           </header>
           {#if sync.error}
@@ -189,6 +214,9 @@
           </div>
         {/if}
       </section>
+      {#if overviewOpen && id && sync.selectedId === id && sync.current}
+        <ConversationOverview {sync} />
+      {/if}
     </div>
     <MessageDialogs {sync} />
   </main>

@@ -55,11 +55,6 @@
 </script>
 
 <div class="message-bubble" class:withdrawn={message.withdrawn}>
-  {#if isGroup(sync.current)}
-    <strong class="message-sender">
-      {message.sender_name ?? sync.senderName(message.sender_id)}
-    </strong>
-  {/if}
   {#if message.withdrawn}
     <p class="message-tombstone">此消息已撤回</p>
   {:else}
@@ -84,6 +79,28 @@
     {#each message.attachments ?? [] as attachment (attachment.id)}
       <AttachmentList {attachment} {onLayout} />
     {/each}
+  {/if}
+  <div class="message-meta">
+    {#if edited}
+      <div class="message-edited">已编辑</div>
+    {/if}
+    <time datetime={message.created_at}>{time(message.created_at)}</time>
+    {#if receipt}
+      <div class="message-receipt" aria-label={receipt.label}>
+        {#if receipt.kind === 'read'}
+          <CheckCheck size={13} />
+        {:else if receipt.kind === 'saved'}
+          <Check size={13} />
+        {:else}
+          {receipt.label}
+        {/if}
+      </div>
+    {/if}
+  </div>
+</div>
+
+{#if !message.withdrawn}
+  <div class="message-footer">
     <div class="message-actions" aria-label="消息操作">
       <Button
         type="button"
@@ -113,22 +130,5 @@
       {/if}
     </div>
     <MessageReactions {message} actions={sync.actions} />
-  {/if}
-  <div class="message-meta">
-    {#if edited}
-      <div class="message-edited">已编辑</div>
-    {/if}
-    <time datetime={message.created_at}>{time(message.created_at)}</time>
-    {#if receipt}
-      <div class="message-receipt" aria-label={receipt.label}>
-        {#if receipt.kind === 'read'}
-          <CheckCheck size={13} />
-        {:else if receipt.kind === 'saved'}
-          <Check size={13} />
-        {:else}
-          {receipt.label}
-        {/if}
-      </div>
-    {/if}
   </div>
-</div>
+{/if}

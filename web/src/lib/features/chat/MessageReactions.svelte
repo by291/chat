@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { SmilePlus } from '@lucide/svelte';
+
   import { Button } from '#lib/components/ui/button/index.js';
 
   import type { Message, ReactionKind } from './models';
@@ -65,7 +67,7 @@
     onclick={() => (opened = !opened)}
     onkeydown={escape}
   >
-    <span aria-hidden="true">🙂</span>
+    <SmilePlus size={14} aria-hidden="true" />
   </Button>
   {#if opened}
     <div class="reaction-picker" role="group" aria-label="选择回应">
@@ -96,7 +98,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.25rem;
-    margin-top: 0.25rem;
+    align-items: center;
   }
   .reaction-picker {
     display: flex;

@@ -3,6 +3,10 @@
   import { beforeNavigate, afterNavigate } from '$app/navigation';
   import { ArrowDown, RotateCcw } from '@lucide/svelte';
 
+  import * as Avatar from '#lib/components/ui/avatar/index.js';
+  import { avatarTone } from '#lib/utils.js';
+  import { auth } from '#lib/features/auth/session.svelte.ts';
+
   import { Button } from '#lib/components/ui/button/index.js';
 
   import { useChat } from './context.svelte';
@@ -253,7 +257,27 @@
           class:context-target={sync.history.contextual &&
             sync.history.targetId === message.id}
         >
-          <MessageBubble {sync} {message} onLayout={mediaLayoutChanged} />
+          <Avatar.Root
+            class="message-avatar"
+            data-tone={avatarTone(message.sender_id)}
+            aria-hidden="true"
+          >
+            <Avatar.Fallback>
+              {Array.from(
+                message.sender_id === userId
+                  ? (auth.user?.display_name ?? '我')
+                  : (message.sender_name ?? sync.senderName(message.sender_id)),
+              )[0] ?? '…'}
+            </Avatar.Fallback>
+          </Avatar.Root>
+          <div class="message-stack">
+            <span class="message-sender">
+              {message.sender_id === userId
+                ? '我'
+                : (message.sender_name ?? sync.senderName(message.sender_id))}
+            </span>
+            <MessageBubble {sync} {message} onLayout={mediaLayoutChanged} />
+          </div>
         </article>
       {/each}
       {#each sync.currentPending as message (message.client_message_id)}
