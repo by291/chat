@@ -1,6 +1,6 @@
 //! Session-bound realtime leases and compare-and-set outbox persistence.
 
-use sqlx::PgPool;
+use sqlx::{PgPool, Postgres, Transaction};
 use time::OffsetDateTime;
 
 use crate::types::{ConversationId, SessionId, UserId};
@@ -108,7 +108,10 @@ pub async fn claim(pool: &PgPool, milliseconds: i64) -> Result<Option<LeasedJob>
     .await
 }
 
-pub async fn complete(pool: &PgPool, job: &LeasedJob) -> Result<u64, sqlx::Error> {
+pub async fn complete(
+    transaction: &mut Transaction<'_, Postgres>,
+    job: &LeasedJob,
+) -> Result<u64, sqlx::Error> {
     let result = sqlx::query(
         r#"
         UPDATE outbox
@@ -120,7 +123,7 @@ pub async fn complete(pool: &PgPool, job: &LeasedJob) -> Result<u64, sqlx::Error
     )
     .bind(job.job_id)
     .bind(job.lease_token)
-    .execute(pool)
+    .execute(&mut **transaction)
     .await?;
 
     Ok(result.rows_affected())
