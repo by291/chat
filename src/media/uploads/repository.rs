@@ -3,7 +3,7 @@
 use sqlx::{Postgres, Transaction};
 use time::OffsetDateTime;
 
-use super::{
+use crate::media::{
     attachment_repository::{self, AttachmentRow},
     model::UploadInput,
 };

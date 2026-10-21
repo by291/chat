@@ -2,7 +2,7 @@
 
 use sqlx::{Postgres, Transaction};
 
-use super::{
+use crate::media::{
     attachment_repository::{AttachmentRow, ObjectRow},
     model::AttachmentView,
 };

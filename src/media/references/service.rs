@@ -9,11 +9,11 @@ use std::{collections::BTreeSet, time::Duration};
 use sqlx::{Postgres, Transaction};
 use time::OffsetDateTime;
 
-use super::{
+use crate::media::{
     DOWNLOAD_GRANT_SECONDS, MAX_MESSAGE_ATTACHMENTS,
     attachment_repository::{self, AttachmentRow},
     model::{AttachmentView, DownloadGrant, DownloadVariant},
-    reference_repository,
+    references::repository as reference_repository,
 };
 use crate::{
     AppState,

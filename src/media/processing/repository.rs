@@ -51,7 +51,7 @@ pub async fn claim(pool: &PgPool) -> Result<Option<LeasedJob>, AppError> {
 }
 
 /// Lock the processing row before inspecting a lease or retirement fence.
-pub(super) async fn lock_job(
+pub(crate) async fn lock_job(
     transaction: &mut Transaction<'_, Postgres>,
     attachment_id: AttachmentId,
 ) -> Result<Option<AttachmentId>, AppError> {
@@ -69,7 +69,7 @@ pub(super) async fn lock_job(
 }
 
 /// Check the wall clock after waiting for the job lock, not the transaction-start timestamp.
-pub(super) async fn lock_live_job(
+pub(crate) async fn lock_live_job(
     transaction: &mut Transaction<'_, Postgres>,
     job: &LeasedJob,
 ) -> Result<Option<OffsetDateTime>, AppError> {
@@ -118,7 +118,7 @@ pub async fn lease_live(pool: &PgPool, job: &LeasedJob) -> Result<bool, AppError
 }
 
 /// Extend the live lease and its immutable ledger keys after a separate job-lock statement.
-pub(super) async fn renew_job_and_objects(
+pub(crate) async fn renew_job_and_objects(
     transaction: &mut Transaction<'_, Postgres>,
     job: &LeasedJob,
 ) -> Result<i64, AppError> {
@@ -153,7 +153,7 @@ pub(super) async fn renew_job_and_objects(
 }
 
 /// Insert an immutable key before any external object write can begin.
-pub(super) async fn insert_candidate(
+pub(crate) async fn insert_candidate(
     transaction: &mut Transaction<'_, Postgres>,
     job: &LeasedJob,
     object_id: Uuid,
@@ -184,7 +184,7 @@ pub(super) async fn insert_candidate(
 }
 
 /// Mark one undeleted candidate as published under the already-held live job fence.
-pub(super) async fn publish_object(
+pub(crate) async fn publish_object(
     transaction: &mut Transaction<'_, Postgres>,
     job: &LeasedJob,
     object_id: Uuid,
@@ -213,7 +213,7 @@ pub(super) async fn publish_object(
 }
 
 /// Final publication CAS checks both lease liveness and the attachment lifetime.
-pub(super) async fn finish_publication(
+pub(crate) async fn finish_publication(
     transaction: &mut Transaction<'_, Postgres>,
     job: &LeasedJob,
 ) -> Result<bool, AppError> {
@@ -245,7 +245,7 @@ pub(super) async fn finish_publication(
 }
 
 /// Release only the live generation lease and persist the application-selected retry delay.
-pub(super) async fn defer(pool: &PgPool, job: &LeasedJob, delay: i64) -> Result<(), AppError> {
+pub(crate) async fn defer(pool: &PgPool, job: &LeasedJob, delay: i64) -> Result<(), AppError> {
     sqlx::query(
         r#"
         UPDATE media_jobs
@@ -271,7 +271,7 @@ pub(super) async fn defer(pool: &PgPool, job: &LeasedJob, delay: i64) -> Result<
 }
 
 /// Fence terminal failure to the live generation; stale workers cannot fail an attachment.
-pub(super) async fn finish_failure(
+pub(crate) async fn finish_failure(
     transaction: &mut Transaction<'_, Postgres>,
     job: &LeasedJob,
 ) -> Result<bool, AppError> {

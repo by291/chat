@@ -6,7 +6,7 @@
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use super::{
+use crate::media::{
     UPLOAD_CLEANUP_GRACE_SECONDS,
     attachment_repository::{AttachmentRow, ObjectRow},
 };
@@ -95,7 +95,7 @@ pub async fn cleanup_attachments(pool: &PgPool) -> Result<Vec<AttachmentRow>, Ap
 }
 
 /// Recheck cleanup age/state using the transaction timestamp under attachment locks.
-pub(super) async fn should_expire(
+pub(crate) async fn should_expire(
     transaction: &mut Transaction<'_, Postgres>,
     attachment_id: AttachmentId,
 ) -> Result<bool, AppError> {
@@ -120,7 +120,7 @@ pub(super) async fn should_expire(
 }
 
 /// Select staging attempts only after PUT drain and dependent processing objects have retired.
-pub(super) async fn cleanup_attempts(
+pub(crate) async fn cleanup_attempts(
     transaction: &mut Transaction<'_, Postgres>,
     attachment_id: AttachmentId,
 ) -> Result<Vec<(UploadAttemptId, String)>, AppError> {
@@ -157,7 +157,7 @@ pub(super) async fn cleanup_attempts(
 }
 
 /// Tombstone eligible immutable keys before deletion outside SQL; live leases protect writes.
-pub(super) async fn tombstone_objects(
+pub(crate) async fn tombstone_objects(
     transaction: &mut Transaction<'_, Postgres>,
     attachment_id: AttachmentId,
 ) -> Result<Vec<ObjectRow>, AppError> {
@@ -188,7 +188,7 @@ pub(super) async fn tombstone_objects(
 }
 
 /// Establish the exactly-once staging reservation release after confirmed remote deletion.
-pub(super) async fn retire_attempt(
+pub(crate) async fn retire_attempt(
     transaction: &mut Transaction<'_, Postgres>,
     attempt_id: UploadAttemptId,
 ) -> Result<Option<i64>, AppError> {
@@ -210,7 +210,7 @@ pub(super) async fn retire_attempt(
 }
 
 /// Record deletion only for an object already tombstoned by cleanup.
-pub(super) async fn retire_object(
+pub(crate) async fn retire_object(
     transaction: &mut Transaction<'_, Postgres>,
     object_id: Uuid,
 ) -> Result<(), AppError> {
@@ -230,7 +230,7 @@ pub(super) async fn retire_object(
 }
 
 /// Determine whether any published bytes remain before releasing the ready-byte reservation.
-pub(super) async fn any_published(
+pub(crate) async fn any_published(
     transaction: &mut Transaction<'_, Postgres>,
     attachment_id: AttachmentId,
 ) -> Result<bool, AppError> {
@@ -291,7 +291,7 @@ pub async fn retired_keys(pool: &PgPool) -> Result<Vec<RetiredKey>, AppError> {
 }
 
 /// Recheck the exact retired key, reference visibility and lease after lock acquisition.
-pub(super) async fn reconciliation_eligible(
+pub(crate) async fn reconciliation_eligible(
     transaction: &mut Transaction<'_, Postgres>,
     key: &RetiredKey,
 ) -> Result<bool, AppError> {

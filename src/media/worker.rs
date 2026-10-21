@@ -5,9 +5,12 @@ use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    MAX_UPLOAD_BYTES, attachment_repository, processing, processing_lifecycle,
-    processing_repository::{self, LeasedJob},
-    retirement, retirement_repository, upload_repository,
+    MAX_UPLOAD_BYTES, attachment_repository, processing,
+    processing::lifecycle as processing_lifecycle,
+    processing::repository::{self as processing_repository, LeasedJob},
+    retirement,
+    retirement::repository as retirement_repository,
+    uploads::repository as upload_repository,
 };
 use crate::{AppState, error::AppError};
 

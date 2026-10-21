@@ -7,12 +7,12 @@
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-use super::{
+use crate::error::AppError;
+use crate::media::{
     attachment_repository::{self, AttachmentRow, ObjectRow, ReadyMetadata},
     processing::InspectedMedia,
-    processing_repository::{self, LeasedJob},
+    processing::repository::{self as processing_repository, LeasedJob},
 };
-use crate::error::AppError;
 
 const CANDIDATE_DRAIN_SECONDS: i64 = 20;
 const MAX_RETRY_EXPONENT: u32 = 6;

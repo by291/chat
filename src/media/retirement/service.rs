@@ -6,10 +6,11 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::{
+use crate::media::{
     attachment_repository::{self, AttachmentRow},
-    processing_repository, reference_repository,
-    retirement_repository::{self, CleanupPlan, RetiredKey},
+    processing::repository as processing_repository,
+    references::repository as reference_repository,
+    retirement::repository::{self as retirement_repository, CleanupPlan, RetiredKey},
 };
 use crate::{
     error::AppError,

@@ -8,12 +8,12 @@ use std::time::Duration;
 use sqlx::{Postgres, Transaction};
 use time::OffsetDateTime;
 
-use super::{
+use crate::media::{
     MAX_PENDING_UPLOADS, MAX_UPLOAD_BYTES, UPLOAD_GRANT_SECONDS,
     attachment_repository::{self, AttachmentRow},
     model::{AttachmentPurpose, AttachmentView, CompleteInput, UploadGrant, UploadInput},
-    reference_repository,
-    upload_repository::{self, AttemptRow},
+    references::repository as reference_repository,
+    uploads::repository::{self as upload_repository, AttemptRow},
 };
 use crate::{
     AppState,
