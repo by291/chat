@@ -33,7 +33,7 @@ services:
       retries: 30
 
   centrifugo:
-    image: centrifugo/centrifugo:v6.9.7
+    image: centrifugo/centrifugo:v6.10.2
     command: [centrifugo, -c, /centrifugo/config.json]
     environment:
       CENTRIFUGO_HTTP_API_KEY: ${CENTRIFUGO_API_KEY:?}
